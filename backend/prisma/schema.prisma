@@ -1,15 +1,110 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+}
+
+model Administrador {
+  AdminID     Int      @id @default(autoincrement())
+  Nome        String
+  Email       String   @unique
+  SenhaHash   String
+  Cargo       String?
+  NivelAcesso Int      @default(1)
+  Ativo       Boolean  @default(true)
+  CriadoEm    DateTime @default(now())
+}
+
+model Cliente {
+  ClienteID          Int        @id @default(autoincrement())
+  CodigoCliente      Int        @unique @default(autoincrement())
+  NomeCompleto       String
+  DataNascimento     DateTime?
+  TipoPessoa         String?
+  CPF_CNPJ           String     @unique @db.VarChar(20)
+  TelefoneFixo       String?
+  TelefoneCelular    String?
+  Whatsapp           String?
+  Email              String     @unique
+  InscricaoEstadual  String?
+  InscricaoMunicipal String?
+  RazaoSocial        String?
+  SenhaHash          String
+  enderecos          Endereco[]
+  pedidos            Pedido[]
+}
+
+model Endereco {
+  EnderecoID   Int      @id @default(autoincrement())
+  ClienteID    Int
+  Nome         String
+  Complemento  String?
+  CEP          String
+  CodigoIBGE   String?
+  Cidade       String
+  UF           String
+  TipoEndereco String   @default("Residencial")
+  cliente      Cliente  @relation(fields: [ClienteID], references: [ClienteID])
+  pedidos      Pedido[]
+}
+
+model Categoria {
+  CategoriaID Int       @id @default(autoincrement())
+  Nome        String
+  produtos    Produto[]
+}
+
+model Produto {
+  ProdutoID   Int           @id @default(autoincrement())
+  Nome        String
+  Descricao   String?
+  Preco       Float
+  Estoque     Int           @default(0)
+  CategoriaID Int
+  categoria   Categoria     @relation(fields: [CategoriaID], references: [CategoriaID])
+  itensPedido ItensPedido[]
+}
+
+model Pedido {
+  PedidoID   Int                @id @default(autoincrement())
+  ClienteID  Int
+  EnderecoID Int
+  DataPedido DateTime           @default(now())
+  Status     String?
+  Total      Float
+  cliente    Cliente            @relation(fields: [ClienteID], references: [ClienteID])
+  endereco   Endereco           @relation(fields: [EnderecoID], references: [EnderecoID])
+  itens      ItensPedido[]
+  pagamentos PagamentosPedido[]
+}
+
+model ItensPedido {
+  ItemID        Int     @id @default(autoincrement())
+  PedidoID      Int
+  ProdutoID     Int
+  Quantidade    Int
+  PrecoUnitario Float
+  pedido        Pedido  @relation(fields: [PedidoID], references: [PedidoID])
+  produto       Produto @relation(fields: [ProdutoID], references: [ProdutoID])
+}
+
+model MetodoPagamento {
+  MetodoID   Int                @id @default(autoincrement())
+  Nome       String
+  Ativo      Boolean            @default(true)
+  pagamentos PagamentosPedido[]
+}
+
+model PagamentosPedido {
+  PagamentoID     Int             @id @default(autoincrement())
+  PedidoID        Int
+  MetodoID        Int
+  ValorPago       Float
+  StatusPagamento String          @default("Pendente")
+  DataPagamento   DateTime        @default(now())
+  pedido          Pedido          @relation(fields: [PedidoID], references: [PedidoID])
+  metodo          MetodoPagamento @relation(fields: [MetodoID], references: [MetodoID])
 }
