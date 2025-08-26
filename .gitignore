@@ -32,3 +32,12 @@ Thumbs.db
 # Coverage
 coverage/
 **/coverage/
+
+# Docker
+.env.docker
+docker-compose.override.yml
+postgres_data/
+
+# Prisma
+**/prisma/migrations/
+!**/prisma/migrations/.gitkeep

@@ -20,11 +20,11 @@ model Administrador {
 
 model Cliente {
   ClienteID          Int        @id @default(autoincrement())
-  CodigoCliente      Int        @unique @default(autoincrement())
+  CodigoCliente      Int        @unique
   NomeCompleto       String
   DataNascimento     DateTime?
   TipoPessoa         String?
-  CPF_CNPJ           String     @unique @db.VarChar(20)
+  CPF_CNPJ           String     @unique @db.VarChar(255)
   TelefoneFixo       String?
   TelefoneCelular    String?
   Whatsapp           String?
@@ -41,12 +41,14 @@ model Endereco {
   EnderecoID   Int      @id @default(autoincrement())
   ClienteID    Int
   Nome         String
+  Numero       String?  
   Complemento  String?
   CEP          String
   CodigoIBGE   String?
   Cidade       String
   UF           String
   TipoEndereco String   @default("Residencial")
+  Bairro       String
   cliente      Cliente  @relation(fields: [ClienteID], references: [ClienteID])
   pedidos      Pedido[]
 }

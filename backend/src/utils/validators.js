@@ -55,9 +55,29 @@ const validateCEP = (cep) => {
   };
 };
 
+const validateCodigoIBGE = (codigo) => {
+  if (!codigo || codigo.trim() === '') {
+    return {
+      isValid: true, // Campo opcional
+      formatted: null,
+      errors: []
+    };
+  }
+  
+  const cleanCodigo = codigo.replace(/[^\d]/g, '');
+  const isValid = /^\d{7}$/.test(cleanCodigo); // Código IBGE tem 7 dígitos
+  
+  return {
+    isValid,
+    formatted: cleanCodigo,
+    errors: isValid ? [] : ['Código IBGE deve ter 7 dígitos']
+  };
+};
+
 module.exports = {
   validatePassword,
   validateDocument,
   validateEmail,
-  validateCEP
+  validateCEP,
+  validateCodigoIBGE
 };
