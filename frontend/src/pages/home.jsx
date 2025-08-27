@@ -56,22 +56,22 @@ function Home() {
       {/* Header */}
       <header className="bg-white shadow-sm border-b sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+          <div className="flex justify-between items-center h-14 sm:h-16">
             <div className="flex items-center">
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-sky-500 bg-clip-text text-transparent">
+              <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-600 to-sky-500 bg-clip-text text-transparent">
                 E-commerce
               </h1>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               <Link 
                 to="/login"
-                className="text-slate-600 hover:text-slate-900 font-medium transition-colors"
+                className="text-slate-600 hover:text-slate-900 font-medium transition-colors text-sm sm:text-base"
               >
                 Entrar
               </Link>
               <Link 
                 to="/cadastro"
-                className="bg-gradient-to-r from-blue-600 to-sky-500 text-white px-4 py-2 rounded-lg font-medium hover:shadow-lg hover:scale-105 transition-all duration-300"
+                className="bg-gradient-to-r from-blue-600 to-sky-500 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg font-medium hover:shadow-lg hover:scale-105 transition-all duration-300 text-sm sm:text-base"
               >
                 Criar Conta
               </Link>
@@ -81,25 +81,25 @@ function Home() {
       </header>
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-blue-50 to-sky-50 py-20">
+      <section className="bg-gradient-to-br from-blue-50 to-sky-50 py-12 sm:py-16 lg:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h1 className="text-4xl md:text-6xl font-bold text-slate-800 mb-6">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-slate-800 mb-4 sm:mb-6">
               Sua loja online
               <span className="block bg-gradient-to-r from-blue-600 to-sky-500 bg-clip-text text-transparent">
                 completa
               </span>
             </h1>
-            <p className="text-xl text-slate-600 mb-8 max-w-3xl mx-auto">
+            <p className="text-lg sm:text-xl text-slate-600 mb-6 sm:mb-8 max-w-3xl mx-auto px-4">
               Encontre tudo o que você precisa em um só lugar. 
               Cadastre-se como pessoa física ou jurídica e aproveite nossas ofertas exclusivas.
             </p>
             
             {/* Botões de ação */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-8 sm:mb-12 px-4">
               <Link 
                 to="/cadastro"
-                className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-600 to-sky-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
+                className="inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-blue-600 to-sky-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 text-sm sm:text-base"
               >
                 <FaShoppingCart />
                 Começar a Comprar
@@ -108,7 +108,7 @@ function Home() {
               
               <Link 
                 to="/login"
-                className="inline-flex items-center gap-2 px-8 py-4 bg-white text-slate-700 font-semibold rounded-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 border border-slate-200"
+                className="inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-4 bg-white text-slate-700 font-semibold rounded-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 border border-slate-200 text-sm sm:text-base"
               >
                 Já tenho conta
                 <FiArrowRight />
@@ -116,19 +116,19 @@ function Home() {
             </div>
 
             {/* Tipos de conta */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
-              <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-200 hover:shadow-xl transition-shadow">
-                <FaUser className="text-4xl text-blue-500 mx-auto mb-4" />
-                <h3 className="text-xl font-bold text-slate-800 mb-2">Pessoa Física</h3>
-                <p className="text-slate-600">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 max-w-2xl mx-auto px-4">
+              <div className="bg-white p-4 sm:p-6 rounded-xl shadow-lg border border-slate-200 hover:shadow-xl transition-shadow">
+                <FaUser className="text-3xl sm:text-4xl text-blue-500 mx-auto mb-3 sm:mb-4" />
+                <h3 className="text-lg sm:text-xl font-bold text-slate-800 mb-2">Pessoa Física</h3>
+                <p className="text-slate-600 text-sm sm:text-base">
                   Cadastro rápido para compras pessoais com CPF
                 </p>
               </div>
               
-              <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-200 hover:shadow-xl transition-shadow">
-                <FaBuilding className="text-4xl text-blue-500 mx-auto mb-4" />
-                <h3 className="text-xl font-bold text-slate-800 mb-2">Pessoa Jurídica</h3>
-                <p className="text-slate-600">
+              <div className="bg-white p-4 sm:p-6 rounded-xl shadow-lg border border-slate-200 hover:shadow-xl transition-shadow">
+                <FaBuilding className="text-3xl sm:text-4xl text-blue-500 mx-auto mb-3 sm:mb-4" />
+                <h3 className="text-lg sm:text-xl font-bold text-slate-800 mb-2">Pessoa Jurídica</h3>
+                <p className="text-slate-600 text-sm sm:text-base">
                   Soluções empresariais com CNPJ e condições especiais
                 </p>
               </div>

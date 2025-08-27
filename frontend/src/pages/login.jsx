@@ -2,21 +2,22 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FaEnvelope, FaLock, FaUser, FaBuilding } from 'react-icons/fa';
 import { FiArrowRight, FiLoader, FiEye, FiEyeOff, FiCheckCircle } from 'react-icons/fi';
+import { baseUrl } from "../config/api";
 
 // Componente para a tela de sucesso do login
 const TelaLoginSucesso = ({ dadosCliente }) => (
-  <div className="w-full min-h-screen flex flex-col items-center justify-center text-center p-6 bg-slate-50 animate-fade-in">
-    <FiCheckCircle className="text-7xl text-green-500 mb-6" />
-    <h2 className="text-4xl md:text-5xl font-bold mb-4 text-slate-800">
+  <div className="w-full min-h-screen flex flex-col items-center justify-center text-center p-4 sm:p-6 bg-slate-50 animate-fade-in">
+    <FiCheckCircle className="text-6xl sm:text-7xl text-green-500 mb-6" />
+    <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 text-slate-800">
       Bem-vindo de volta!
     </h2>
-    <p className="text-slate-500 mb-8 max-w-md">Login realizado com sucesso. Redirecionando para o painel...</p>
-    <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
-      <p className="text-slate-500 text-sm uppercase">Logado como</p>
-      <p className="text-2xl font-bold text-blue-600 my-2">
+    <p className="text-slate-500 mb-8 max-w-md text-sm sm:text-base">Login realizado com sucesso. Redirecionando para o painel...</p>
+    <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200 w-full max-w-sm">
+      <p className="text-slate-500 text-xs sm:text-sm uppercase">Logado como</p>
+      <p className="text-xl sm:text-2xl font-bold text-blue-600 my-2 break-words">
         {dadosCliente.nome}
       </p>
-      <p className="text-slate-500 text-sm">
+      <p className="text-slate-500 text-xs sm:text-sm break-all">
         {dadosCliente.email}
       </p>
     </div>
@@ -38,7 +39,6 @@ function Login() {
   const lidarComAlteracao = (e) => {
     const { name, value } = e.target;
     setDadosLogin(prev => ({ ...prev, [name]: value }));
-    // Limpar erros quando o usuário começar a digitar
     if (erros.length > 0) {
       setErros([]);
     }
@@ -49,7 +49,6 @@ function Login() {
     setCarregando(true);
     setErros([]);
 
-    // Validações básicas no frontend
     const errosValidacao = [];
     if (!dadosLogin.email.trim()) {
       errosValidacao.push('Email é obrigatório');
@@ -65,7 +64,7 @@ function Login() {
     }
 
     try {
-      const response = await fetch("http://localhost:3001/clientes/login", {
+      const response = await fetch(`${baseUrl}/clientes/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -80,13 +79,10 @@ function Login() {
         throw new Error(data.errors?.join('\n') || 'Erro ao fazer login');
       }
 
-      // Login bem-sucedido
       setLoginSucesso(data.data);
-      
-      // Simular redirecionamento após 2 segundos
+
       setTimeout(() => {
-        // Aqui você pode redirecionar para o dashboard/painel
-        navigate('/dashboard'); // ou a rota que você quiser
+        navigate('/dashboard'); 
       }, 2000);
 
     } catch (error) {
@@ -98,12 +94,10 @@ function Login() {
     }
   };
 
-  // Se login foi bem-sucedido, mostrar tela de sucesso
   if (loginSucesso) {
     return <TelaLoginSucesso dadosCliente={loginSucesso} />;
   }
 
-  // --- Estilos (reutilizando do cadastro) ---
   const classeGrupoInput = "relative mb-6";
   const classeInput = "w-full pl-12 pr-4 py-3 bg-white border-2 border-slate-200 rounded-lg shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300";
   const classeIconeInput = "absolute left-4 top-1/2 -translate-y-1/2 text-slate-400";
@@ -114,12 +108,28 @@ function Login() {
     <main className="min-h-screen bg-white text-slate-800 font-sans">
       <div className="flex flex-col md:flex-row min-h-screen">
         {/* Sidebar com informações */}
-        <aside className="w-full md:w-1/3 lg:w-1/4 p-6 md:p-8 bg-gradient-to-br from-blue-600 to-sky-500 text-white border-b md:border-b-0">
+        <aside className="w-full md:w-1/3 lg:w-1/4 p-4 sm:p-6 md:p-8 bg-gradient-to-br from-blue-600 to-sky-500 text-white border-b md:border-b-0">
           <div className="md:sticky md:top-8">
-            <h1 className="text-2xl md:text-3xl font-bold mb-2">Fazer Login</h1>
-            <p className="text-blue-100 mb-8 hidden md:block">Acesse sua conta para continuar suas compras.</p>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2">Fazer Login</h1>
+            <p className="text-blue-100 mb-6 md:mb-8 text-sm sm:text-base hidden md:block">Acesse sua conta para continuar suas compras.</p>
             
-            {/* Ícones decorativos */}
+            {/* Ícones decorativos - Mobile */}
+            <div className="flex md:hidden justify-center space-x-8 mb-4">
+              <div className="flex flex-col items-center">
+                <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center mb-2">
+                  <FaUser className="text-white text-sm" />
+                </div>
+                <p className="text-blue-100 text-xs text-center">Pessoa<br/>Física</p>
+              </div>
+              <div className="flex flex-col items-center">
+                <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center mb-2">
+                  <FaBuilding className="text-white text-sm" />
+                </div>
+                <p className="text-blue-100 text-xs text-center">Pessoa<br/>Jurídica</p>
+              </div>
+            </div>
+            
+            {/* Ícones decorativos - Desktop */}
             <div className="hidden md:flex flex-col space-y-6 mt-12">
               <div className="flex items-center space-x-4">
                 <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
@@ -144,10 +154,10 @@ function Login() {
         </aside>
 
         {/* Formulário de login */}
-        <div className="w-full p-6 md:p-16 flex flex-col justify-center bg-slate-50">
+        <div className="w-full p-4 sm:p-6 md:p-16 flex flex-col justify-center bg-slate-50">
           <div className="w-full max-w-md mx-auto">
             <form onSubmit={enviarLogin} className="animate-fade-in">
-              <h2 className="text-3xl font-bold mb-8 text-slate-800">Entre na sua conta</h2>
+              <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-slate-800">Entre na sua conta</h2>
               
               {/* Campo Email */}
               <div className={classeGrupoInput}>

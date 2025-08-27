@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider          = "postgresql"
-  url               = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Administrador {
@@ -16,6 +16,16 @@ model Administrador {
   NivelAcesso Int      @default(1)
   Ativo       Boolean  @default(true)
   CriadoEm    DateTime @default(now())
+
+  @@map("Administrador")
+}
+
+model Categoria {
+  CategoriaID Int       @id @default(autoincrement())
+  Nome        String
+  produtos    Produto[]
+
+  @@map("Categoria")
 }
 
 model Cliente {
@@ -35,28 +45,26 @@ model Cliente {
   SenhaHash          String
   enderecos          Endereco[]
   pedidos            Pedido[]
+
+  @@map("Cliente")
 }
 
 model Endereco {
   EnderecoID   Int      @id @default(autoincrement())
   ClienteID    Int
   Nome         String
-  Numero       String?  
   Complemento  String?
   CEP          String
   CodigoIBGE   String?
   Cidade       String
   UF           String
   TipoEndereco String   @default("Residencial")
+  Numero       String?
   Bairro       String
   cliente      Cliente  @relation(fields: [ClienteID], references: [ClienteID])
-  pedidos      Pedido[]
-}
+  Pedido       Pedido[]
 
-model Categoria {
-  CategoriaID Int       @id @default(autoincrement())
-  Nome        String
-  produtos    Produto[]
+  @@map("Endereco")
 }
 
 model Produto {
@@ -66,21 +74,25 @@ model Produto {
   Preco       Float
   Estoque     Int           @default(0)
   CategoriaID Int
-  categoria   Categoria     @relation(fields: [CategoriaID], references: [CategoriaID])
   itensPedido ItensPedido[]
+  categoria   Categoria     @relation(fields: [CategoriaID], references: [CategoriaID])
+
+  @@map("Produto")
 }
 
 model Pedido {
-  PedidoID   Int                @id @default(autoincrement())
-  ClienteID  Int
-  EnderecoID Int
-  DataPedido DateTime           @default(now())
-  Status     String?
-  Total      Float
-  cliente    Cliente            @relation(fields: [ClienteID], references: [ClienteID])
-  endereco   Endereco           @relation(fields: [EnderecoID], references: [EnderecoID])
-  itens      ItensPedido[]
-  pagamentos PagamentosPedido[]
+  PedidoID         Int                @id @default(autoincrement())
+  ClienteID        Int
+  EnderecoID       Int
+  DataPedido       DateTime           @default(now())
+  Status           String?
+  Total            Float
+  itensPedido      ItensPedido[]
+  pagamentosPedido PagamentosPedido[]
+  cliente          Cliente            @relation(fields: [ClienteID], references: [ClienteID])
+  Endereco         Endereco           @relation(fields: [EnderecoID], references: [EnderecoID])
+
+  @@map("Pedido")
 }
 
 model ItensPedido {
@@ -91,13 +103,17 @@ model ItensPedido {
   PrecoUnitario Float
   pedido        Pedido  @relation(fields: [PedidoID], references: [PedidoID])
   produto       Produto @relation(fields: [ProdutoID], references: [ProdutoID])
+
+  @@map("ItensPedido")
 }
 
 model MetodoPagamento {
-  MetodoID   Int                @id @default(autoincrement())
-  Nome       String
-  Ativo      Boolean            @default(true)
-  pagamentos PagamentosPedido[]
+  MetodoID         Int                @id @default(autoincrement())
+  Nome             String
+  Ativo            Boolean            @default(true)
+  PagamentosPedido PagamentosPedido[]
+
+  @@map("MetodoPagamento")
 }
 
 model PagamentosPedido {
@@ -107,6 +123,8 @@ model PagamentosPedido {
   ValorPago       Float
   StatusPagamento String          @default("Pendente")
   DataPagamento   DateTime        @default(now())
+  MetodoPagamento MetodoPagamento @relation(fields: [MetodoID], references: [MetodoID])
   pedido          Pedido          @relation(fields: [PedidoID], references: [PedidoID])
-  metodo          MetodoPagamento @relation(fields: [MetodoID], references: [MetodoID])
+
+  @@map("PagamentosPedido")
 }

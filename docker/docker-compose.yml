@@ -12,7 +12,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ../backend/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - ecommerce-network
     healthcheck:
@@ -24,12 +24,12 @@ services:
   # Backend API
   backend:
     build:
-      context: ./backend
+      context: ../backend
       dockerfile: Dockerfile
     container_name: ecommerce-backend
     restart: unless-stopped
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
       DATABASE_URL: postgresql://postgres:postgres123@postgres:5432/projeto_ecommerce
       PORT: 3001
     ports:
@@ -40,13 +40,20 @@ services:
     networks:
       - ecommerce-network
     volumes:
-      - ./backend:/app
+      - ../backend:/app
       - /app/node_modules
+    develop:
+      watch:
+        - action: sync
+          path: ../backend/src
+          target: /app/src
+        - action: rebuild
+          path: ../backend/package.json
 
   # Frontend React
   frontend:
     build:
-      context: ./frontend
+      context: ../frontend
       dockerfile: Dockerfile
     container_name: ecommerce-frontend
     restart: unless-stopped
@@ -59,8 +66,15 @@ services:
     networks:
       - ecommerce-network
     volumes:
-      - ./frontend:/app
+      - ../frontend:/app
       - /app/node_modules
+    develop:
+      watch:
+        - action: sync
+          path: ../frontend/src
+          target: /app/src
+        - action: rebuild
+          path: ../frontend/package.json
 
 volumes:
   postgres_data:

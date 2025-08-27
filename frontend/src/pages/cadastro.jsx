@@ -1,83 +1,95 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { FaUser, FaBuilding, FaEnvelope, FaLock, FaMapMarkerAlt, FaPhone, FaIdCard, FaCity, FaWhatsapp } from 'react-icons/fa';
-import { FiArrowRight, FiArrowLeft, FiCheckCircle, FiLoader, FiEye, FiEyeOff } from 'react-icons/fi';
+import { FaUser, FaBuilding, FaEnvelope, FaMapMarkerAlt, FaPhone, FaIdCard, FaCity, FaWhatsapp } from 'react-icons/fa';
+import { FiArrowRight, FiArrowLeft, FiCheckCircle, FiLoader } from 'react-icons/fi';
 import { InputMask } from '@react-input/mask';
+import InputSenha from '../components/InputSenha';
+import { mascararCPF, mascararCNPJ, mascararTelefone, mascararCEP } from '../utils/mascaras';
+import { useBuscarCep } from '../hooks/useBuscarCep';
+import { criarCliente } from '../services/clientesApi';
 
-// Componente para a barra de progresso (agora responsiva)
+
 const IndicadorEtapa = ({ etapaAtual, etapas }) => (
-  <aside className="w-full md:w-1/3 lg:w-1/4 p-6 md:p-8 bg-white md:bg-slate-50/50 border-b md:border-b-0 md:border-r border-slate-200">
+  <aside className="w-full md:w-1/3 lg:w-1/4 p-4 sm:p-6 md:p-8 bg-white md:bg-slate-50/50 border-b md:border-b-0 md:border-r border-slate-200">
     <div className="md:sticky md:top-8">
-      <h1 className="text-2xl md:text-3xl font-bold text-slate-800 mb-2">Criar Conta</h1>
-      <p className="text-slate-500 mb-8 hidden md:block">Siga os passos para se juntar a nós.</p>
+      <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-800 mb-2">Criar Conta</h1>
+      <p className="text-slate-500 mb-6 md:mb-8 hidden md:block">Siga os passos para se juntar a nós.</p>
       <nav>
         {/* Layout para Desktop */}
         <ul className="hidden md:block">
           {etapas.map((etapa, index) => (
-            <li key={index} className="mb-6">
+            <li key={index} className="mb-4 lg:mb-6">
               <div className={`flex items-center transition-all duration-300 ${etapaAtual === index + 1 ? 'text-blue-600' : 'text-slate-400'}`}>
-                <div className={`w-10 h-10 rounded-full border-2 flex items-center justify-center mr-4 ${etapaAtual >= index + 1 ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300'}`}>
+                <div className={`w-8 h-8 lg:w-10 lg:h-10 rounded-full border-2 flex items-center justify-center mr-3 lg:mr-4 text-sm lg:text-base ${etapaAtual >= index + 1 ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300'}`}>
                   {etapaAtual > index + 1 ? <FiCheckCircle /> : etapa.icon}
                 </div>
                 <div>
                   <p className="text-xs uppercase font-semibold">Passo {index + 1}</p>
-                  <p className="font-bold text-lg text-slate-700">{etapa.name}</p>
+                  <p className="font-bold text-base lg:text-lg text-slate-700">{etapa.name}</p>
                 </div>
               </div>
             </li>
           ))}
         </ul>
         {/* Layout para Mobile */}
-        <div className="md:hidden flex items-center justify-between">
-          <p className="font-bold text-slate-700">{etapas[etapaAtual - 1].name}</p>
-          <p className="text-sm text-slate-500">Passo {etapaAtual} de {etapas.length}</p>
+        <div className="md:hidden">
+          <div className="flex items-center justify-between mb-4">
+            <p className="font-bold text-slate-700 text-base sm:text-lg">{etapas[etapaAtual - 1].name}</p>
+            <p className="text-xs sm:text-sm text-slate-500">Passo {etapaAtual} de {etapas.length}</p>
+          </div>
+          {/* Barra de progresso mobile */}
+          <div className="w-full bg-slate-200 rounded-full h-2">
+            <div 
+              className="bg-gradient-to-r from-blue-600 to-sky-500 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${(etapaAtual / etapas.length) * 100}%` }}
+            ></div>
+          </div>
         </div>
       </nav>
     </div>
   </aside>
 );
 
-// Componente para a tela de seleção inicial
+
 const SelecaoTipo = ({ onSelecionar }) => (
-  <div className="w-full min-h-screen flex flex-col items-center justify-center text-center p-6 bg-slate-50 animate-fade-in">
-    <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-sky-500 bg-clip-text text-transparent">
+  <div className="w-full min-h-screen flex flex-col items-center justify-center text-center p-4 sm:p-6 bg-slate-50 animate-fade-in">
+    <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-sky-500 bg-clip-text text-transparent">
       Vamos Começar
     </h2>
-    <p className="text-slate-500 mb-12 max-w-md">Para começar, selecione o tipo de conta que você deseja criar.</p>
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl">
+    <p className="text-slate-500 mb-8 sm:mb-12 max-w-md text-sm sm:text-base">Para começar, selecione o tipo de conta que você deseja criar.</p>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 w-full max-w-2xl">
       <button
         onClick={() => onSelecionar("fisica")}
-        className="group p-8 bg-white rounded-2xl shadow-lg border border-transparent hover:border-blue-500 hover:scale-105 transition-all duration-300"
+        className="group p-6 sm:p-8 bg-white rounded-2xl shadow-lg border border-transparent hover:border-blue-500 hover:scale-105 active:scale-95 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
       >
-        <FaUser className="text-5xl text-blue-500 mx-auto mb-4 transition-colors" />
-        <h3 className="text-2xl font-bold text-slate-800">Pessoa Física</h3>
-        <p className="text-slate-500">Para contas pessoais e autônomas.</p>
+        <FaUser className="text-4xl sm:text-5xl text-blue-500 mx-auto mb-4 transition-colors" />
+        <h3 className="text-xl sm:text-2xl font-bold text-slate-800 mb-2">Pessoa Física</h3>
+        <p className="text-slate-500 text-sm sm:text-base">Para contas pessoais e autônomas.</p>
       </button>
       <button
         onClick={() => onSelecionar("juridica")}
-        className="group p-8 bg-white rounded-2xl shadow-lg border border-transparent hover:border-blue-500 hover:scale-105 transition-all duration-300"
+        className="group p-6 sm:p-8 bg-white rounded-2xl shadow-lg border border-transparent hover:border-blue-500 hover:scale-105 active:scale-95 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
       >
-        <FaBuilding className="text-5xl text-blue-500 mx-auto mb-4 transition-colors" />
-        <h3 className="text-2xl font-bold text-slate-800">Pessoa Jurídica</h3>
-        <p className="text-slate-500">Para empresas e organizações.</p>
+        <FaBuilding className="text-4xl sm:text-5xl text-blue-500 mx-auto mb-4 transition-colors" />
+        <h3 className="text-xl sm:text-2xl font-bold text-slate-800 mb-2">Pessoa Jurídica</h3>
+        <p className="text-slate-500 text-sm sm:text-base">Para empresas e organizações.</p>
       </button>
     </div>
-    {/* --- BOTÃO DE LOGIN ADICIONADO AQUI --- */}
-    <div className="mt-12 text-center">
-        <p className="text-slate-500">
-            Já possui uma conta?{' '}
-            <Link
-                to="/login"
-                className="font-semibold text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 rounded"
-            >
-                Faça Login
-            </Link>
-        </p>
+    <div className="mt-8 sm:mt-12 text-center">
+      <p className="text-slate-500 text-sm sm:text-base">
+        Já possui uma conta?{' '}
+        <Link
+          to="/login"
+          className="font-semibold text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 rounded"
+        >
+          Faça Login
+        </Link>
+      </p>
     </div>
   </div>
 );
 
-// Nova tela de sucesso para exibir o código do cliente
+
 const TelaSucesso = ({ codigoCliente }) => (
   <div className="w-full min-h-screen flex flex-col items-center justify-center text-center p-6 bg-slate-50 animate-fade-in">
     <FiCheckCircle className="text-7xl text-green-500 mb-6" />
@@ -91,7 +103,6 @@ const TelaSucesso = ({ codigoCliente }) => (
         {codigoCliente}
       </p>
     </div>
-    {/* --- BOTÃO "CONCLUIR" ATUALIZADO PARA "IR PARA LOGIN" --- */}
     <Link
       to="/login"
       className="mt-12 px-8 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-sky-500 shadow-md hover:shadow-lg hover:scale-105 transition-all duration-300 inline-block"
@@ -124,21 +135,14 @@ function Cadastro() {
     estado: "",
     cep: "",
     codigoIBGE: "",
-    dataNascimento: "", // Adicionado para evitar erro no input de data
+    dataNascimento: "", 
   });
 
   const [erros, setErros] = useState([]);
   const [carregando, setCarregando] = useState(false);
-  const [carregandoCep, setCarregandoCep] = useState(false);
+  const { buscarCep, carregandoCep } = useBuscarCep();
   const [animacao, setAnimacao] = useState(false);
-  const [mostrarSenha, setMostrarSenha] = useState(false);
   const [novoCodigoCliente, setNovoCodigoCliente] = useState(null);
-  const [mostrarRegras, setMostrarRegras] = useState(false);
-  const [temComprimento, setTemComprimento] = useState(false);
-  const [temMaiuscula, setTemMaiuscula] = useState(false);
-  const [temMinuscula, setTemMinuscula] = useState(false);
-  const [temNumero, setTemNumero] = useState(false);
-  const [temEspecial, setTemEspecial] = useState(false);
 
   useEffect(() => {
     setAnimacao(true);
@@ -146,70 +150,41 @@ function Cadastro() {
     return () => clearTimeout(timer);
   }, [etapaAtual]);
 
-  useEffect(() => {
-    const senha = dadosFormulario.senha;
-    setTemComprimento(senha.length >= 8);
-    setTemMaiuscula(/[A-Z]/.test(senha));
-    setTemMinuscula(/[a-z]/.test(senha));
-    setTemNumero(/\d/.test(senha));
-    setTemEspecial(/[^A-Za-z0-9]/.test(senha));
-  }, [dadosFormulario.senha]);
-
+  
   const proximaEtapa = () => {
-    setErros([]); // Limpar erros ao avançar
+    setErros([]); 
     setEtapaAtual((prev) => prev + 1);
   };
   const etapaAnterior = () => {
-    setErros([]); // Limpar erros ao voltar
+    setErros([]); 
     setEtapaAtual((prev) => prev - 1);
   };
 
-  const buscarCep = async (cep) => {
-    const cepLimpo = cep.replace(/\D/g, '');
-    if (cepLimpo.length !== 8) return;
-
-    setCarregandoCep(true);
-    setErros([]);
-    try {
-      const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
-      const data = await response.json();
-      if (data.erro) {
-        setErros(["CEP não encontrado."]);
-      } else {
-        setDadosFormulario((prev) => ({
-          ...prev,
-          endereco: data.logradouro,
-          bairro: data.bairro,
-          cidade: data.localidade,
-          estado: data.uf,
-        }));
-      }
-    } catch (error) {
-      setErros(["Erro ao buscar CEP."]);
-    } finally {
-      setCarregandoCep(false);
-    }
-  };
-
-  // --- Funções de Máscara ---
-  const mascararCPF = (value) => value.replace(/\D/g, '').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-  const mascararCNPJ = (value) => value.replace(/\D/g, '').replace(/(\d{2})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1/$2').replace(/(\d{4})(\d{1,2})$/, '$1-$2');
-  const mascararTelefone = (value) => value.replace(/\D/g, '').replace(/(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d)/, '$1-$2').replace(/(-\d{4})\d+?$/, '$1');
-  const mascararCEP = (value) => value.replace(/\D/g, '').replace(/(\d{5})(\d)/, '$1-$2');
-
-  const lidarComAlteracao = (e) => {
+  const lidarComAlteracao = async (e) => {
     const { name, value } = e.target;
-    let maskedValue = value;
+    let valorMascarado = value;
 
-    if (name === 'cpf') maskedValue = mascararCPF(value);
-    else if (name === 'cnpj') maskedValue = mascararCNPJ(value);
-    else if (name === 'cep') maskedValue = mascararCEP(value);
-    else if (['telefoneCelular', 'whatsapp', 'telefoneFixo'].includes(name)) maskedValue = mascararTelefone(value);
+    if (name === 'cpf') valorMascarado = mascararCPF(value);
+    else if (name === 'cnpj') valorMascarado = mascararCNPJ(value);
+    else if (name === 'cep') valorMascarado = mascararCEP(value);
+    else if (['telefoneCelular', 'whatsapp', 'telefoneFixo'].includes(name)) valorMascarado = mascararTelefone(value);
 
-    setDadosFormulario(prev => ({ ...prev, [name]: maskedValue }));
+    setDadosFormulario(prev => ({ ...prev, [name]: valorMascarado }));
 
     if (name === 'cep') {
-      buscarCep(value);
+      const resultado = await buscarCep(value);
+      if (resultado?.erro) {
+        setErros(["CEP não encontrado."]);
+      } else if (resultado) {
+        setErros([]);
+        setDadosFormulario((prev) => ({
+          ...prev,
+          endereco: resultado.endereco,
+          bairro: resultado.bairro,
+          cidade: resultado.cidade,
+          estado: resultado.estado,
+        }));
+      }
     }
   };
 
@@ -217,7 +192,7 @@ function Cadastro() {
     setCarregando(true);
     setErros([]);
     
-    const payload = {
+    const dadosCliente = {
       NomeCompleto: tipoPessoa === "fisica" ? dadosFormulario.nome : dadosFormulario.razaoSocial,
       TipoPessoa: tipoPessoa === "fisica" ? "Física" : "Jurídica",
       CPF_CNPJ: tipoPessoa === "fisica" ? dadosFormulario.cpf : dadosFormulario.cnpj,
@@ -236,26 +211,12 @@ function Cadastro() {
       Cidade: dadosFormulario.cidade,
       Estado: dadosFormulario.estado,
       CEP: dadosFormulario.cep,
-      CodigoIBGE: dadosFormulario.codigoIBGE,
-      // DataNascimento: dadosFormulario.dataNascimento, // Pode adicionar ao payload se necessário
+      CodigoIBGE: dadosFormulario.codigoIBGE
     };
 
     try {
-      const response = await fetch("http://localhost:3001/clientes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.errors?.join('\n') || 'Erro ao cadastrar');
-      }
-
-      // Define o código do cliente para exibir a tela de sucesso
-      setNovoCodigoCliente(data.data.CodigoCliente);
-      
+      const dados = await criarCliente(dadosCliente);
+      setNovoCodigoCliente(dados.data.CodigoCliente);
     } catch (error) {
       setErros(Array.isArray(error.message.split('\n')) 
         ? error.message.split('\n') 
@@ -265,14 +226,7 @@ function Cadastro() {
     }
   };
 
-  const lidarComFocoSenha = () => {
-    setMostrarRegras(true);
-  };
-
-  const lidarComDesfocoSenha = () => {
-    setMostrarRegras(false);
-  };
-
+  
   const etapas = [
     { name: "Identificação", icon: <FaIdCard /> },
     { name: "Contato", icon: <FaPhone /> },
@@ -280,7 +234,6 @@ function Cadastro() {
     { name: "Revisão", icon: <FiCheckCircle /> },
   ];
 
-  // --- Estilos ---
   const classeGrupoInput = "relative mb-6";
 
   const classeInput = "w-full pl-12 pr-4 py-3 bg-white border-2 border-slate-200 rounded-lg shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300";
@@ -296,10 +249,10 @@ function Cadastro() {
   const renderizarConteudoFormulario = () => {
     const classeAnimacao = animacao ? 'animate-fade-in' : '';
     switch (etapaAtual) {
-      case 1: // Identificação
+      case 1: 
         return (
           <div className={classeAnimacao}>
-            <h2 className="text-3xl font-bold mb-8 text-slate-800">{tipoPessoa === "fisica" ? "Seus Dados" : "Dados da Empresa"}</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-slate-800">{tipoPessoa === "fisica" ? "Seus Dados" : "Dados da Empresa"}</h2>
             {tipoPessoa === "fisica" ? (
               <>
                 <div className={classeGrupoInput}><FaUser className={classeIconeInput} /><input className={classeInput} name="nome" placeholder="Nome Completo" value={dadosFormulario.nome} onChange={lidarComAlteracao} /></div>
@@ -316,102 +269,27 @@ function Cadastro() {
             )}
           </div>
         );
-      case 2: // Contato
+      case 2: 
         return (
           <div className={classeAnimacao}>
-            <h2 className="text-3xl font-bold mb-8 text-slate-800">Informações de Contato</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-slate-800">Informações de Contato</h2>
             <div className={classeGrupoInput}><FaEnvelope className={classeIconeInput} /><input className={classeInput} type="email" name="email" placeholder="Seu melhor e-mail" value={dadosFormulario.email} onChange={lidarComAlteracao} /></div>
-            <div className={`${classeGrupoInput} relative`}>
-              <FaLock className={classeIconeInput} />
-              <input 
-                className={`${classeInput} pr-12`} 
-                type={mostrarSenha ? "text" : "password"} 
-                name="senha" 
-                placeholder="Crie uma senha segura" 
-                value={dadosFormulario.senha} 
-                onChange={lidarComAlteracao} 
-                onFocus={lidarComFocoSenha}
-                onBlur={lidarComDesfocoSenha}
-                aria-describedby="password-rules-tooltip"
-              />
-              <button type="button" onClick={() => setMostrarSenha(!mostrarSenha)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-blue-600 z-10">
-                {mostrarSenha ? <FiEyeOff /> : <FiEye />}
-              </button>
-
-              {mostrarRegras && (
-                <>
-                  {/* Desktop / larger screens: tooltip flutuante à direita */}
-                  <div id="password-rules-tooltip" className="absolute left-full top-1/2 -translate-y-1/2 ml-4 w-80 z-50 hidden md:block">
-                    <div style={{ position: 'relative' }}>
-                      <div style={{ position: 'absolute', left: '-8px', top: '50%', transform: 'translateY(-50%) rotate(45deg)', width: '16px', height: '16px', background: '#fff', borderTop: '1px solid #e2e8f0', borderLeft: '1px solid #e2e8f0' }} />
-                      <div className="bg-white border border-slate-200 shadow-lg rounded-lg p-3">
-                        <h4 className="text-sm font-semibold mb-2 text-slate-800">Regras para criar uma senha</h4>
-                        <ul className="text-xs text-slate-600 space-y-1">
-                          <li className="flex items-center gap-2">
-                            <FiCheckCircle className={temComprimento ? 'text-green-500' : 'text-slate-400'} />
-                            Pelo menos 8 caracteres
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <FiCheckCircle className={temMaiuscula ? 'text-green-500' : 'text-slate-400'} />
-                            Ao menos uma letra maiúscula
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <FiCheckCircle className={temMinuscula ? 'text-green-500' : 'text-slate-400'} />
-                            Ao menos uma letra minúscula
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <FiCheckCircle className={temNumero ? 'text-green-500' : 'text-slate-400'} />
-                            Ao menos um número
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <FiCheckCircle className={temEspecial ? 'text-green-500' : 'text-slate-400'} />
-                            Ao menos um caractere especial
-                          </li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Mobile / small screens: bloco abaixo do input */}
-                  <div className="block md:hidden mt-2 w-full">
-                    <div className="bg-white border border-slate-200 shadow rounded-lg p-3">
-                      <h4 className="text-sm font-semibold mb-2 text-slate-800">Regras para criar uma senha</h4>
-                      <ul className="text-xs text-slate-600 space-y-1">
-                        <li className="flex items-center gap-2">
-                          <FiCheckCircle className={temComprimento ? 'text-green-500' : 'text-slate-400'} />
-                          Pelo menos 8 caracteres
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <FiCheckCircle className={temMaiuscula ? 'text-green-500' : 'text-slate-400'} />
-                          Ao menos uma letra maiúscula
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <FiCheckCircle className={temMinuscula ? 'text-green-500' : 'text-slate-400'} />
-                          Ao menos uma letra minúscula
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <FiCheckCircle className={temNumero ? 'text-green-500' : 'text-slate-400'} />
-                          Ao menos um número
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <FiCheckCircle className={temEspecial ? 'text-green-500' : 'text-slate-400'} />
-                          Ao menos um caractere especial
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
+            <InputSenha
+              valor={dadosFormulario.senha}
+              aoAlterar={lidarComAlteracao}
+              classeInput={classeInput}
+              classeIcone={classeIconeInput}
+              classeGrupo={classeGrupoInput}
+            />
             <div className={classeGrupoInput}><FaPhone className={classeIconeInput} /><input className={classeInput} type="tel" name="telefoneFixo" placeholder="Telefone Fixo (Opcional)" value={dadosFormulario.telefoneFixo} onChange={lidarComAlteracao} maxLength="15" /></div>
             <div className={classeGrupoInput}><FaPhone className={classeIconeInput} /><input className={classeInput} type="tel" name="telefoneCelular" placeholder="Celular com DDD" value={dadosFormulario.telefoneCelular} onChange={lidarComAlteracao} maxLength="15" /></div>
             <div className={classeGrupoInput}><FaWhatsapp className={classeIconeInput} /><input className={classeInput} type="tel" name="whatsapp" placeholder="WhatsApp (Opcional)" value={dadosFormulario.whatsapp} onChange={lidarComAlteracao} maxLength="15" /></div>
           </div>
         );
-      case 3: // Endereço
+      case 3: 
         return (
           <div className={classeAnimacao}>
-            <h2 className="text-3xl font-bold mb-8 text-slate-800">Endereço de Entrega</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-slate-800">Endereço de Entrega</h2>
             <div className={classeGrupoInput}>
               <FaMapMarkerAlt className={classeIconeInput} />
               <InputMask
@@ -426,48 +304,48 @@ function Cadastro() {
               {carregandoCep && <FiLoader className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-blue-500" />}
             </div>
             <div className={classeGrupoInput}><FaMapMarkerAlt className={classeIconeInput} /><input className={classeInput} name="endereco" placeholder="Endereço" value={dadosFormulario.endereco} onChange={lidarComAlteracao} disabled={carregandoCep} /></div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className={classeGrupoInput}><FaMapMarkerAlt className={classeIconeInput} /><input className={classeInput} name="numero" placeholder="Número" value={dadosFormulario.numero} onChange={lidarComAlteracao} /></div>
               <div className={classeGrupoInput}><FaMapMarkerAlt className={classeIconeInput} /><input className={classeInput} name="complemento" placeholder="Complemento" value={dadosFormulario.complemento} onChange={lidarComAlteracao} /></div>
             </div>
             <div className={classeGrupoInput}><FaMapMarkerAlt className={classeIconeInput} /><input className={classeInput} name="bairro" placeholder="Bairro" value={dadosFormulario.bairro} onChange={lidarComAlteracao} disabled={carregandoCep} /></div>
-            <div className="grid grid-cols-3 gap-4">
-              <div className={`${classeGrupoInput} col-span-2`}><FaCity className={classeIconeInput} /><input className={classeInput} name="cidade" placeholder="Cidade" value={dadosFormulario.cidade} onChange={lidarComAlteracao} disabled={carregandoCep} /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className={`${classeGrupoInput} sm:col-span-2`}><FaCity className={classeIconeInput} /><input className={classeInput} name="cidade" placeholder="Cidade" value={dadosFormulario.cidade} onChange={lidarComAlteracao} disabled={carregandoCep} /></div>
               <div className={classeGrupoInput}><FaCity className={classeIconeInput} /><input className={classeInput} name="estado" placeholder="UF" value={dadosFormulario.estado} onChange={lidarComAlteracao} disabled={carregandoCep} /></div>
             </div>
             <div className={classeGrupoInput}><FaIdCard className={classeIconeInput} /><input className={classeInput} name="codigoIBGE" placeholder="Código IBGE (Opcional)" value={dadosFormulario.codigoIBGE} onChange={lidarComAlteracao} maxLength="7" /></div>
           </div>
         );
-      case 4: // Revisão
+      case 4: 
         return (
           <div className={classeAnimacao}>
-            <h2 className="text-3xl font-bold mb-8 text-slate-800">Revise seus Dados</h2>
-            <div className="bg-slate-100 p-6 rounded-xl space-y-3 text-sm">
+            <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-slate-800">Revise seus Dados</h2>
+            <div className="bg-slate-100 p-4 sm:p-6 rounded-xl space-y-3 text-sm">
               {/* Dados Pessoais/Empresa */}
               <h3 className="font-bold text-slate-700 border-b pb-2 mb-2">Identificação</h3>
               {tipoPessoa === "fisica" ? (
                 <>
-                  <p className="flex justify-between"><span className="font-semibold text-slate-600">Nome:</span><span>{dadosFormulario.nome}</span></p>
-                  <p className="flex justify-between"><span className="font-semibold text-slate-600">CPF:</span><span>{dadosFormulario.cpf}</span></p>
+                  <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0"><span className="font-semibold text-slate-600">Nome:</span><span className="break-words">{dadosFormulario.nome}</span></p>
+                  <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0"><span className="font-semibold text-slate-600">CPF:</span><span>{dadosFormulario.cpf}</span></p>
                 </>
               ) : (
                 <>
-                  <p className="flex justify-between"><span className="font-semibold text-slate-600">Razão Social:</span><span>{dadosFormulario.razaoSocial}</span></p>
-                  <p className="flex justify-between"><span className="font-semibold text-slate-600">CNPJ:</span><span>{dadosFormulario.cnpj}</span></p>
+                  <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0"><span className="font-semibold text-slate-600">Razão Social:</span><span className="break-words">{dadosFormulario.razaoSocial}</span></p>
+                  <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0"><span className="font-semibold text-slate-600">CNPJ:</span><span>{dadosFormulario.cnpj}</span></p>
                 </>
               )}
               {/* Contatos */}
               <h3 className="font-bold text-slate-700 border-b pb-2 mb-2 pt-4">Contato</h3>
-              <p className="flex justify-between"><span className="font-semibold text-slate-600">Email:</span><span>{dadosFormulario.email}</span></p>
-              <p className="flex justify-between"><span className="font-semibold text-slate-600">Celular:</span><span>{dadosFormulario.telefoneCelular}</span></p>
+              <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0"><span className="font-semibold text-slate-600">Email:</span><span className="break-all">{dadosFormulario.email}</span></p>
+              <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0"><span className="font-semibold text-slate-600">Celular:</span><span>{dadosFormulario.telefoneCelular}</span></p>
               {/* Endereço */}
               <h3 className="font-bold text-slate-700 border-b pb-2 mb-2 pt-4">Endereço</h3>
-              <p className="flex justify-between"><span className="font-semibold text-slate-600">Endereço:</span><span>{`${dadosFormulario.endereco}, ${dadosFormulario.numero}`}</span></p>
-              <p className="flex justify-between"><span className="font-semibold text-slate-600">Bairro:</span><span>{dadosFormulario.bairro}</span></p>
-              <p className="flex justify-between"><span className="font-semibold text-slate-600">Cidade/UF:</span><span>{`${dadosFormulario.cidade} / ${dadosFormulario.estado}`}</span></p>
-              <p className="flex justify-between"><span className="font-semibold text-slate-600">CEP:</span><span>{dadosFormulario.cep}</span></p>
+              <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0"><span className="font-semibold text-slate-600">Endereço:</span><span className="break-words">{`${dadosFormulario.endereco}, ${dadosFormulario.numero}`}</span></p>
+              <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0"><span className="font-semibold text-slate-600">Bairro:</span><span className="break-words">{dadosFormulario.bairro}</span></p>
+              <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0"><span className="font-semibold text-slate-600">Cidade/UF:</span><span className="break-words">{`${dadosFormulario.cidade} / ${dadosFormulario.estado}`}</span></p>
+              <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0"><span className="font-semibold text-slate-600">CEP:</span><span>{dadosFormulario.cep}</span></p>
               {dadosFormulario.codigoIBGE && (
-                <p className="flex justify-between"><span className="font-semibold text-slate-600">Código IBGE:</span><span>{dadosFormulario.codigoIBGE}</span></p>
+                <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0"><span className="font-semibold text-slate-600">Código IBGE:</span><span>{dadosFormulario.codigoIBGE}</span></p>
               )}
             </div>
           </div>
@@ -477,7 +355,6 @@ function Cadastro() {
     }
   };
 
-  // Lógica de renderização principal
   if (novoCodigoCliente) {
     return <TelaSucesso codigoCliente={novoCodigoCliente} />;
   }
