@@ -46,7 +46,6 @@ fi
 
 echo ""
 echo "🚀 Iniciando containers..."
-echo "   - PostgreSQL (porta 5432)"
 echo "   - Backend API (porta 3001)" 
 echo "   - Frontend React (porta 5173)"
 echo ""

@@ -2,15 +2,6 @@
 # Use: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
 
 services:
-  postgres:
-    environment:
-      POSTGRES_DB: projeto_ecommerce_prod
-      POSTGRES_USER: ecommerce_user
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sua_senha_segura_aqui}
-    volumes:
-      - postgres_prod_data:/var/lib/postgresql/data
-    # Remover porta exposta em produção por segurança
-    ports: []
 
   backend:
     environment:
@@ -33,7 +24,3 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
-
-volumes:
-  postgres_prod_data:
-    driver: local
