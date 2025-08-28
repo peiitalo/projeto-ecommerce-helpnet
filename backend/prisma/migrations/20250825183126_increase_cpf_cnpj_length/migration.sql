@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "public"."Cliente" ALTER COLUMN "CPF_CNPJ" SET DATA TYPE VARCHAR(255);
