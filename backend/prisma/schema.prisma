@@ -32,7 +32,6 @@ model Cliente {
   ClienteID          Int        @id @default(autoincrement())
   CodigoCliente      Int        @unique
   NomeCompleto       String
-  DataNascimento     DateTime?
   TipoPessoa         String?
   CPF_CNPJ           String     @unique @db.VarChar(255)
   TelefoneFixo       String?
@@ -43,6 +42,7 @@ model Cliente {
   InscricaoMunicipal String?
   RazaoSocial        String?
   SenhaHash          String
+  DataCadastro       DateTime   @default(now())
   enderecos          Endereco[]
   pedidos            Pedido[]
 
@@ -61,6 +61,7 @@ model Endereco {
   TipoEndereco String   @default("Residencial")
   Numero       String?
   Bairro       String
+  Obrigatorio  Boolean  @default(false)
   cliente      Cliente  @relation(fields: [ClienteID], references: [ClienteID])
   Pedido       Pedido[]
 
