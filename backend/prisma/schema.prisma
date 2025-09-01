@@ -71,6 +71,7 @@ model Endereco {
 model Produto {
   ProdutoID   Int           @id @default(autoincrement())
   Nome        String
+  CodBarras   String        @unique
   Descricao   String?
   Preco       Float
   Estoque     Int           @default(0)

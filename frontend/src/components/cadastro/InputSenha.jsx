@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { FiEye, FiEyeOff, FiCheckCircle } from 'react-icons/fi';
 import { FaLock } from 'react-icons/fa';
-import { useRegrasSenha } from '../hooks/useRegrasSenha';
+import { useRegrasSenha } from '../../hooks/useRegrasSenha';
 
 export default function InputSenha({ valor, aoAlterar, classeInput, classeIcone, classeGrupo }) {
   const [mostrarSenha, setMostrarSenha] = useState(false);

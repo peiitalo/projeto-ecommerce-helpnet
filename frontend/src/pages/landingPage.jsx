@@ -114,25 +114,6 @@ function Home() {
                 <FiArrowRight />
               </Link>
             </div>
-
-            {/* Tipos de conta */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 max-w-2xl mx-auto px-4">
-              <div className="bg-white p-4 sm:p-6 rounded-xl shadow-lg border border-slate-200 hover:shadow-xl transition-shadow">
-                <FaUser className="text-3xl sm:text-4xl text-blue-500 mx-auto mb-3 sm:mb-4" />
-                <h3 className="text-lg sm:text-xl font-bold text-slate-800 mb-2">Pessoa Física</h3>
-                <p className="text-slate-600 text-sm sm:text-base">
-                  Cadastro rápido para compras pessoais com CPF
-                </p>
-              </div>
-              
-              <div className="bg-white p-4 sm:p-6 rounded-xl shadow-lg border border-slate-200 hover:shadow-xl transition-shadow">
-                <FaBuilding className="text-3xl sm:text-4xl text-blue-500 mx-auto mb-3 sm:mb-4" />
-                <h3 className="text-lg sm:text-xl font-bold text-slate-800 mb-2">Pessoa Jurídica</h3>
-                <p className="text-slate-600 text-sm sm:text-base">
-                  Soluções empresariais com CNPJ e condições especiais
-                </p>
-              </div>
-            </div>
           </div>
         </div>
       </section>

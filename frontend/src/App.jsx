@@ -1,9 +1,9 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Home from './pages/clients/home';
+import Home from './pages/landingPage';
 import Login from './pages/login';
 import Cadastro from './pages/cadastro';
 import Dashboard from './pages/clients/dashboard';
-import NotFound from './pages/notFound';
+import NotFound from './pages/errors/notFound';
 
 function App() {
   return (

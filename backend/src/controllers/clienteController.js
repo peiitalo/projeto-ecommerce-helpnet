@@ -1,6 +1,7 @@
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 const cryptoService = require("../services/cryptoService");
+const removerAcentos = require("remove-accents");
 const {
   validatePassword,
   validateDocument,
@@ -23,6 +24,7 @@ exports.criarCliente = async (req, res) => {
     InscricaoMunicipal,
     RazaoSocial,
     senha,
+    confirmarSenha,
     Endereco,
     Numero,
     Complemento,
@@ -70,6 +72,13 @@ exports.criarCliente = async (req, res) => {
       errors.push("Estado é obrigatório");
     }
 
+    if (senha !== confirmarSenha) {
+      return res.status(400).json({
+        success: false,
+        errors: ["As senhas não coincidem"],
+      });
+    }
+
     let docValidation = null;
     if (CPF_CNPJ && CPF_CNPJ.trim() !== "") {
       docValidation = validateDocument(CPF_CNPJ, TipoPessoa);
@@ -113,6 +122,11 @@ exports.criarCliente = async (req, res) => {
         success: false,
         errors,
       });
+    }
+
+    function toUpperNoAccent(str) {
+      if (!str) return str;
+      return removeAccents(str).toUpperCase();
     }
 
     const SenhaHash = await cryptoService.hashPassword(senha);
