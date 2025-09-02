@@ -13,7 +13,6 @@ const {
 exports.criarCliente = async (req, res) => {
   const {
     NomeCompleto,
-    DataNascimento,
     TipoPessoa,
     CPF_CNPJ,
     TelefoneFixo,
@@ -24,7 +23,6 @@ exports.criarCliente = async (req, res) => {
     InscricaoMunicipal,
     RazaoSocial,
     senha,
-    confirmarSenha,
     Endereco,
     Numero,
     Complemento,
@@ -72,12 +70,6 @@ exports.criarCliente = async (req, res) => {
       errors.push("Estado é obrigatório");
     }
 
-    if (senha !== confirmarSenha) {
-      return res.status(400).json({
-        success: false,
-        errors: ["As senhas não coincidem"],
-      });
-    }
 
     let docValidation = null;
     if (CPF_CNPJ && CPF_CNPJ.trim() !== "") {
@@ -154,7 +146,6 @@ exports.criarCliente = async (req, res) => {
           data: {
             CodigoCliente: proximoCodigoCliente,
             NomeCompleto,
-            DataNascimento: DataNascimento ? new Date(DataNascimento) : null,
             TipoPessoa,
             CPF_CNPJ: CpfCnpjHash,
             TelefoneFixo: TelefoneFixo || null,
