@@ -70,7 +70,6 @@ exports.criarCliente = async (req, res) => {
       errors.push("Estado é obrigatório");
     }
 
-
     let docValidation = null;
     if (CPF_CNPJ && CPF_CNPJ.trim() !== "") {
       docValidation = validateDocument(CPF_CNPJ, TipoPessoa);
@@ -118,7 +117,7 @@ exports.criarCliente = async (req, res) => {
 
     function toUpperNoAccent(str) {
       if (!str) return str;
-      return removeAccents(str).toUpperCase();
+      return removerAcentos(str).toUpperCase();
     }
 
     const SenhaHash = await cryptoService.hashPassword(senha);
@@ -129,6 +128,15 @@ exports.criarCliente = async (req, res) => {
     let cliente;
     let tentativas = 0;
     const maxTentativas = 5;
+
+    const NomeCompletoTratado = toUpperNoAccent(NomeCompleto);
+    const BairroTratado = toUpperNoAccent(Bairro);
+    const CidadeTratada = toUpperNoAccent(Cidade);
+    const EnderecoTratado = toUpperNoAccent(Endereco);
+    const RazaoSocialTratada = toUpperNoAccent(RazaoSocial);
+    const ComplementoTratado = toUpperNoAccent(Complemento);
+    const InscricaoEstadualTratada = toUpperNoAccent(InscricaoEstadual);
+    const InscricaoMunicipalTratada = toUpperNoAccent(InscricaoMunicipal);
 
     while (tentativas < maxTentativas) {
       try {
@@ -145,25 +153,25 @@ exports.criarCliente = async (req, res) => {
         cliente = await prisma.cliente.create({
           data: {
             CodigoCliente: proximoCodigoCliente,
-            NomeCompleto,
+            NomeCompleto: NomeCompletoTratado,
             TipoPessoa,
             CPF_CNPJ: CpfCnpjHash,
             TelefoneFixo: TelefoneFixo || null,
             TelefoneCelular: TelefoneCelular || null,
             Whatsapp: Whatsapp || null,
             Email: Email.toLowerCase(),
-            InscricaoEstadual: InscricaoEstadual || null,
-            InscricaoMunicipal: InscricaoMunicipal || null,
-            RazaoSocial: RazaoSocial || null,
+            InscricaoEstadual: InscricaoEstadualTratada || null,
+            InscricaoMunicipal: InscricaoMunicipalTratada || null,
+            RazaoSocial: RazaoSocialTratada || null,
             SenhaHash,
             enderecos: {
               create: [
                 {
-                  Nome: Endereco,
+                  Nome: EnderecoTratado,
                   Numero: Numero,
-                  Complemento: Complemento || null,
-                  Bairro: Bairro,
-                  Cidade: Cidade,
+                  Complemento: ComplementoTratado || null,
+                  Bairro: BairroTratado,
+                  Cidade: CidadeTratada,
                   UF: Estado.toUpperCase(),
                   CEP: cepValidation.formatted,
                   CodigoIBGE: codigoIBGEValidation?.formatted || null,

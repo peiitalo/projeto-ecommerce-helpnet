@@ -26,6 +26,13 @@ import {
   mascararTelefone,
   mascararCEP,
 } from "../utils/mascaras";
+import {
+  validatePassword,
+  validateDocument,
+  validateEmail,
+  validateCEP,
+  validateCodigoIBGE,
+} from "../utils/validations";
 import { useBuscarCep } from "../hooks/useBuscarCep";
 import { criarCliente } from "../services/clientesApi";
 
@@ -204,10 +211,104 @@ function Cadastro() {
     return () => clearTimeout(timer);
   }, [etapaAtual]);
 
+  const validarEtapa = () => {
+    const errosValidacao = [];
+
+    if (etapaAtual === 1) {
+      if (tipoPessoa === "fisica") {
+        if (!dadosFormulario.nome.trim())
+          errosValidacao.push("Nome Completo é obrigatório.");
+        if (!dadosFormulario.cpf.trim())
+          errosValidacao.push("CPF é obrigatório.");
+        else {
+          const { isValid, errors } = validateDocument(
+            dadosFormulario.cpf,
+            "fisica"
+          );
+          if (!isValid) errosValidacao.push(...errors);
+        }
+      } else if (tipoPessoa === "juridica") {
+        if (!dadosFormulario.razaoSocial.trim())
+          errosValidacao.push("Razão Social é obrigatória.");
+        if (!dadosFormulario.cnpj.trim())
+          errosValidacao.push("CNPJ é obrigatório.");
+        else {
+          const { isValid, errors } = validateDocument(
+            dadosFormulario.cnpj,
+            "juridica"
+          );
+          if (!isValid) errosValidacao.push(...errors);
+        }
+      }
+    } else if (etapaAtual === 2) {
+      if (!dadosFormulario.email.trim())
+        errosValidacao.push("Email é obrigatório.");
+      else {
+        const { isValid, errors } = validateEmail(dadosFormulario.email);
+        if (!isValid) errosValidacao.push(...errors);
+      }
+
+      if (!dadosFormulario.senha.trim())
+        errosValidacao.push("Senha é obrigatória.");
+      else {
+        const { isValid, errors } = validatePassword(dadosFormulario.senha);
+        if (!isValid) errosValidacao.push(...errors);
+      }
+
+      if (dadosFormulario.senha !== dadosFormulario.confirmarSenha)
+        errosValidacao.push("As senhas não coincidem.");
+
+      if (!dadosFormulario.telefoneCelular.trim())
+        errosValidacao.push("Celular com DDD é obrigatório.");
+    } else if (etapaAtual === 3) {
+      if (!dadosFormulario.cep.trim())
+        errosValidacao.push("CEP é obrigatório.");
+      else {
+        const { isValid, errors } = validateCEP(dadosFormulario.cep);
+        if (!isValid) errosValidacao.push(...errors);
+      }
+
+      if (!dadosFormulario.endereco.trim())
+        errosValidacao.push("Endereço é obrigatório.");
+      if (!dadosFormulario.numero.trim())
+        errosValidacao.push("Número é obrigatório.");
+      if (!dadosFormulario.bairro.trim())
+        errosValidacao.push("Bairro é obrigatório.");
+      if (!dadosFormulario.cidade.trim())
+        errosValidacao.push("Cidade é obrigatória.");
+      if (!dadosFormulario.estado.trim())
+        errosValidacao.push("Estado é obrigatório.");
+
+      if (dadosFormulario.codigoIBGE.trim()) {
+        const { isValid, errors } = validateCodigoIBGE(
+          dadosFormulario.codigoIBGE
+        );
+        if (!isValid) errosValidacao.push(...errors);
+      }
+    }
+
+    return errosValidacao;
+  };
+
   const proximaEtapa = () => {
+    const errosValidacao = validarEtapa();
+    if (errosValidacao.length > 0) {
+      const proximaEtapa = () => {
+        const errosValidacao = validarEtapa();
+        if (errosValidacao.length > 0) {
+          setErros(errosValidacao);
+          return;
+        }
+        setErros([]);
+        setEtapaAtual((prev) => prev + 1);
+      };
+      setErros(errosValidacao);
+      return;
+    }
     setErros([]);
     setEtapaAtual((prev) => prev + 1);
   };
+
   const etapaAnterior = () => {
     setErros([]);
     setEtapaAtual((prev) => prev - 1);
@@ -296,7 +397,7 @@ function Cadastro() {
 
   const classeGrupoInput = "relative mb-6";
 
-   const classeInput =
+  const classeInput =
     "w-full pl-12 pr-4 py-3 bg-white border-2 border-slate-200 rounded-lg shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300";
 
   const classeIconeInput =
@@ -339,17 +440,6 @@ function Cadastro() {
                     value={dadosFormulario.cpf}
                     onChange={lidarComAlteracao}
                     maxLength="14"
-                  />
-                </div>
-                <div className={classeGrupoInput}>
-                  <FaIdCard className={classeIconeInput} />
-                  <input
-                    type="date"
-                    className={classeInput}
-                    name="dataNascimento"
-                    placeholder="Data de Nascimento"
-                    value={dadosFormulario.dataNascimento}
-                    onChange={lidarComAlteracao}
                   />
                 </div>
               </>
@@ -424,14 +514,13 @@ function Cadastro() {
               classeIcone={classeIconeInput}
               classeGrupo={classeGrupoInput}
             />
-          <InputConfirmarSenha 
-          classeGrupo={classeGrupoInput}
-          classeIcone={classeIconeInput}
-          classeInput={classeInput}
-          valor={dadosFormulario.confirmarSenha}
-          aoAlterar={lidarComAlteracao}
-          
-          />
+            <InputConfirmarSenha
+              classeGrupo={classeGrupoInput}
+              classeIcone={classeIconeInput}
+              classeInput={classeInput}
+              valor={dadosFormulario.confirmarSenha}
+              aoAlterar={lidarComAlteracao}
+            />
 
             <div className={classeGrupoInput}>
               <FaPhone className={classeIconeInput} />

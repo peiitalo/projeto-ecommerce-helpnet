@@ -2,12 +2,13 @@ import { useState } from "react";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import { FaLock } from "react-icons/fa";
 
-export default function InputConfirmarSenha(
-   { valor,
+export default function InputConfirmarSenha({
+  valor,
+  aoAlterar,
   classeInput,
   classeIcone,
-  classeGrupo}
-) {
+  classeGrupo,
+}) {
   const [mostrarSenha, setMostrarSenha] = useState(false);
 
   return (
@@ -18,7 +19,8 @@ export default function InputConfirmarSenha(
         type={mostrarSenha ? "text" : "password"}
         name="confirmarSenha"
         placeholder="Confirme a senha"
-        onChange={(e) => valor(e.target.value)}
+        value={valor}
+        onChange={aoAlterar}  
         required
         aria-describedby="password-confirmation"
       />
