@@ -4,6 +4,7 @@ const clienteRoutes = require('./routes/clienteRoutes');
 
 const app = express();
 
+
 // Configuração CORS para aceitar conexões de qualquer origem
 app.use(cors({
   origin: '*',

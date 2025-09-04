@@ -82,7 +82,7 @@ function Login() {
       setLoginSucesso(data.data);
 
       setTimeout(() => {
-        navigate('/dashboard'); 
+        navigate('/home'); 
       }, 2000);
 
     } catch (error) {

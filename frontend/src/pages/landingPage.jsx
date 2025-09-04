@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { FaShoppingCart, FaUser, FaBuilding, FaShieldAlt, FaTruck, FaHeadset } from 'react-icons/fa';
 import { FiArrowRight, FiStar } from 'react-icons/fi';
 
-function Home() {
+function LandingPage() {
   const recursos = [
     {
       icone: <FaShieldAlt />,
@@ -238,4 +238,4 @@ function Home() {
   );
 }
 
-export default Home;
+export default LandingPage;

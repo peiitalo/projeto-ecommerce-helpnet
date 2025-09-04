@@ -17,7 +17,6 @@ CREATE TABLE "public"."Cliente" (
     "ClienteID" SERIAL NOT NULL,
     "CodigoCliente" SERIAL NOT NULL,
     "NomeCompleto" TEXT NOT NULL,
-    "DataNascimento" TIMESTAMP(3),
     "TipoPessoa" TEXT,
     "CPF_CNPJ" VARCHAR(20) NOT NULL,
     "TelefoneFixo" TEXT,
