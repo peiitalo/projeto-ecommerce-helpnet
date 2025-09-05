@@ -31,6 +31,15 @@ exports.criarCliente = async (req, res) => {
     Estado,
     CEP,
     CodigoIBGE,
+    EnderecoCobranca,
+    NumeroCobranca,
+    ComplementoCobranca,
+    BairroCobranca,
+    CidadeCobranca,
+    EstadoCobranca,
+    CepCobranca,
+    CodigoIBGECobranca,
+    enderecoCobrancaIgualEntrega,
   } = req.body;
 
   try {
@@ -70,6 +79,27 @@ exports.criarCliente = async (req, res) => {
       errors.push("Estado é obrigatório");
     }
 
+    if (!enderecoCobrancaIgualEntrega) {
+      if (!CepCobranca || CepCobranca.trim() === "") {
+        errors.push("CEP do endereço de cobrança é obrigatório");
+      }
+      if (!EnderecoCobranca || EnderecoCobranca.trim() === "") {
+        errors.push("Endereço de cobrança é obrigatório");
+      }
+      if (!NumeroCobranca || NumeroCobranca.trim() === "") {
+        errors.push("Número do endereço de cobrança é obrigatório");
+      }
+      if (!BairroCobranca || BairroCobranca.trim() === "") {
+        errors.push("Bairro do endereço de cobrança é obrigatório");
+      }
+      if (!CidadeCobranca || CidadeCobranca.trim() === "") {
+        errors.push("Cidade do endereço de cobrança é obrigatória");
+      }
+      if (!EstadoCobranca || EstadoCobranca.trim() === "") {
+        errors.push("Estado do endereço de cobrança é obrigatório");
+      }
+    }
+
     let docValidation = null;
     if (CPF_CNPJ && CPF_CNPJ.trim() !== "") {
       docValidation = validateDocument(CPF_CNPJ, TipoPessoa);
@@ -100,11 +130,27 @@ exports.criarCliente = async (req, res) => {
       }
     }
 
+    let cepCobrancaValidation = null;
+    if (CepCobranca && CepCobranca.trim() !== "") {
+      cepCobrancaValidation = validateCEP(CepCobranca);
+      if (!cepCobrancaValidation.isValid) {
+        errors.push(...cepCobrancaValidation.errors);
+      }
+    }
+
     let codigoIBGEValidation = null;
     if (CodigoIBGE) {
       codigoIBGEValidation = validateCodigoIBGE(CodigoIBGE);
       if (!codigoIBGEValidation.isValid) {
         errors.push(...codigoIBGEValidation.errors);
+      }
+    }
+
+    let codigoIBGECobrancaValidation = null;
+    if (CodigoIBGECobranca) {
+      codigoIBGECobrancaValidation = validateCodigoIBGE(CodigoIBGECobranca);
+      if (!codigoIBGECobrancaValidation.isValid) {
+        errors.push(...codigoIBGECobrancaValidation.errors);
       }
     }
 
@@ -138,6 +184,11 @@ exports.criarCliente = async (req, res) => {
     const InscricaoEstadualTratada = toUpperNoAccent(InscricaoEstadual);
     const InscricaoMunicipalTratada = toUpperNoAccent(InscricaoMunicipal);
 
+    const BairroCobrancaTratado = toUpperNoAccent(BairroCobranca);
+    const CidadeCobrancaTratada = toUpperNoAccent(CidadeCobranca);
+    const EnderecoCobrancaTratado = toUpperNoAccent(EnderecoCobranca);
+    const ComplementoCobrancaTratado = toUpperNoAccent(ComplementoCobranca);
+
     while (tentativas < maxTentativas) {
       try {
         const ultimoCliente = await prisma.cliente.findFirst({
@@ -148,6 +199,34 @@ exports.criarCliente = async (req, res) => {
         let proximoCodigoCliente = 100000;
         if (ultimoCliente && ultimoCliente.CodigoCliente >= 100000) {
           proximoCodigoCliente = ultimoCliente.CodigoCliente + 1;
+        }
+
+        const enderecosCreate = [
+          {
+            Nome: EnderecoTratado,
+            Numero: Numero,
+            Complemento: ComplementoTratado || null,
+            Bairro: BairroTratado,
+            Cidade: CidadeTratada,
+            UF: Estado.toUpperCase(),
+            CEP: cepValidation.formatted,
+            CodigoIBGE: codigoIBGEValidation?.formatted || null,
+            TipoEndereco: "Residencial",
+          },
+        ];
+
+        if (!enderecoCobrancaIgualEntrega) {
+          enderecosCreate.push({
+            Nome: EnderecoCobrancaTratado,
+            Numero: NumeroCobranca,
+            Complemento: ComplementoCobrancaTratado || null,
+            Bairro: BairroCobrancaTratado,
+            Cidade: CidadeCobrancaTratada,
+            UF: EstadoCobranca.toUpperCase(),
+            CEP: cepCobrancaValidation.formatted,
+            CodigoIBGE: codigoIBGECobrancaValidation?.formatted || null,
+            TipoEndereco: "Cobrança",
+          });
         }
 
         cliente = await prisma.cliente.create({
@@ -165,18 +244,7 @@ exports.criarCliente = async (req, res) => {
             RazaoSocial: RazaoSocialTratada || null,
             SenhaHash,
             enderecos: {
-              create: [
-                {
-                  Nome: EnderecoTratado,
-                  Numero: Numero,
-                  Complemento: ComplementoTratado || null,
-                  Bairro: BairroTratado,
-                  Cidade: CidadeTratada,
-                  UF: Estado.toUpperCase(),
-                  CEP: cepValidation.formatted,
-                  CodigoIBGE: codigoIBGEValidation?.formatted || null,
-                },
-              ],
+              create: enderecosCreate,
             },
           },
           include: {
