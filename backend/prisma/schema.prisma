@@ -42,7 +42,6 @@ model Cliente {
   InscricaoMunicipal String?
   RazaoSocial        String?
   SenhaHash          String
-  DataCadastro       DateTime   @default(now())
   enderecos          Endereco[]
   pedidos            Pedido[]
 
@@ -61,7 +60,6 @@ model Endereco {
   TipoEndereco String   @default("Residencial")
   Numero       String?
   Bairro       String
-  Obrigatorio  Boolean  @default(false)
   cliente      Cliente  @relation(fields: [ClienteID], references: [ClienteID])
   Pedido       Pedido[]
 
@@ -69,15 +67,31 @@ model Endereco {
 }
 
 model Produto {
-  ProdutoID   Int           @id @default(autoincrement())
-  Nome        String
-  Descricao   String?
-  Preco       Float
-  Estoque     Int           @default(0)
-  CategoriaID Int
-  CodBarras   String        @unique
-  itensPedido ItensPedido[]
-  categoria   Categoria     @relation(fields: [CategoriaID], references: [CategoriaID])
+  ProdutoID     Int           @id @default(autoincrement())
+  Nome          String
+  Descricao     String?
+  Preco         Float
+  PrecoOriginal Float?
+  Estoque       Int           @default(0)
+  CategoriaID   Int
+  CodBarras     String?       @unique
+  SKU           String        @unique
+  Peso          String?
+  Dimensoes     String?
+  Marca         String?
+  Modelo        String?
+  Cor           String?
+  Garantia      String?
+  Origem        String?       @default("Nacional")
+  Condicao      String?       @default("Novo")
+  FreteGratis   Boolean?      @default(false)
+  Desconto      Int?          @default(0)
+  PrazoEntrega  String?
+  Imagens       String[]      @default([])
+  Ativo         Boolean       @default(true)
+  CriadoEm      DateTime      @default(now())
+  itensPedido   ItensPedido[]
+  categoria     Categoria     @relation(fields: [CategoriaID], references: [CategoriaID])
 
   @@map("Produto")
 }

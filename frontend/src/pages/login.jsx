@@ -73,7 +73,13 @@ function Login() {
         }),
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonErr) {
+        // Se não for JSON, provavelmente é HTML de erro
+        throw new Error('Erro de conexão com o servidor. Verifique se o backend está rodando e a URL está correta.');
+      }
 
       if (!response.ok) {
         throw new Error(data.errors?.join('\n') || 'Erro ao fazer login');

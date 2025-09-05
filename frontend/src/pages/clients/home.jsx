@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from "react-router-dom";
+import { produtoService } from '../../services/api';
 import {
   FaShoppingCart,
   FaUser,
@@ -37,6 +38,8 @@ function Home() {
   const [query, setQuery] = useState('');
   const [selectedFilters, setSelectedFilters] = useState([]);
   const [sortBy, setSortBy] = useState('relevance');
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
   
   // Contadores (mock)
   const [cartCount] = useState(2);
@@ -54,11 +57,11 @@ function Home() {
   // Opções de filtros disponíveis
   const filterOptions = [
     { type: 'category', label: 'Eletrônicos', value: 'Eletrônicos' },
-    { type: 'category', label: 'Moda', value: 'Moda' },
-    { type: 'category', label: 'Casa & Decoração', value: 'Casa & Decoração' },
-    { type: 'category', label: 'Esportes', value: 'Esportes' },
-    { type: 'category', label: 'Livros', value: 'Livros' },
-    { type: 'category', label: 'Beleza', value: 'Beleza' },
+    { type: 'category', label: 'Casa e Decoração', value: 'Casa e Decoração' },
+    { type: 'category', label: 'Beleza e Saúde', value: 'Beleza e Saúde' },
+    { type: 'category', label: 'Moda e Acessórios', value: 'Moda e Acessórios' },
+    { type: 'category', label: 'Esportes e Lazer', value: 'Esportes e Lazer' },
+    { type: 'category', label: 'Outras', value: 'Outras' },
     { type: 'price', label: 'Até R$ 100', value: 'price-100' },
     { type: 'price', label: 'R$ 100 - R$ 500', value: 'price-100-500' },
     { type: 'price', label: 'R$ 500 - R$ 1000', value: 'price-500-1000' },
@@ -119,78 +122,52 @@ function Home() {
   const goPrev = () => setActiveSlide((activeSlide - 1 + slides.length) % slides.length);
   const goNext = () => setActiveSlide((activeSlide + 1) % slides.length);
 
-  // Produtos mockados com mais informações
-  const products = [
-    {
-      id: 'p1',
-      name: 'Fone Bluetooth Noise Cancelling',
-      price: 399.9,
-      originalPrice: 499.9,
-      image: 'https://images.unsplash.com/photo-1518444028785-8f6f1a1a79f0?q=80&w=1200&auto=format&fit=crop',
-      rating: 4.6,
-      sales: 1240,
-      category: 'Eletrônicos',
-      freeShipping: true,
-      discount: 20
-    },
-    {
-      id: 'p2',
-      name: 'Smartwatch Pro Series',
-      price: 899.9,
-      image: 'https://images.unsplash.com/photo-1517411032315-54ef2cb783bb?q=80&w=1200&auto=format&fit=crop',
-      rating: 4.3,
-      sales: 820,
-      category: 'Eletrônicos',
-      freeShipping: true,
-      discount: 0
-    },
-    {
-      id: 'p3',
-      name: 'Tênis Corrida Performance',
-      price: 349.9,
-      originalPrice: 449.9,
-      image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=1200&auto=format&fit=crop',
-      rating: 4.8,
-      sales: 1960,
-      category: 'Esportes',
-      freeShipping: false,
-      discount: 22
-    },
-    {
-      id: 'p4',
-      name: 'Cafeteira Automática',
-      price: 729.9,
-      image: 'https://images.unsplash.com/photo-1504754524776-8f4f37790ca0?q=80&w=1200&auto=format&fit=crop',
-      rating: 4.2,
-      sales: 540,
-      category: 'Casa & Decoração',
-      freeShipping: true,
-      discount: 0
-    },
-    {
-      id: 'p5',
-      name: 'Cadeira Ergonômica Gamer',
-      price: 1299.9,
-      originalPrice: 1599.9,
-      image: 'https://images.unsplash.com/photo-1616628188460-8a47f364262e?q=80&w=1200&auto=format&fit=crop',
-      rating: 4.5,
-      sales: 720,
-      category: 'Casa & Decoração',
-      freeShipping: true,
-      discount: 19
-    },
-    {
-      id: 'p6',
-      name: 'Teclado Mecânico RGB',
-      price: 299.9,
-      image: 'https://images.unsplash.com/photo-1610395219791-21b8a9aef6da?q=80&w=1200&auto=format&fit=crop',
-      rating: 4.1,
-      sales: 1120,
-      category: 'Eletrônicos',
-      freeShipping: false,
-      discount: 0
+  // Carregar produtos da API
+  useEffect(() => {
+    carregarProdutos();
+  }, []);
+
+  const carregarProdutos = async () => {
+    try {
+      setLoading(true);
+      const response = await produtoService.listar({ status: 'ativo' });
+      
+      // Mapear produtos da API para o formato esperado pelo frontend
+      const produtosMapeados = (response.produtos || response).map(produto => ({
+        id: produto.ProdutoID || produto.id,
+        name: produto.Nome || produto.name,
+        price: produto.Preco || produto.price,
+        originalPrice: produto.PrecoOriginal || produto.originalPrice,
+        image: (produto.Imagens && produto.Imagens[0]) || produto.image || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?q=80&w=1200&auto=format&fit=crop',
+        rating: 4.5, // Mock rating - pode ser implementado depois
+        sales: Math.floor(Math.random() * 2000) + 100, // Mock sales - pode ser implementado depois
+        category: produto.categoria?.Nome || produto.category || 'Geral',
+        freeShipping: produto.FreteGratis || produto.freeShipping || false,
+        discount: produto.Desconto || produto.discount || 0
+      }));
+
+      setProducts(produtosMapeados);
+    } catch (error) {
+      console.error('Erro ao carregar produtos:', error);
+      // Fallback para produtos mockados em caso de erro
+      setProducts([
+        {
+          id: 'p1',
+          name: 'Fone Bluetooth Noise Cancelling',
+          price: 399.9,
+          originalPrice: 499.9,
+          image: 'https://images.unsplash.com/photo-1518444028785-8f6f1a1a79f0?q=80&w=1200&auto=format&fit=crop',
+          rating: 4.6,
+          sales: 1240,
+          category: 'Eletrônicos',
+          freeShipping: true,
+          discount: 20
+        }
+      ]);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   // Funções para gerenciar filtros
   const addFilter = (filter) => {
@@ -849,65 +826,96 @@ function Home() {
             </div>
 
             
-            {/* Grid de produtos */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+            {/* Loading de produtos */}
+            {loading ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+                {[...Array(10)].map((_, i) => (
+                  <div key={i} className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm animate-pulse">
+                    <div className="aspect-square bg-slate-200"></div>
+                    <div className="p-3">
+                      <div className="h-4 bg-slate-200 rounded mb-2"></div>
+                      <div className="h-3 bg-slate-200 rounded w-3/4 mb-2"></div>
+                      <div className="h-4 bg-slate-200 rounded w-1/2"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              /* Grid de produtos */
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
               {filteredProducts.map((p) => (
-                <div key={p.id} className="group bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition flex flex-col h-full">
-                  <div className="relative aspect-square overflow-hidden">
-                    <img src={p.image} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                    
-                    {/* Badges */}
-                    <div className="absolute top-2 left-2 flex flex-col gap-1">
-                      {p.discount > 0 && (
-                        <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded flex items-center gap-0.5 shadow-sm">
-                          <FaPercent className="text-[8px]" />
-                          {p.discount}%
-                        </span>
-                      )}
-                      {p.freeShipping && (
-                        <span className="px-1.5 py-0.5 bg-green-500 text-white text-[10px] font-bold rounded flex items-center gap-0.5 shadow-sm">
-                          <FaTruck className="text-[8px]" />
-                          Grátis
-                        </span>
-                      )}
-                    </div>
-
-                    <button
-                      className="absolute top-2 right-2 p-1.5 rounded-full bg-white/90 text-slate-700 hover:bg-white shadow-sm hover:shadow-md transition-all"
-                      aria-label="Salvar produto"
-                    >
-                      <FaHeart className="text-xs" />
-                    </button>
-                  </div>
-                  
-                  <div className="p-3 flex flex-col flex-1">
-                    <h4 className="font-medium text-slate-900 text-sm leading-tight mb-2 line-clamp-2 min-h-[2.5rem] flex-shrink-0">{p.name}</h4>
-                    
-                    <div className="flex items-center justify-between mb-2 flex-shrink-0">
-                      {renderStars(p.rating)}
-                      <span className="text-[10px] text-slate-500">({p.sales.toLocaleString('pt-BR')})</span>
-                    </div>
-                    
-                    <div className="mt-auto">
-                      {p.originalPrice && (
-                        <div className="mb-1">
-                          <span className="text-[10px] text-slate-400 line-through">{formatPrice(p.originalPrice)}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-bold text-blue-700 flex-1 mr-2">{formatPrice(p.price)}</span>
-                        <button className="p-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md flex-shrink-0">
-                          <FaShoppingCart className="text-xs" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div key={p.id} className="group bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition flex flex-col h-full">
+            <Link to={`/produto/${p.id}`} className="relative aspect-square overflow-hidden">
+            <img src={p.image} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+            
+            {/* Badges */}
+            <div className="absolute top-2 left-2 flex flex-col gap-1">
+            {p.discount > 0 && (
+            <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded flex items-center gap-0.5 shadow-sm">
+            <FaPercent className="text-[8px]" />
+            {p.discount}%
+            </span>
+            )}
+            {p.freeShipping && (
+            <span className="px-1.5 py-0.5 bg-green-500 text-white text-[10px] font-bold rounded flex items-center gap-0.5 shadow-sm">
+            <FaTruck className="text-[8px]" />
+            Grátis
+            </span>
+            )}
             </div>
+            
+            <button
+            onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // Lógica para favoritar
+            }}
+            className="absolute top-2 right-2 p-1.5 rounded-full bg-white/90 text-slate-700 hover:bg-white shadow-sm hover:shadow-md transition-all"
+            aria-label="Salvar produto"
+            >
+            <FaHeart className="text-xs" />
+            </button>
+            </Link>
+            
+            <div className="p-3 flex flex-col flex-1">
+            <Link to={`/produto/${p.id}`}>
+            <h4 className="font-medium text-slate-900 text-sm leading-tight mb-2 line-clamp-2 min-h-[2.5rem] flex-shrink-0 hover:text-blue-700 transition-colors">{p.name}</h4>
+            </Link>
+            
+            <div className="flex items-center justify-between mb-2 flex-shrink-0">
+            {renderStars(p.rating)}
+            <span className="text-[10px] text-slate-500">({p.sales.toLocaleString('pt-BR')})</span>
+            </div>
+            
+            <div className="mt-auto">
+            {p.originalPrice && (
+            <div className="mb-1">
+            <span className="text-[10px] text-slate-400 line-through">{formatPrice(p.originalPrice)}</span>
+            </div>
+            )}
+            <div className="flex items-center justify-between">
+            <span className="text-sm font-bold text-blue-700 flex-1 mr-2">{formatPrice(p.price)}</span>
+            <button 
+            onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // Lógica para adicionar ao carrinho
+            alert('Produto adicionado ao carrinho!');
+            }}
+            className="p-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md flex-shrink-0"
+            >
+            <FaShoppingCart className="text-xs" />
+            </button>
+            </div>
+            </div>
+            </div>
+            </div>
+            ))}
+            </div>
+            )}
 
             {/* Caso não encontre produtos */}
-            {filteredProducts.length === 0 && (
+            {!loading && filteredProducts.length === 0 && (
               <div className="text-center py-16 text-slate-500">
                 <p className="text-lg mb-2">Nenhum produto encontrado</p>
                 <p className="text-sm">Tente ajustar os filtros ou buscar por outros termos</p>

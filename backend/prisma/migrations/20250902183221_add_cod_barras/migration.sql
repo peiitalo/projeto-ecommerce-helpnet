@@ -7,14 +7,3 @@
 
 */
 -- AlterTable
-ALTER TABLE "public"."Cliente" DROP COLUMN "DataNascimento",
-ADD COLUMN     "DataCadastro" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
-
--- AlterTable
-ALTER TABLE "public"."Endereco" ADD COLUMN     "Obrigatorio" BOOLEAN NOT NULL DEFAULT false;
-
--- AlterTable
-ALTER TABLE "public"."Produto" ADD COLUMN     "CodBarras" TEXT NOT NULL;
-
--- CreateIndex
-CREATE UNIQUE INDEX "Produto_CodBarras_key" ON "public"."Produto"("CodBarras");

@@ -5,6 +5,9 @@ import Cadastro from './pages/cadastro';
 import Dashboard from './pages/admin/dashboard';
 import NotFound from './pages/errors/notFound';
 import Home from './pages/clients/Home';
+import ProductPage from './pages/clients/ProductPage';
+import ProductsManagement from './pages/admin/ProductsManagement';
+import ProductForm from './pages/admin/ProductForm';
 
 function App() {
   return (
@@ -20,6 +23,13 @@ function App() {
         
         {/* Área do cliente */}
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/produto/:id" element={<ProductPage />} />
+        
+        {/* Área administrativa */}
+        <Route path="/admin" element={<Dashboard />} />
+        <Route path="/admin/produtos" element={<ProductsManagement />} />
+        <Route path="/admin/produtos/novo" element={<ProductForm />} />
+        <Route path="/admin/produtos/:id/editar" element={<ProductForm />} />
         
         {/* Páginas futuras - podem ser implementadas depois */}
         <Route path="/produtos" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">Produtos - Em desenvolvimento</h1></div>} />
