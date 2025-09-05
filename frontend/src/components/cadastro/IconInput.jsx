@@ -1,7 +1,6 @@
 import { CLASSES } from '../constants/classes';
 
 export default function IconInput({ 
-  icon: Icon, 
   name, 
   type = "text", 
   placeholder, 
@@ -12,7 +11,6 @@ export default function IconInput({
 }) {
   return (
     <div className={CLASSES.grupoInput}>
-      <Icon className={CLASSES.iconeInput} />
       <input
         className={CLASSES.input}
         type={type}

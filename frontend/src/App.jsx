@@ -4,7 +4,7 @@ import Login from './pages/login';
 import Cadastro from './pages/cadastro';
 import Dashboard from './pages/admin/dashboard';
 import NotFound from './pages/errors/notFound';
-import Home from './pages/clients/Home';
+import Home from './pages/clients/home';
 
 function App() {
   return (

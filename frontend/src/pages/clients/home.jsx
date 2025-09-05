@@ -211,6 +211,79 @@ function Home() {
 
   // Filtros aplicados
   const filteredProducts = useMemo(() => {
+    // Produtos mockados com mais informações
+    const products = [
+      {
+        id: 'p1',
+        name: 'Fone Bluetooth Noise Cancelling',
+        price: 399.9,
+        originalPrice: 499.9,
+        image: 'https://images.unsplash.com/photo-1518779578993-ec3579fee39f?q=80&w=1200&auto=format&fit=crop',
+        rating: 4.6,
+        sales: 1240,
+        category: 'Eletrônicos',
+        freeShipping: true,
+        discount: 20
+      },
+      {
+        id: 'p2',
+        name: 'Smartwatch Pro Series',
+        price: 899.9,
+        image: 'https://images.unsplash.com/photo-1517411032315-54ef2cb783bb?q=80&w=1200&auto=format&fit=crop',
+        rating: 4.3,
+        sales: 820,
+        category: 'Eletrônicos',
+        freeShipping: true,
+        discount: 0
+      },
+      {
+        id: 'p3',
+        name: 'Tênis Corrida Performance',
+        price: 349.9,
+        originalPrice: 449.9,
+        image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=1200&auto=format&fit=crop',
+        rating: 4.8,
+        sales: 1960,
+        category: 'Esportes',
+        freeShipping: false,
+        discount: 22
+      },
+      {
+        id: 'p4',
+        name: 'Cafeteira Automática',
+        price: 729.9,
+        image: 'https://images.unsplash.com/photo-1504754524776-8f4f37790ca0?q=80&w=1200&auto=format&fit=crop',
+        rating: 4.2,
+        sales: 540,
+        category: 'Casa & Decoração',
+        freeShipping: true,
+        discount: 0
+      },
+      {
+        id: 'p5',
+        name: 'Cadeira Ergonômica Gamer',
+        price: 1299.9,
+        originalPrice: 1599.9,
+        image: 'https://images.unsplash.com/photo-1616628188460-8a47f364262e?q=80&w=1200&auto=format&fit=crop',
+        rating: 4.5,
+        sales: 720,
+        category: 'Casa & Decoração',
+        freeShipping: true,
+        discount: 19
+      },
+      {
+        id: 'p6',
+        name: 'Teclado Mecânico RGB',
+        price: 299.9,
+        image: 'https://images.unsplash.com/photo-1610395219791-21b8a9aef6da?q=80&w=1200&auto=format&fit=crop',
+        rating: 4.1,
+        sales: 1120,
+        category: 'Eletrônicos',
+        freeShipping: false,
+        discount: 0
+      }
+    ];
+
     let filtered = products;
 
     // Filtro por texto

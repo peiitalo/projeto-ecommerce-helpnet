@@ -19,7 +19,7 @@ export function useBuscarCep() {
         cidade: dados.localidade,
         estado: dados.uf,
       };
-    } catch (e) {
+    } catch {
       return { erro: true };
     } finally {
       setCarregandoCep(false);

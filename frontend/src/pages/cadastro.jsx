@@ -197,13 +197,22 @@ function Cadastro() {
     cep: "",
     codigoIBGE: "",
     dataNascimento: "",
+    enderecoCobranca: "",
+    numeroCobranca: "",
+    complementoCobranca: "",
+    bairroCobranca: "",
+    cidadeCobranca: "",
+    estadoCobranca: "",
+    cepCobranca: "",
+    codigoIBGECobranca: "",
   });
-
   const [erros, setErros] = useState([]);
   const [carregando, setCarregando] = useState(false);
   const { buscarCep, carregandoCep } = useBuscarCep();
   const [animacao, setAnimacao] = useState(false);
   const [novoCodigoCliente, setNovoCodigoCliente] = useState(null);
+  const [enderecoCobrancaIgualEntrega, setEnderecoCobrancaIgualEntrega] =
+    useState(true);
 
   useEffect(() => {
     setAnimacao(true);
@@ -260,6 +269,31 @@ function Cadastro() {
 
       if (!dadosFormulario.telefoneCelular.trim())
         errosValidacao.push("Celular com DDD é obrigatório.");
+
+      if (!enderecoCobrancaIgualEntrega) {
+        if (!dadosFormulario.cepCobranca.trim())
+          errosValidacao.push("CEP do endereço de cobrança é obrigatório.");
+        else {
+          const { isValid, errors } = validateCEP(dadosFormulario.cepCobranca);
+          if (!isValid) errosValidacao.push(...errors);
+        }
+        if (!dadosFormulario.enderecoCobranca.trim())
+          errosValidacao.push("Endereço de cobrança é obrigatório.");
+        if (!dadosFormulario.numeroCobranca.trim())
+          errosValidacao.push("Número do endereço de cobrança é obrigatório.");
+        if (!dadosFormulario.bairroCobranca.trim())
+          errosValidacao.push("Bairro do endereço de cobrança é obrigatório.");
+        if (!dadosFormulario.cidadeCobranca.trim())
+          errosValidacao.push("Cidade do endereço de cobrança é obrigatória.");
+        if (!dadosFormulario.estadoCobranca.trim())
+          errosValidacao.push("Estado do endereço de cobrança é obrigatório.");
+        if (dadosFormulario.codigoIBGECobranca.trim()) {
+          const { isValid, errors } = validateCodigoIBGE(
+            dadosFormulario.codigoIBGECobranca
+          );
+          if (!isValid) errosValidacao.push(...errors);
+        }
+      }
     } else if (etapaAtual === 3) {
       if (!dadosFormulario.cep.trim())
         errosValidacao.push("CEP é obrigatório.");
@@ -293,15 +327,6 @@ function Cadastro() {
   const proximaEtapa = () => {
     const errosValidacao = validarEtapa();
     if (errosValidacao.length > 0) {
-      const proximaEtapa = () => {
-        const errosValidacao = validarEtapa();
-        if (errosValidacao.length > 0) {
-          setErros(errosValidacao);
-          return;
-        }
-        setErros([]);
-        setEtapaAtual((prev) => prev + 1);
-      };
       setErros(errosValidacao);
       return;
     }
@@ -321,6 +346,7 @@ function Cadastro() {
     if (name === "cpf") valorMascarado = mascararCPF(value);
     else if (name === "cnpj") valorMascarado = mascararCNPJ(value);
     else if (name === "cep") valorMascarado = mascararCEP(value);
+    else if (name === "cepCobranca") valorMascarado = mascararCEP(value);
     else if (["telefoneCelular", "whatsapp", "telefoneFixo"].includes(name))
       valorMascarado = mascararTelefone(value);
 
@@ -338,6 +364,22 @@ function Cadastro() {
           bairro: resultado.bairro,
           cidade: resultado.cidade,
           estado: resultado.estado,
+        }));
+      }
+    }
+
+    if (name === "cepCobranca") {
+      const resultado = await buscarCep(value);
+      if (resultado?.erro) {
+        setErros(["CEP de cobrança não encontrado."]);
+      } else if (resultado) {
+        setErros([]);
+        setDadosFormulario((prev) => ({
+          ...prev,
+          enderecoCobranca: resultado.endereco,
+          bairroCobranca: resultado.bairro,
+          cidadeCobranca: resultado.cidade,
+          estadoCobranca: resultado.estado,
         }));
       }
     }
@@ -372,6 +414,15 @@ function Cadastro() {
       Estado: dadosFormulario.estado,
       CEP: dadosFormulario.cep,
       CodigoIBGE: dadosFormulario.codigoIBGE,
+      EnderecoCobranca: dadosFormulario.enderecoCobranca,
+      NumeroCobranca: dadosFormulario.numeroCobranca,
+      ComplementoCobranca: dadosFormulario.complementoCobranca,
+      BairroCobranca: dadosFormulario.bairroCobranca,
+      CidadeCobranca: dadosFormulario.cidadeCobranca,
+      EstadoCobranca: dadosFormulario.estadoCobranca,
+      CepCobranca: dadosFormulario.cepCobranca,
+      CodigoIBGECobranca: dadosFormulario.codigoIBGECobranca,
+      enderecoCobrancaIgualEntrega: enderecoCobrancaIgualEntrega,
     };
 
     try {
@@ -566,6 +617,7 @@ function Cadastro() {
             <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-slate-800">
               Endereço de Entrega
             </h2>
+            {/* Formulário endereço de entrega */}
             <div className={classeGrupoInput}>
               <FaMapMarkerAlt className={classeIconeInput} />
               <InputMask
@@ -660,6 +712,124 @@ function Cadastro() {
                 maxLength="7"
               />
             </div>
+
+            {/* Checkbox para endereço de cobrança */}
+            <label className="flex items-center gap-2 mb-4">
+              <input
+                type="checkbox"
+                checked={enderecoCobrancaIgualEntrega}
+                onChange={() =>
+                  setEnderecoCobrancaIgualEntrega(
+                    !enderecoCobrancaIgualEntrega
+                  )
+                }
+                className="w-5 h-5"
+              />
+              <span>Este também será seu endereço de cobrança</span>
+            </label>
+
+            {/* Formulário endereço de cobrança, só aparece se checkbox desmarcada */}
+            {!enderecoCobrancaIgualEntrega && (
+              <>
+                <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-slate-800">
+                  Endereço de Cobrança
+                </h2>
+                <div className={classeGrupoInput}>
+                  <FaMapMarkerAlt className={classeIconeInput} />
+                  <InputMask
+                    mask="_____-___"
+                    replacement={{ _: /\d/ }}
+                    value={dadosFormulario.cepCobranca}
+                    onChange={lidarComAlteracao}
+                    name="cepCobranca"
+                    className={classeInput}
+                    placeholder="CEP"
+                  />
+                  {carregandoCep && (
+                    <FiLoader className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-blue-500" />
+                  )}
+                </div>
+                <div className={classeGrupoInput}>
+                  <FaMapMarkerAlt className={classeIconeInput} />
+                  <input
+                    className={classeInput}
+                    name="enderecoCobranca"
+                    placeholder="Endereço"
+                    value={dadosFormulario.enderecoCobranca}
+                    onChange={lidarComAlteracao}
+                    disabled={carregandoCep}
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className={classeGrupoInput}>
+                    <FaMapMarkerAlt className={classeIconeInput} />
+                    <input
+                      className={classeInput}
+                      name="numeroCobranca"
+                      placeholder="Número"
+                      value={dadosFormulario.numeroCobranca}
+                      onChange={lidarComAlteracao}
+                    />
+                  </div>
+                  <div className={classeGrupoInput}>
+                    <FaMapMarkerAlt className={classeIconeInput} />
+                    <input
+                      className={classeInput}
+                      name="complementoCobranca"
+                      placeholder="Complemento"
+                      value={dadosFormulario.complementoCobranca}
+                      onChange={lidarComAlteracao}
+                    />
+                  </div>
+                </div>
+                <div className={classeGrupoInput}>
+                  <FaMapMarkerAlt className={classeIconeInput} />
+                  <input
+                    className={classeInput}
+                    name="bairroCobranca"
+                    placeholder="Bairro"
+                    value={dadosFormulario.bairroCobranca}
+                    onChange={lidarComAlteracao}
+                    disabled={carregandoCep}
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className={`${classeGrupoInput} sm:col-span-2`}>
+                    <FaCity className={classeIconeInput} />
+                    <input
+                      className={classeInput}
+                      name="cidadeCobranca"
+                      placeholder="Cidade"
+                      value={dadosFormulario.cidadeCobranca}
+                      onChange={lidarComAlteracao}
+                      disabled={carregandoCep}
+                    />
+                  </div>
+                  <div className={classeGrupoInput}>
+                    <FaCity className={classeIconeInput} />
+                    <input
+                      className={classeInput}
+                      name="estadoCobranca"
+                      placeholder="UF"
+                      value={dadosFormulario.estadoCobranca}
+                      onChange={lidarComAlteracao}
+                      disabled={carregandoCep}
+                    />
+                  </div>
+                </div>
+                <div className={classeGrupoInput}>
+                  <FaIdCard className={classeIconeInput} />
+                  <input
+                    className={classeInput}
+                    name="codigoIBGECobranca"
+                    placeholder="Código IBGE (Opcional)"
+                    value={dadosFormulario.codigoIBGECobranca}
+                    onChange={lidarComAlteracao}
+                    maxLength="7"
+                  />
+                </div>
+              </>
+            )}
           </div>
         );
       case 4:
@@ -676,8 +846,12 @@ function Cadastro() {
               {tipoPessoa === "fisica" ? (
                 <>
                   <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                    <span className="font-semibold text-slate-600">Nome:</span>
-                    <span className="break-words">{dadosFormulario.nome}</span>
+                    <span className="font-semibold text-slate-600">
+                      Nome:
+                    </span>
+                    <span className="break-words">
+                      {dadosFormulario.nome}
+                    </span>
                   </p>
                   <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
                     <span className="font-semibold text-slate-600">CPF:</span>
@@ -695,7 +869,9 @@ function Cadastro() {
                     </span>
                   </p>
                   <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                    <span className="font-semibold text-slate-600">CNPJ:</span>
+                    <span className="font-semibold text-slate-600">
+                      CNPJ:
+                    </span>
                     <span>{dadosFormulario.cnpj}</span>
                   </p>
                 </>
@@ -717,7 +893,9 @@ function Cadastro() {
                 Endereço
               </h3>
               <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                <span className="font-semibold text-slate-600">Endereço:</span>
+                <span className="font-semibold text-slate-600">
+                  Endereço:
+                </span>
                 <span className="break-words">{`${dadosFormulario.endereco}, ${dadosFormulario.numero}`}</span>
               </p>
               <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
@@ -725,7 +903,9 @@ function Cadastro() {
                 <span className="break-words">{dadosFormulario.bairro}</span>
               </p>
               <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                <span className="font-semibold text-slate-600">Cidade/UF:</span>
+                <span className="font-semibold text-slate-600">
+                  Cidade/UF:
+                </span>
                 <span className="break-words">{`${dadosFormulario.cidade} / ${dadosFormulario.estado}`}</span>
               </p>
               <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
@@ -789,7 +969,8 @@ function Cadastro() {
                 }
                 disabled={carregando}
               >
-                <FiArrowLeft /> {etapaAtual === 1 ? "Trocar Tipo" : "Anterior"}
+                <FiArrowLeft />{" "}
+                {etapaAtual === 1 ? "Trocar Tipo" : "Anterior"}
               </button>
               {etapaAtual < etapas.length ? (
                 <button

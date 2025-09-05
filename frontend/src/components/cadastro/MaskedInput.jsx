@@ -3,7 +3,6 @@ import { FiLoader } from 'react-icons/fi';
 import { CLASSES } from '../constants/classes';
 
 export default function MaskedInput({ 
-  icon: Icon, 
   mask, 
   replacement, 
   name, 
@@ -14,7 +13,6 @@ export default function MaskedInput({
 }) {
   return (
     <div className={CLASSES.grupoInput}>
-      <Icon className={CLASSES.iconeInput} />
       <InputMask
         mask={mask}
         replacement={replacement}
