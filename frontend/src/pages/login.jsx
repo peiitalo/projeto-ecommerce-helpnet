@@ -8,7 +8,7 @@ import {
   FiEyeOff,
   FiCheckCircle,
 } from "react-icons/fi";
-import { baseUrl } from "../config/api";
+import { clienteService } from "../services/api";
 
 // Componente para a tela de sucesso do login
 const TelaLoginSucesso = ({ dadosCliente }) => (
@@ -66,33 +66,46 @@ function Login() {
     }
 
     if (errosValidacao.length > 0) {
+      console.error("⚠️ [Login] Erros de validação:", errosValidacao);
       setErros(errosValidacao);
       setCarregando(false);
       return;
     }
 
     try {
-      const response = await fetch(`${baseUrl}/clientes/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: dadosLogin.email,
-          senha: dadosLogin.senha,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.errors?.join("\n") || "Erro ao fazer login");
-      }
-
+      console.log("📡 [Login] Enviando requisição via clienteService.login");
+      const data = await clienteService.login(dadosLogin.email, dadosLogin.senha);
+      console.log("✅ [Login] Login bem-sucedido:", data);
       setLoginSucesso(data.data);
 
+      // MVP: definir role com base no retorno do backend, aqui simulamos cliente
+      const role = data?.data?.role || 'cliente';
+      const empresaId = data?.data?.empresaId || null;
+
+      // persistir sessão
+      try {
+        localStorage.setItem('auth:user', JSON.stringify({
+          id: data?.data?.id,
+          nome: data?.data?.nome,
+          email: data?.data?.email,
+          role,
+          empresaId,
+          token: data?.token || data?.data?.token || null,
+        }));
+      } catch (_e) {}
+
       setTimeout(() => {
-        navigate("/home");
-      }, 2000);
+        // redirecionar por role
+        if (role === 'admin') return navigate('/admin');
+        if (role === 'vendedor') return navigate('/vendedor');
+        return navigate('/home');
+      }, 800);
     } catch (error) {
+      console.error("🔥 [Login] Erro inesperado:", {
+        message: error.message,
+        stack: error.stack,
+      });
+
       setErros(
         Array.isArray(error.message.split("\n"))
           ? error.message.split("\n")

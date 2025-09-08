@@ -1,7 +1,8 @@
-const validator = require('validator');
-const { cpf, cnpj } = require('cpf-cnpj-validator');
+// backend/src/utils/validators.js
+import { cpf, cnpj } from 'cpf-cnpj-validator';
+import validator from 'validator';
 
-const validatePassword = (password) => {
+export const validatePassword = (password) => {
   const minLength = 8;
   const hasUpperCase = /[A-Z]/.test(password);
   const hasLowerCase = /[a-z]/.test(password);
@@ -21,7 +22,7 @@ const validatePassword = (password) => {
   };
 };
 
-const validateDocument = (numero, tipo) => {
+export const validateDocument = (numero, tipo) => {
   const cleanDoc = numero.replace(/[^\d]/g, '');
   
   if (tipo === 'Física') {
@@ -39,14 +40,14 @@ const validateDocument = (numero, tipo) => {
   }
 };
 
-const validateEmail = (email) => {
+export const validateEmail = (email) => {
   return {
     isValid: validator.isEmail(email),
     errors: validator.isEmail(email) ? [] : ['Email inválido']
   };
 };
 
-const validateCEP = (cep) => {
+export const validateCEP = (cep) => {
   const cleanCEP = cep.replace(/[^\d]/g, '');
   return {
     isValid: /^\d{8}$/.test(cleanCEP),
@@ -55,7 +56,7 @@ const validateCEP = (cep) => {
   };
 };
 
-const validateCodigoIBGE = (codigo) => {
+export const validateCodigoIBGE = (codigo) => {
   if (!codigo || codigo.trim() === '') {
     return {
       isValid: true, // Campo opcional
@@ -74,10 +75,3 @@ const validateCodigoIBGE = (codigo) => {
   };
 };
 
-module.exports = {
-  validatePassword,
-  validateDocument,
-  validateEmail,
-  validateCEP,
-  validateCodigoIBGE
-};

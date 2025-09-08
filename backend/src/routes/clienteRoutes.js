@@ -1,10 +1,11 @@
-const express = require('express');
-const router = express.Router();
-const clienteController = require('../controllers/clienteController');
+import express from 'express';
+import * as clienteController from '../controllers/clienteController.js';
+
+const router = express.Router();    
 
 
-// Rotas para clientes
-router.post('/clientes', clienteController.criarCliente);
-router.post('/clientes/login', clienteController.login);
+// Rotas para clientes (compatível com montagens em /api/clientes e /clientes)
+router.post('/cadastro', clienteController.criarCliente);
+router.post('/login', clienteController.login);
 
-module.exports = router;
+export default router;

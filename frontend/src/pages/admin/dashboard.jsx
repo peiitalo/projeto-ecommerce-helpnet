@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from "react-router-dom";
 import { FaUser, FaShoppingCart, FaCog, FaSignOutAlt } from 'react-icons/fa';
 import {
@@ -17,9 +17,15 @@ import {
   FiBriefcase,
   FiPlus
 } from 'react-icons/fi';
+import { produtoService } from '../../services/api';
+import AdminLayout from '../../components/AdminLayout';
 
 function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const [productsTotal, setProductsTotal] = useState(null);
+  const [productsActive, setProductsActive] = useState(null);
+  const [productsNoStock, setProductsNoStock] = useState(null);
 
   // Usuário admin mockado - em produção viriam do contexto/estado global
   const adminUser = {
@@ -28,12 +34,34 @@ function Dashboard() {
     id: "ADM-0001"
   };
 
+  useEffect(() => {
+    let isMounted = true;
+    const loadData = async () => {
+      try {
+        const [all, active, noStock] = await Promise.all([
+          produtoService.listar({ limit: 1 }),
+          produtoService.listar({ status: 'ativo', limit: 1 }),
+          produtoService.listar({ status: 'sem-estoque', limit: 1 }),
+        ]);
+        if (!isMounted) return;
+        const getTotal = (resp) => resp?.total ?? (Array.isArray(resp) ? resp.length : (resp?.produtos?.length ?? 0));
+        setProductsTotal(getTotal(all));
+        setProductsActive(getTotal(active));
+        setProductsNoStock(getTotal(noStock));
+      } catch (e) {
+        console.error('Erro ao carregar KPIs de produtos:', e);
+      }
+    };
+    loadData();
+    return () => { isMounted = false; };
+  }, []);
+
   // KPIs do painel administrativo
   const kpis = [
     { titulo: "Receita", valor: "R$ 12.450", icone: <FiBarChart2 />, cor: "bg-blue-600" },
     { titulo: "Pedidos", valor: "126", icone: <FiPackage />, cor: "bg-blue-500" },
     { titulo: "Clientes", valor: "824", icone: <FiUsers />, cor: "bg-blue-400" },
-    { titulo: "Produtos", valor: "342", icone: <FiBox />, cor: "bg-blue-700" },
+    { titulo: "Produtos", valor: productsTotal !== null ? String(productsTotal) : "342", icone: <FiBox />, cor: "bg-blue-700" },
   ];
 
   const pedidosRecentes = [
@@ -68,112 +96,8 @@ function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      {/* Overlay Mobile */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-slate-900/50 md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar Mobile (Drawer) */}
-      <div
-        className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-200 transform transition-transform duration-200 ease-in-out md:hidden ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
-      >
-        <div className="h-16 px-4 border-b border-slate-200 flex items-center justify-between">
-          <Link to="/" className="text-lg font-semibold text-blue-700">HelpNet Admin</Link>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="p-2 rounded-lg text-blue-700 hover:bg-blue-50 border border-transparent hover:border-blue-200"
-            aria-label="Fechar menu"
-          >
-            <FiX />
-          </button>
-        </div>
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          <p className="px-3 text-xs font-semibold tracking-wide text-slate-500 uppercase">Administração</p>
-          {menuAdministrativo.map((item) => (
-            <Link
-              key={item.label}
-              to={item.to}
-              onClick={() => setSidebarOpen(false)}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 hover:bg-blue-50 hover:text-blue-700 border border-transparent hover:border-blue-200 transition-colors"
-            >
-              <span className="w-5 h-5 flex items-center justify-center">{item.icon}</span>
-              <span className="text-sm font-medium">{item.label}</span>
-            </Link>
-          ))}
-        </nav>
-        <div className="p-4 border-t border-slate-200">
-          <button className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-blue-700 hover:bg-blue-50 border border-blue-200">
-            <FaSignOutAlt />
-            <span className="text-sm font-medium">Sair</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Sidebar Desktop (sempre aberta) */}
-      <aside className="hidden md:flex md:w-72 bg-white border-r border-slate-200 flex-col">
-        <div className="h-16 px-6 border-b border-slate-200 flex items-center">
-          <Link to="/" className="text-xl font-semibold text-blue-700">
-            HelpNet Admin
-          </Link>
-        </div>
-        <nav className="flex-1 p-4 space-y-1">
-          <p className="px-3 text-xs font-semibold tracking-wide text-slate-500 uppercase">Administração</p>
-          {menuAdministrativo.map((item) => (
-            <Link
-              key={item.label}
-              to={item.to}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 hover:bg-blue-50 hover:text-blue-700 border border-transparent hover:border-blue-200 transition-colors"
-            >
-              <span className="w-5 h-5 flex items-center justify-center">{item.icon}</span>
-              <span className="text-sm font-medium">{item.label}</span>
-            </Link>
-          ))}
-        </nav>
-        <div className="p-4 border-t border-slate-200">
-          <button className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-blue-700 hover:bg-blue-50 border border-blue-200">
-            <FaSignOutAlt />
-            <span className="text-sm font-medium">Sair</span>
-          </button>
-        </div>
-      </aside>
-
-      {/* Conteúdo Principal */}
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
-          <div className="px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center gap-3">
-                {/* Botão para abrir sidebar no mobile */}
-                <button
-                  onClick={() => setSidebarOpen(true)}
-                  className="md:hidden p-2 rounded-lg text-blue-700 hover:bg-blue-50 border border-transparent hover:border-blue-200"
-                  aria-label="Abrir menu"
-                >
-                  <FiMenu />
-                </button>
-                <h1 className="text-lg lg:text-xl font-semibold text-slate-900">Painel Administrativo</h1>
-                <span className="hidden sm:inline text-slate-400">/</span>
-                <span className="hidden sm:inline text-sm text-slate-500">Visão geral</span>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <p className="text-sm font-medium text-slate-900">{adminUser.nome}</p>
-                  <p className="text-xs text-slate-500">{adminUser.email}</p>
-                </div>
-                <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center text-blue-700">
-                  <FaUser />
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <main className="px-4 sm:px-6 lg:px-8 py-8">
+    <AdminLayout>
+      <div className="px-4 sm:px-6 lg:px-8 py-8">
           {/* Boas-vindas / Introdução */}
           <section className="mb-8">
             <div className="bg-white border border-slate-200 rounded-xl p-6">
@@ -197,6 +121,43 @@ function Dashboard() {
                 </div>
               </div>
             ))}
+          </section>
+
+          {/* Métricas de Produtos (dados reais) */}
+          <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
+              <div className="flex items-center">
+                <div className="bg-blue-700 p-3 rounded-lg text-white mr-4">
+                  <FiBox />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">{productsTotal !== null ? productsTotal : '—'}</p>
+                  <p className="text-slate-600 text-sm">Produtos (Total)</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
+              <div className="flex items-center">
+                <div className="bg-green-600 p-3 rounded-lg text-white mr-4">
+                  <FiBox />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">{productsActive !== null ? productsActive : '—'}</p>
+                  <p className="text-slate-600 text-sm">Produtos Ativos</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
+              <div className="flex items-center">
+                <div className="bg-yellow-600 p-3 rounded-lg text-white mr-4">
+                  <FiBox />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">{productsNoStock !== null ? productsNoStock : '—'}</p>
+                  <p className="text-slate-600 text-sm">Sem Estoque</p>
+                </div>
+              </div>
+            </div>
           </section>
 
           <section className="grid grid-cols-1 xl:grid-cols-3 gap-8">
@@ -298,9 +259,8 @@ function Dashboard() {
               </div>
             </div>
           </section>
-        </main>
-      </div>
-    </div>
+        </div>
+      </AdminLayout>
   );
 }
 

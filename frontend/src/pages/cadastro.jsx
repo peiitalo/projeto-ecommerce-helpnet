@@ -320,7 +320,9 @@ function Cadastro() {
         if (!isValid) errosValidacao.push(...errors);
       }
     }
-
+    if (errosValidacao.length > 0) {
+      console.error("Erros de validação:", errosValidacao); // log dos erros de validação
+    }
     return errosValidacao;
   };
 
@@ -355,6 +357,7 @@ function Cadastro() {
     if (name === "cep") {
       const resultado = await buscarCep(value);
       if (resultado?.erro) {
+        console.error("CEP não encontrado:", value); // log do CEP inválido
         setErros(["CEP não encontrado."]);
       } else if (resultado) {
         setErros([]);
@@ -367,10 +370,10 @@ function Cadastro() {
         }));
       }
     }
-
     if (name === "cepCobranca") {
       const resultado = await buscarCep(value);
       if (resultado?.erro) {
+        console.error("CEP de cobrança não encontrado:", value); // log do CEP cobrança inválido
         setErros(["CEP de cobrança não encontrado."]);
       } else if (resultado) {
         setErros([]);
@@ -429,6 +432,7 @@ function Cadastro() {
       const dados = await criarCliente(dadosCliente);
       setNovoCodigoCliente(dados.data.CodigoCliente);
     } catch (error) {
+      console.error("Erro ao criar cliente:", error); // <-- log do erro completo
       setErros(
         Array.isArray(error.message.split("\n"))
           ? error.message.split("\n")
@@ -719,9 +723,7 @@ function Cadastro() {
                 type="checkbox"
                 checked={enderecoCobrancaIgualEntrega}
                 onChange={() =>
-                  setEnderecoCobrancaIgualEntrega(
-                    !enderecoCobrancaIgualEntrega
-                  )
+                  setEnderecoCobrancaIgualEntrega(!enderecoCobrancaIgualEntrega)
                 }
                 className="w-5 h-5"
               />
@@ -846,12 +848,8 @@ function Cadastro() {
               {tipoPessoa === "fisica" ? (
                 <>
                   <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                    <span className="font-semibold text-slate-600">
-                      Nome:
-                    </span>
-                    <span className="break-words">
-                      {dadosFormulario.nome}
-                    </span>
+                    <span className="font-semibold text-slate-600">Nome:</span>
+                    <span className="break-words">{dadosFormulario.nome}</span>
                   </p>
                   <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
                     <span className="font-semibold text-slate-600">CPF:</span>
@@ -869,9 +867,7 @@ function Cadastro() {
                     </span>
                   </p>
                   <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                    <span className="font-semibold text-slate-600">
-                      CNPJ:
-                    </span>
+                    <span className="font-semibold text-slate-600">CNPJ:</span>
                     <span>{dadosFormulario.cnpj}</span>
                   </p>
                 </>
@@ -893,9 +889,7 @@ function Cadastro() {
                 Endereço
               </h3>
               <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                <span className="font-semibold text-slate-600">
-                  Endereço:
-                </span>
+                <span className="font-semibold text-slate-600">Endereço:</span>
                 <span className="break-words">{`${dadosFormulario.endereco}, ${dadosFormulario.numero}`}</span>
               </p>
               <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
@@ -903,9 +897,7 @@ function Cadastro() {
                 <span className="break-words">{dadosFormulario.bairro}</span>
               </p>
               <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                <span className="font-semibold text-slate-600">
-                  Cidade/UF:
-                </span>
+                <span className="font-semibold text-slate-600">Cidade/UF:</span>
                 <span className="break-words">{`${dadosFormulario.cidade} / ${dadosFormulario.estado}`}</span>
               </p>
               <p className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
@@ -969,8 +961,7 @@ function Cadastro() {
                 }
                 disabled={carregando}
               >
-                <FiArrowLeft />{" "}
-                {etapaAtual === 1 ? "Trocar Tipo" : "Anterior"}
+                <FiArrowLeft /> {etapaAtual === 1 ? "Trocar Tipo" : "Anterior"}
               </button>
               {etapaAtual < etapas.length ? (
                 <button

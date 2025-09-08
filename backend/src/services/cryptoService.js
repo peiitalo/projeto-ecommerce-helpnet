@@ -1,5 +1,5 @@
-const bcrypt = require('bcryptjs');
-
+// backend/src/services/cryptoService.js
+import bcrypt from 'bcryptjs';
 const SALT_ROUNDS = 12;
 
 const cryptoService = {
@@ -25,4 +25,4 @@ const cryptoService = {
   }
 };
 
-module.exports = cryptoService;
+export default cryptoService;

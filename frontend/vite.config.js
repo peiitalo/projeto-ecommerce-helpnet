@@ -5,8 +5,12 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: '0.0.0.0',
+    host: true, // bind 0.0.0.0 and let HMR use the browser's hostname
     port: 5173,
-    strictPort: true
+    strictPort: true,
+    hmr: {
+      // Ensure the client connects back on the exposed port
+      clientPort: 5173,
+    },
   }
 })
