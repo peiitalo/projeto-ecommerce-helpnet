@@ -205,9 +205,9 @@ function Login() {
                 <FaEnvelope className={classeIconeInput} />
                 <input
                   className={classeInput}
-                  type="email"
+                  type="text"
                   name="email"
-                  placeholder="Seu e-mail"
+                  placeholder="E-mail, CPF/CNPJ ou telefone"
                   value={dadosLogin.email}
                   onChange={lidarComAlteracao}
                   required

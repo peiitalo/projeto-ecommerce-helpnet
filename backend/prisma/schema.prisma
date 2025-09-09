@@ -50,7 +50,7 @@ model Cliente {
   DataCadastro       DateTime   @default(now())
   enderecos          Endereco[]
   pedidos            Pedido[]
-  role               Role
+  role               Role       @default(CLIENTE)
   @@map("Cliente")
 }
 
