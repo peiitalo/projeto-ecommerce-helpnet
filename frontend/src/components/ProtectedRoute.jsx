@@ -18,7 +18,7 @@ export default function ProtectedRoute({ allowedRoles }) {
   if (Array.isArray(allowedRoles) && allowedRoles.length > 0) {
     if (!allowedRoles.includes(user.role)) {
       // Redirecionar por função
-      if (user.role === 'vendedor') return <Navigate to="/vendedor" replace />;
+      if (user.role === 'vendedor' || user.role === 'juridico') return <Navigate to="/vendedor" replace />;
       if (user.role === 'admin') return <Navigate to="/admin" replace />;
       return <Navigate to="/home" replace />;
     }

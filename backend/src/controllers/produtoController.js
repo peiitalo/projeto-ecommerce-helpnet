@@ -15,7 +15,8 @@ export const listarProdutos = async (req, res) => {
     else if (status === "sem-estoque") where.Estoque = 0;
 
     if (busca) {
-      where.or = [
+      // Uso correto de OR no Prisma para busca por nome/SKU (case-insensitive)
+      where.OR = [
         { Nome: { contains: busca, mode: "insensitive" } },
         { SKU: { contains: busca, mode: "insensitive" } },
       ];
@@ -24,7 +25,18 @@ export const listarProdutos = async (req, res) => {
     const [produtos, total] = await prisma.$transaction([
       prisma.produto.findMany({
         where,
-        include: { categoria: true },
+        // Seleciona apenas campos necessários para reduzir payload
+        select: {
+          ProdutoID: true,
+          Nome: true,
+          Preco: true,
+          PrecoOriginal: true,
+          Imagens: true,
+          FreteGratis: true,
+          Desconto: true,
+          categoria: { select: { Nome: true } },
+          criadoEm: true,
+        },
         orderBy: { criadoEm: "desc" },
         skip,
         take: parseInt(limit),
@@ -33,6 +45,8 @@ export const listarProdutos = async (req, res) => {
     ]);
 
     logger.info('listar_produtos_ok', { total, filtros: req.query });
+    // Cache curto para melhorar TTFB em listagens
+    res.set('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=120');
     res.json({ produtos, total });
   } catch (error) {
     logControllerError('listar_produtos_error', error, req);
@@ -45,7 +59,7 @@ export const buscarProdutoPorId = async (req, res) => {
     const { id } = req.params;
     const produto = await prisma.produto.findUnique({
       where: { ProdutoID: parseInt(id) },
-      include: { categoria: true },
+      include: { categoria: true, empresa: { select: { EmpresaID: true, Nome: true } } },
     });
 
     if (!produto) {

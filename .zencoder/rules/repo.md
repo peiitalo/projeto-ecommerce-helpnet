@@ -6,14 +6,13 @@ alwaysApply: true
 # E-commerce HelpNet Project Information
 
 ## Summary
-An e-commerce platform with a React frontend, Node.js backend, and PostgreSQL database. The project is fully containerized with Docker and includes a complete shopping system with product management, user accounts, and order processing.
+Full-stack e-commerce application with React frontend, Node.js backend, and PostgreSQL database. The project is containerized with Docker for easy deployment and development.
 
 ## Structure
-- **backend/**: Node.js Express API with Prisma ORM
 - **frontend/**: React application built with Vite and TailwindCSS
-- **docker/**: Docker Compose configurations for development and production
-- **scripts/**: Utility scripts for Docker and mobile setup
-- **config/**: Configuration files for the project
+- **backend/**: Node.js API with Express and Prisma ORM
+- **docker/**: Docker configuration files for containerization
+- **scripts/**: Utility scripts for Docker and development setup
 
 ## Language & Runtime
 **Frontend**:
@@ -36,87 +35,68 @@ An e-commerce platform with a React frontend, Node.js backend, and PostgreSQL da
 - React 19.1.1
 - React Router DOM 7.8.2
 - React Icons 5.5.0
-- CPF/CNPJ Validator 1.0.3
-
-**Development Dependencies**:
-- Vite 7.1.2
 - TailwindCSS 3.4.17
-- ESLint 9.33.0
-- PostCSS 8.5.6
 
 ### Backend
 **Main Dependencies**:
 - Express 5.1.0
 - Prisma Client 6.15.0
 - bcryptjs 3.0.2
-- CORS 2.8.5
-- Nodemon 3.1.10 (for development)
-
-**Development Dependencies**:
-- Prisma CLI 6.15.0
-
-## Build & Installation
-
-### Frontend
-```bash
-cd frontend
-npm install
-npm run dev     # Development server
-npm run build   # Production build
-```
-
-### Backend
-```bash
-cd backend
-npm install
-npx prisma generate
-npx prisma migrate deploy
-npm run dev     # Development server
-npm start       # Production server
-```
-
-## Docker
-**Docker Compose**: docker/docker-compose.yml
-**Images**:
-- Frontend: node:18-alpine
-- Backend: node:18-alpine
-- Database: postgres:15-alpine (implied from README)
-
-**Configuration**:
-- Frontend runs on port 5173
-- Backend runs on port 3001
-- PostgreSQL runs on port 5432
-- All services connected via ecommerce-network
-
-**Run Commands**:
-```bash
-# Start all services
-docker-compose up --build
-
-# Start in background
-docker-compose up --build -d
-
-# Stop services
-docker-compose down
-```
+- jsonwebtoken 9.0.2
+- cors 2.8.5
 
 ## Database
 **Type**: PostgreSQL
-**Models**:
-- Administrador: System administrators
-- Categoria: Product categories
-- Cliente: Customer information
-- Endereco: Address information
-- Produto: Product details
-- Pedido: Order information
-- ItensPedido: Order items
-- MetodoPagamento: Payment methods
-- PagamentosPedido: Order payments
+**Schema**: Prisma schema with models for:
+- Customers (Cliente)
+- Products (Produto)
+- Categories (Categoria)
+- Orders (Pedido)
+- Addresses (Endereco)
+- Payment Methods (MetodoPagamento)
 
-**Connection**: Managed through Prisma ORM with connection string:
-```
-postgresql://postgres:postgres123@postgres:5432/projeto_ecommerce
+## Build & Installation
+
+### Development Setup
+```bash
+# Start all services with Docker
+docker-compose up --build
+
+# Frontend development
+cd frontend
+npm install
+npm run dev
+
+# Backend development
+cd backend
+npm install
+npm run dev
 ```
 
-## Testing
-No specific testing framework identified in the project files.
+## Docker
+**Configuration**: Multi-container setup with docker-compose
+**Images**:
+- Frontend: node:18-alpine
+- Backend: node:18-alpine
+- Database: postgres:15-alpine (referenced in README)
+
+**Docker Compose Files**:
+- docker/docker-compose.yml: Main configuration
+- docker/docker-compose.prod.yml: Production configuration
+- docker/docker-compose.mobile.yml: Mobile development configuration
+
+## API Endpoints
+- `/api/clientes`: Customer management
+- `/api/produtos`: Product management
+- `/api/categorias`: Category management
+- `/api/vendedor/produtos`: Vendor product management
+
+## Environment Variables
+**Backend**:
+- DATABASE_URL: PostgreSQL connection string
+- PORT: API port (default: 3001)
+- SALT_ROUNDS: Password hashing rounds
+- NODE_ENV: Environment (development/production)
+
+**Frontend**:
+- VITE_API_BASE_URL: Backend API URL

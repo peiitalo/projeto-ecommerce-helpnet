@@ -12,6 +12,46 @@ import {
 import { logControllerError, logger } from "../utils/logger.js";
 import jwt from 'jsonwebtoken'
 
+// Helpers para tokens
+const ACCESS_SECRET = process.env.JWT_SECRET || 'seu_segredo';
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'seu_segredo_refresh';
+const ACCESS_EXPIRES = process.env.JWT_ACCESS_EXPIRES || '15m';
+const REFRESH_EXPIRES = process.env.JWT_REFRESH_EXPIRES || '30d';
+
+function signAccess(payload) {
+  return jwt.sign(payload, ACCESS_SECRET, { expiresIn: ACCESS_EXPIRES });
+}
+function signRefresh(payload) {
+  return jwt.sign(payload, REFRESH_SECRET, { expiresIn: REFRESH_EXPIRES });
+}
+function setRefreshCookie(res, token) {
+  const isProd = process.env.NODE_ENV === 'production';
+  res.cookie('refreshToken', token, {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
+    path: '/api/clientes',
+    maxAge: 1000 * 60 * 60 * 24 * 30, // 30 dias
+  });
+}
+function clearRefreshCookie(res) {
+  const isProd = process.env.NODE_ENV === 'production';
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
+    path: '/api/clientes',
+  });
+}
+function parseCookies(req) {
+  const header = req.headers?.cookie || '';
+  return Object.fromEntries(header.split(';').map(v => v.trim()).filter(Boolean).map(kv => {
+    const idx = kv.indexOf('=');
+    if (idx === -1) return [kv, ''];
+    return [decodeURIComponent(kv.slice(0, idx)), decodeURIComponent(kv.slice(idx + 1))];
+  }));
+}
+
 export const criarCliente = async (req, res) => {
   const {
     NomeCompleto,
@@ -194,6 +234,16 @@ export const login = async (req, res) => {
   const { email, senha } = req.body || {};
 
   try {
+    // Garante que possamos setar cookie
+    if (typeof res.cookie !== 'function') {
+      res.cookie = function(name, value, options) {
+        // fallback: set header manualmente
+        const serialized = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; Path=${options?.path || '/'}; HttpOnly; Max-Age=${Math.floor((options?.maxAge || 0)/1000)}` + (options?.secure ? '; Secure' : '') + (options?.sameSite ? `; SameSite=${options.sameSite}` : '');
+        const prev = res.getHeader('Set-Cookie');
+        const next = Array.isArray(prev) ? prev.concat(serialized) : (prev ? [prev, serialized] : [serialized]);
+        res.setHeader('Set-Cookie', next);
+      }
+    }
     // Validação básica para evitar exceptions e retornar erros claros
     const errors = [];
     if (!email || typeof email !== 'string' || !email.trim()) errors.push('Email/CPF/CNPJ ou telefone é obrigatório');
@@ -315,8 +365,11 @@ export const login = async (req, res) => {
       vendedorId: vendedorInfo?.VendedorID || null,
     };
 
-    const JWT_SECRET = process.env.JWT_SECRET || 'seu_segredo';
-    const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '7d' });
+    const accessToken = signAccess(tokenPayload);
+    const refreshToken = signRefresh({ id: tokenPayload.id });
+
+    // seta cookie httpOnly com refresh
+    setRefreshCookie(res, refreshToken);
 
     // Sugestão de redirecionamento baseada em tipo/role (alinha com rotas do frontend)
     const redirectTo = (roleLower === 'vendedor' || tipoPessoa === 'JURIDICA')
@@ -338,7 +391,7 @@ export const login = async (req, res) => {
         vendedorId: vendedorInfo?.VendedorID || null,
         // Mantém objeto vendor para compatibilidade
         vendor: vendedorInfo ? { empresaId: vendedorInfo.EmpresaID, vendedorId: vendedorInfo.VendedorID } : null,
-        token,
+        accessToken,
         redirectTo,
       },
     });
@@ -348,17 +401,76 @@ export const login = async (req, res) => {
   }
 };
 
+export const refreshToken = async (req, res) => {
+  try {
+    const cookies = parseCookies(req);
+    const token = cookies['refreshToken'];
+    if (!token) return res.status(401).json({ success: false, errors: ['Refresh token ausente'] });
+
+    const payload = jwt.verify(token, REFRESH_SECRET);
+
+    // Carrega o cliente mínimo para reemitir access (e possíveis flags)
+    const client = await prisma.cliente.findUnique({ where: { ClienteID: payload.id } });
+    if (!client) return res.status(401).json({ success: false, errors: ['Cliente não encontrado'] });
+
+    // Opcional: rotacionar refresh
+    const newRefresh = signRefresh({ id: client.ClienteID });
+    setRefreshCookie(res, newRefresh);
+
+    // Reconstroi payload do access
+    const tipoPessoa = (client.TipoPessoa || '').toUpperCase();
+    const roleLower = (tipoPessoa === 'JURIDICA' ? 'VENDEDOR' : (client.role || 'CLIENTE')).toLowerCase();
+
+    // Busca vínculo vendedor, se aplicável (leve)
+    let vendedorInfo = null;
+    if (roleLower === 'vendedor') {
+      vendedorInfo = await prisma.vendedor.findUnique({ where: { Email: client.Email }, select: { VendedorID: true, EmpresaID: true } });
+    }
+
+    const access = signAccess({
+      id: client.ClienteID,
+      email: client.Email,
+      role: roleLower,
+      tipoPessoa: client.TipoPessoa || null,
+      empresaId: vendedorInfo?.EmpresaID || null,
+      vendedorId: vendedorInfo?.VendedorID || null,
+    });
+
+    res.json({ success: true, data: { accessToken: access } });
+  } catch (err) {
+    return res.status(401).json({ success: false, errors: ['Refresh inválido ou expirado'] });
+  }
+}
+
+export const logout = async (req, res) => {
+  try {
+    clearRefreshCookie(res);
+    res.json({ success: true, message: 'Logout realizado' });
+  } catch {
+    res.json({ success: true, message: 'Logout realizado' });
+  }
+}
+
 export const autoLoginClient = async (req, res) => {
   const { user } = req;
   const client = await prisma.cliente.findUnique({ where: { ClienteID: user.id}})
 
-  if (!client) throw new Error("Cliente não encontrado")
+  if (!client) return res.status(401).json({ success: false, errors: ['Cliente não encontrado'] });
 
   // Normaliza role para minúsculas quando vier do banco (VENDEDOR/CLIENTE)
   const clientRole = (user.role || client.role || '').toString().toLowerCase();
   const tipoPessoa = (client.TipoPessoa || '').toUpperCase();
 
-  // Repassa dados de sessão úteis para o frontend decidir rotas
+  // Reemite Access curto na verificação do auto-login (opcional)
+  const newAccess = signAccess({
+    id: client.ClienteID,
+    email: client.Email,
+    role: clientRole,
+    tipoPessoa: client.TipoPessoa || null,
+    empresaId: user.empresaId || null,
+    vendedorId: user.vendedorId || null,
+  });
+
   res.json({
     success: true,
     message: "Auto login realizado com sucesso!",
@@ -370,6 +482,7 @@ export const autoLoginClient = async (req, res) => {
       tipoPessoa: client.TipoPessoa || null,
       empresaId: user.empresaId || null,
       vendedorId: user.vendedorId || null,
+      accessToken: newAccess,
       redirectTo: (clientRole === 'vendedor' || tipoPessoa === 'JURIDICA') ? '/vendedor' : '/home',
     }
   });

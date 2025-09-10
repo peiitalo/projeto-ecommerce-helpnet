@@ -14,8 +14,8 @@ router.get('/', async (req, res) => {
     const { status, busca, categoria, pagina = 1, limit = 10 } = req.query;
     const skip = (parseInt(pagina) - 1) * parseInt(limit);
 
-    // Escopo por empresa + legados sem EmpresaID
-    const empresaClause = { OR: [{ EmpresaID: req.vendorEmpresaId }, { EmpresaID: null }] };
+    // Escopo estrito por empresa (não inclui legados sem EmpresaID)
+    const empresaClause = { EmpresaID: req.vendorEmpresaId };
     const andClauses = [empresaClause];
 
     if (categoria) andClauses.push({ CategoriaID: parseInt(categoria) });

@@ -97,7 +97,7 @@ function Login() {
       setTimeout(() => {
         // redirecionar por role
         if (role === 'admin') return navigate('/admin');
-        if (role === 'vendedor') return navigate('/vendedor');
+        if (role === 'vendedor' || role === 'juridico') return navigate('/vendedor');
         return navigate('/home');
       }, 800);
     } catch (error) {

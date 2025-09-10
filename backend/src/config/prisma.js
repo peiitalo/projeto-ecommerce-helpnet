@@ -3,16 +3,37 @@ import { PrismaClient } from "@prisma/client";
 
 let url = process.env.DATABASE_URL || "";
 
-// Se estiver usando o host "pooler" do Supabase, forçamos a porta de sessão (6543)
-// para evitar problemas com prepared statements em modo transacional.
-if (url.includes(":5432")) {
-  url = url.replace(":5432", ":6543");
-}
+try {
+  if (url) {
+    const u = new URL(url);
 
-// Para uso com PgBouncer, desabilita prepared statements no Prisma.
-// Isso evita erros do tipo: "prepared statement \"sX\" already exists".
-if (url) {
-  url += url.includes("?") ? "&pgbouncer=true" : "?pgbouncer=true";
+    const hostname = u.hostname || "";
+    const isSupabase = hostname.endsWith("supabase.com");
+    const isPooler = hostname.includes("pooler.supabase.com");
+
+    // Se for Supabase, garanta SSL
+    if (isSupabase && !u.searchParams.has("sslmode")) {
+      u.searchParams.set("sslmode", "require");
+    }
+
+    // Se for o host de Pooler da Supabase, use porta 6543 e adicione flags de PgBouncer
+    if (isPooler) {
+      if (u.port !== "6543") {
+        u.port = "6543"; // porta do pooler
+      }
+      if (!u.searchParams.has("pgbouncer")) {
+        u.searchParams.set("pgbouncer", "true");
+      }
+      // Limite de conexões recomendado para Prisma + PgBouncer
+      if (!u.searchParams.has("connection_limit")) {
+        u.searchParams.set("connection_limit", "1");
+      }
+    }
+
+    url = u.toString();
+  }
+} catch (e) {
+  // Se a URL não puder ser parseada, mantém como está
 }
 
 const prisma = new PrismaClient({

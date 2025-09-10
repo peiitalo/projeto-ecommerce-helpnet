@@ -24,8 +24,12 @@ export const validatePassword = (password) => {
 
 export const validateDocument = (numero, tipo) => {
   const cleanDoc = numero.replace(/[^\d]/g, '');
-  
-  if (tipo === 'Física') {
+
+  // Normaliza tipo de pessoa para ser insensível a acentos e caixa
+  const norm = (tipo || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+  const isFisica = norm === 'fisica' || norm === 'f' || norm === 'pf';
+
+  if (isFisica) {
     return {
       isValid: cpf.isValid(cleanDoc),
       formatted: cpf.format(cleanDoc),

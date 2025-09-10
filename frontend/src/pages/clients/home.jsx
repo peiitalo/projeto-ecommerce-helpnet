@@ -239,26 +239,27 @@ function Home() {
       }
     });
 
-    // Ordenação
-    switch (sortBy) {
-      case 'price-low':
-        filtered.sort((a, b) => a.price - b.price);
-        break;
-      case 'price-high':
-        filtered.sort((a, b) => b.price - a.price);
-        break;
-      case 'rating':
-        filtered.sort((a, b) => b.rating - a.rating);
-        break;
-      case 'sales':
-        filtered.sort((a, b) => b.sales - a.sales);
-        break;
-      default:
-        // relevance - manter ordem original
-        break;
+    // Ordenação (evita mutar o array original)
+    let result = filtered;
+    if (['price-low','price-high','rating','sales'].includes(sortBy)) {
+      result = [...filtered];
+      switch (sortBy) {
+        case 'price-low':
+          result.sort((a, b) => a.price - b.price);
+          break;
+        case 'price-high':
+          result.sort((a, b) => b.price - a.price);
+          break;
+        case 'rating':
+          result.sort((a, b) => b.rating - a.rating);
+          break;
+        case 'sales':
+          result.sort((a, b) => b.sales - a.sales);
+          break;
+      }
     }
 
-    return filtered;
+    return result;
   }, [products, query, selectedFilters, sortBy]);
 
   const renderStars = (rating) => {

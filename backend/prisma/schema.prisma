@@ -101,6 +101,10 @@ model Produto {
   categoria     Categoria     @relation(fields: [CategoriaID], references: [CategoriaID])
   empresa       Empresa?      @relation(fields: [EmpresaID], references: [EmpresaID])
 
+  @@index([CategoriaID])
+  @@index([Ativo])
+  @@index([criadoEm])
+  @@index([CategoriaID, Ativo, criadoEm])
   @@map("Produto")
 }
 

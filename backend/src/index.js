@@ -9,11 +9,13 @@ import { logger, requestLogger } from './utils/logger.js';
 
 const app = express();
 
-// Configuração CORS para aceitar conexões de qualquer origem
+// Configuração CORS com credenciais (para cookies httpOnly de refresh)
 app.use(cors({
-  origin: '*',
+  origin: (origin, callback) => callback(null, true), // reflete a origem da requisição
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Empresa-ID']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Empresa-ID'],
+  exposedHeaders: ['Set-Cookie'],
 }));
 
 // Middlewares
@@ -21,11 +23,20 @@ app.use(express.json({ limit: '10mb' })); // Aumentar limite para upload de imag
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(requestLogger);
 
+// Respostas comprimidas e cache curto para assets (quando servido estático)
+try {
+  const compression = (await import('compression')).default;
+  app.use(compression());
+} catch {}
+
 // Rotas
 app.use('/api/clientes', clienteRoutes);
 app.use('/api/produtos', produtoRoutes);
 app.use('/api/categorias', categoriaRoutes);
 app.use('/api/vendedor/produtos', vendorProdutoRoutes);
+
+// Helper: healthcheck simples
+app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // Rota de teste
 app.get('/', (req, res) => {

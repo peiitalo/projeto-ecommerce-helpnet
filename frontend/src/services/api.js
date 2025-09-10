@@ -1,4 +1,4 @@
-const API_BASE_URL = (typeof window !== 'undefined' && window?.location) ? `${window.location.protocol}//${window.location.hostname}:${3001}/api` : 'http://localhost:3001/api';
+const API_BASE_URL = (import.meta?.env?.VITE_API_BASE_URL) || ((typeof window !== 'undefined' && window?.location) ? `${window.location.protocol}//${window.location.hostname}:${3001}/api` : 'http://localhost:3001/api');
 const withEmpresaHeader = (empresaId, options = {}) => ({
   ...options,
   headers: {
@@ -13,6 +13,7 @@ const fetchConfig = {
   headers: {
     'Content-Type': 'application/json',
   },
+  credentials: 'include', // necessário para enviar/receber cookies (refresh)
 };
 
 // Função auxiliar para fazer requisições
@@ -23,6 +24,17 @@ const apiRequest = async (endpoint, options = {}) => {
       ...fetchConfig,
       ...options,
     };
+
+    // Injeta Authorization se houver accessToken persistido
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      if (token) {
+        config.headers = {
+          ...(config.headers || {}),
+          Authorization: `Bearer ${token}`,
+        };
+      }
+    } catch {}
 
     const response = await fetch(url, config);
     
@@ -48,7 +60,7 @@ export const produtoService = {
     if (filtros.categoria) params.append('categoria', filtros.categoria);
     if (filtros.status) params.append('status', filtros.status);
     if (filtros.busca) params.append('busca', filtros.busca);
-    if (filtros.page) params.append('page', filtros.page);
+    if (filtros.page || filtros.pagina) params.append('pagina', filtros.pagina || filtros.page);
     if (filtros.limit) params.append('limit', filtros.limit);
 
     const queryString = params.toString();
@@ -168,10 +180,43 @@ export const clienteService = {
 
   // Login cliente
   login: async (email, senha) => {
-    return apiRequest('/clientes/login', {
+    const resp = await apiRequest('/clientes/login', {
       method: 'POST',
       body: JSON.stringify({ email, senha }),
     });
+    try {
+      const at = resp?.data?.accessToken;
+      if (at && typeof window !== 'undefined') localStorage.setItem('accessToken', at);
+    } catch {}
+    return resp;
+  },
+
+  // Refresh token -> obtém novo access via cookie httpOnly
+  refresh: async () => {
+    const resp = await apiRequest('/clientes/refresh', { method: 'POST' });
+    try {
+      const at = resp?.data?.accessToken;
+      if (at && typeof window !== 'undefined') localStorage.setItem('accessToken', at);
+    } catch {}
+    return resp;
+  },
+
+  // Auto-login usando access atual (ou após refresh)
+  autoLogin: async () => {
+    // tenta refresh antes
+    try { await apiRequest('/clientes/refresh', { method: 'POST' }); } catch {}
+    const resp = await apiRequest('/clientes/auto-login');
+    try {
+      const at = resp?.data?.accessToken;
+      if (at && typeof window !== 'undefined') localStorage.setItem('accessToken', at);
+    } catch {}
+    return resp;
+  },
+
+  // Logout: limpa refresh cookie e access local
+  logout: async () => {
+    try { if (typeof window !== 'undefined') localStorage.removeItem('accessToken'); } catch {}
+    return apiRequest('/clientes/logout', { method: 'POST' });
   },
 };
 

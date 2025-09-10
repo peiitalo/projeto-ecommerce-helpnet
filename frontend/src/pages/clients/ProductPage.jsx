@@ -141,6 +141,8 @@ function ProductPage() {
   const condicao = product?.Condicao || product?.condicao || '';
   const prazoEntrega = product?.PrazoEntrega || product?.prazoEntrega || calcularPrazoEntrega(userAddress.cep);
   const categoria = (product?.categoria && (product.categoria.Nome || product.categoria.nome)) || '';
+  const vendedorEmpresaNome = product?.empresa?.Nome || product?.empresaNome || null;
+  const vendedorEmpresaId = product?.empresa?.EmpresaID || product?.empresaId || null;
   const features = product?.Caracteristicas || product?.features || [];
   const entregaPromocao = product?.entregaPromocao || calcularPromocao(userAddress.cep);
   // Specs para aba de especificações
@@ -369,6 +371,14 @@ function ProductPage() {
 
               {/* Descrição */}
               <p className="text-slate-600 leading-relaxed">{description}</p>
+
+              {/* Informações do vendedor */}
+              {vendedorEmpresaNome && (
+                <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-700">
+                  <span className="text-sm">Vendido por: </span>
+                  <span className="font-semibold">{vendedorEmpresaNome}</span>
+                </div>
+              )}
             </div>
 
             {/* Controles de Compra */}
