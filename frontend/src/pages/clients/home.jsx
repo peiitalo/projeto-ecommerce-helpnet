@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from "react-router-dom";
 import { produtoService } from '../../services/api';
 import { log } from '../../utils/logger';
+import { useCart } from '../../context/CartContext.jsx';
 import {
   FaShoppingCart,
   FaUser,
@@ -43,7 +44,8 @@ function Home() {
   const [loading, setLoading] = useState(true);
   
   // Contadores (mock)
-  const [cartCount] = useState(2);
+  // Contador real do carrinho a partir do contexto
+  const { count: cartCount } = useCart();
   const [savedCount] = useState(8);
   const [notifCount] = useState(3);
 

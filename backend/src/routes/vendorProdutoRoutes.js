@@ -2,10 +2,12 @@
 import express from 'express';
 import prisma from '../config/prisma.js';
 import vendorScope from '../middleware/vendorScope.js';
+import { authMiddleware } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Aplica escopo do vendedor para todas as rotas abaixo
+// Autenticação + escopo de vendedor em todas as rotas
+router.use(authMiddleware);
 router.use(vendorScope);
 
 // Listar produtos da empresa do vendedor

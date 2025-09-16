@@ -23,11 +23,13 @@ import {
 } from 'react-icons/fi';
 import { produtoService } from '../../services/api';
 import { log } from '../../utils/logger';
+import { useCart } from '../../context/CartContext.jsx';
 
 
 function ProductPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { addItem } = useCart();
 
   // Mock do endereço do usuário (em produção, puxar do contexto do usuário logado)
   const userAddress = {
@@ -199,8 +201,15 @@ function ProductPage() {
   };
 
   const handleAddToCart = () => {
-    // Implementar lógica do carrinho
-    console.log(`${quantity} item(s) adicionado(s) ao carrinho!`);
+    const mapped = {
+      id: product?.ProdutoID || product?.id || id,
+      name: product?.Nome || product?.nome || name,
+      price: Number(product?.Preco ?? product?.preco ?? price ?? 0),
+      image: Array.isArray(product?.Imagens) ? product.Imagens[0] : null,
+      sku: product?.SKU || product?.sku || sku,
+      estoque: product?.Estoque ?? product?.estoque ?? estoque ?? 0,
+    };
+    addItem(mapped, quantity);
   };
 
   const handleToggleFavorite = () => {

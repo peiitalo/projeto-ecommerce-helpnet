@@ -34,23 +34,28 @@ model Categoria {
 }
 
 model Cliente {
-  ClienteID          Int        @id @default(autoincrement())
-  CodigoCliente      Int        @unique
+  ClienteID          Int             @id @default(autoincrement())
+  CodigoCliente      Int             @unique
   NomeCompleto       String
   TipoPessoa         String?
-  CPF_CNPJ           String     @unique @db.VarChar(255)
+  CPF_CNPJ           String          @unique @db.VarChar(255)
   TelefoneFixo       String?
   TelefoneCelular    String?
   Whatsapp           String?
-  Email              String     @unique
+  Email              String          @unique
   InscricaoEstadual  String?
   InscricaoMunicipal String?
   RazaoSocial        String?
   SenhaHash          String
-  DataCadastro       DateTime   @default(now())
+  DataCadastro       DateTime        @default(now())
   enderecos          Endereco[]
   pedidos            Pedido[]
-  role               Role       @default(CLIENTE)
+  role               Role            @default(CLIENTE)
+  // Back-relations
+  favoritos          Favorito[]
+  carrinhoItens      CarrinhoItem[]
+  avaliacoes         Avaliacao[]
+
   @@map("Cliente")
 }
 
@@ -100,6 +105,10 @@ model Produto {
   itensPedido   ItensPedido[]
   categoria     Categoria     @relation(fields: [CategoriaID], references: [CategoriaID])
   empresa       Empresa?      @relation(fields: [EmpresaID], references: [EmpresaID])
+  // Back-relations
+  favoritos     Favorito[]
+  carrinhoItens CarrinhoItem[]
+  avaliacoes    Avaliacao[]
 
   @@index([CategoriaID])
   @@index([Ativo])
@@ -182,4 +191,46 @@ model Vendedor {
   empresa    Empresa  @relation(fields: [EmpresaID], references: [EmpresaID])
 
   @@map("Vendedor")
+}
+
+// ===== Novos modelos para favoritos, carrinho e avaliações =====
+model Favorito {
+  ClienteID    Int
+  ProdutoID    Int
+  AdicionadoEm DateTime @default(now())
+
+  cliente Cliente @relation(fields: [ClienteID], references: [ClienteID])
+  produto Produto @relation(fields: [ProdutoID], references: [ProdutoID])
+
+  @@unique([ClienteID, ProdutoID], name: "ClienteID_ProdutoID")
+  @@map("Favorito")
+}
+
+model CarrinhoItem {
+  CarrinhoItemID Int      @id @default(autoincrement())
+  ClienteID      Int
+  ProdutoID      Int
+  Quantidade     Int      @default(1)
+  AdicionadoEm   DateTime @default(now())
+
+  cliente Cliente @relation(fields: [ClienteID], references: [ClienteID])
+  produto Produto @relation(fields: [ProdutoID], references: [ProdutoID])
+
+  @@unique([ClienteID, ProdutoID], name: "ClienteID_ProdutoID")
+  @@map("CarrinhoItem")
+}
+
+model Avaliacao {
+  AvaliacaoID Int      @id @default(autoincrement())
+  ClienteID   Int
+  ProdutoID   Int
+  Nota        Int
+  Comentario  String?
+  CriadoEm    DateTime @default(now())
+
+  cliente Cliente @relation(fields: [ClienteID], references: [ClienteID])
+  produto Produto @relation(fields: [ProdutoID], references: [ProdutoID])
+
+  @@unique([ClienteID, ProdutoID], name: "ClienteID_ProdutoID")
+  @@map("Avaliacao")
 }

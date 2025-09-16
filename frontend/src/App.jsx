@@ -8,6 +8,7 @@ const Dashboard = lazy(() => import('./pages/admin/dashboard'));
 const NotFound = lazy(() => import('./pages/errors/notFound'));
 const Home = lazy(() => import('./pages/clients/home'));
 const ProductPage = lazy(() => import('./pages/clients/ProductPage'));
+const CartPage = lazy(() => import('./pages/clients/CartPage'));
 const ProductsManagement = lazy(() => import('./pages/vendor/ProductsManagement'));
 const ProductForm = lazy(() => import('./pages/vendor/ProductForm'));
 const VendorDashboard = lazy(() => import('./pages/vendor/VendorDashboard'));
@@ -21,6 +22,7 @@ function App() {
           {/* Público */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/home" element={<Home />} />
+          <Route path="/carrinho" element={<CartPage />} />
           <Route path="/produto/:id" element={<ProductPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/cadastro" element={<Cadastro />} />
