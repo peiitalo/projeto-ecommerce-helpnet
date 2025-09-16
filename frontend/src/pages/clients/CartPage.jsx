@@ -1,58 +1,153 @@
-import { Link } from 'react-router-dom';
+import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext.jsx';
-import { FaTrash, FaShoppingCart } from 'react-icons/fa';
+import { FaTrash, FaArrowLeft } from 'react-icons/fa';
+import '@fontsource/poppins/400.css'; // Regular
+import '@fontsource/poppins/600.css'; // Semibold
 
 export default function CartPage() {
-  const { items, updateQuantity, removeItem, clear, subtotal } = useCart();
+  const { items, updateQuantity, removeItem } = useCart();
+  const navigate = useNavigate();
 
-  const formatPrice = (n) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [coupon, setCoupon] = useState('');
+  const [selectedCoupons, setSelectedCoupons] = useState([]);
+
+  const availableCoupons = [
+    { code: 'PROMO10', discount: 0.1 },
+    { code: 'FRETEGRATIS', discount: 0 }, // exemplo: frete grátis
+  ];
+
+  const formatPrice = (n) =>
+    n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  const toggleSelectItem = (id) => {
+    setSelectedItems((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
 
   const handleQtyChange = (id, delta) => {
     const item = items.find((i) => i.id === id);
     if (!item) return;
-    updateQuantity(id, (item.quantity || 1) + delta);
+    updateQuantity(id, Math.max(1, (item.quantity || 1) + delta));
   };
 
+  const handleRemoveSelected = () => {
+    if (
+      window.confirm(
+        `Tem certeza que deseja remover ${selectedItems.length} item(s) selecionado(s)?`
+      )
+    ) {
+      selectedItems.forEach((id) => removeItem(id));
+      setSelectedItems([]);
+    }
+  };
+
+  const toggleCoupon = (code) => {
+    setSelectedCoupons((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
+    );
+  };
+
+  // Subtotal baseado em itens selecionados
+  const subtotal = useMemo(() => {
+    return selectedItems.reduce((acc, id) => {
+      const item = items.find((i) => i.id === id);
+      if (!item) return acc;
+      return acc + item.price * item.quantity;
+    }, 0);
+  }, [selectedItems, items]);
+
   return (
-    <div className="min-h-screen bg-white">
-      <header className="bg-white sticky top-0 z-40 border-b border-slate-200">
+    <div className="min-h-screen bg-gray-50 font-poppins flex flex-col">
+      {/* Header fixo */}
+      <header className="bg-white sticky top-0 z-50 border-b border-gray-200 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <h1 className="text-lg sm:text-xl font-semibold text-slate-900 flex items-center gap-2">
-            <FaShoppingCart /> Carrinho
-          </h1>
-          <Link to="/home" className="text-blue-600 hover:text-blue-700 text-sm">Continuar comprando</Link>
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold"
+          >
+            <FaArrowLeft /> Carrinho
+          </button>
+
+          {selectedItems.length > 0 && (
+            <button
+              onClick={handleRemoveSelected}
+              className="text-red-600 hover:text-red-700 flex items-center gap-1"
+              title="Remover itens selecionados"
+            >
+              <FaTrash size={18} />
+            </button>
+          )}
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Lista de itens */}
         <section className="lg:col-span-2 space-y-4">
           {items.length === 0 ? (
-            <div className="p-8 border border-slate-200 rounded-xl text-center text-slate-600">
+            <div className="p-8 border border-gray-200 rounded-xl text-center text-gray-500">
               Seu carrinho está vazio.
             </div>
           ) : (
             items.map((item) => (
-              <div key={item.id} className="p-4 border border-slate-200 rounded-xl flex gap-4">
-                <div className="w-24 h-24 rounded-lg bg-slate-100 overflow-hidden flex items-center justify-center">
+              <div
+                key={item.id}
+                className={`p-4 border rounded-xl flex gap-4 items-center transition ${
+                  selectedItems.includes(item.id)
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-200 bg-white hover:shadow'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedItems.includes(item.id)}
+                  onChange={() => toggleSelectItem(item.id)}
+                  className="h-5 w-5 text-blue-600"
+                />
+                <div className="w-24 h-24 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center">
                   {item.image ? (
-                    <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
-                    <div className="text-slate-400 text-sm">Sem imagem</div>
+                    <div className="text-gray-400 text-sm">Sem imagem</div>
                   )}
                 </div>
                 <div className="flex-1">
-                  <h2 className="font-semibold text-slate-900">{item.name}</h2>
-                  {item.sku && <p className="text-xs text-slate-500">SKU: {item.sku}</p>}
+                  <h2 className="font-semibold text-gray-900">{item.name}</h2>
+                  {item.sku && (
+                    <p className="text-xs text-gray-500">SKU: {item.sku}</p>
+                  )}
                   <div className="mt-2 flex items-center gap-3">
-                    <span className="text-blue-700 font-semibold">{formatPrice(item.price)}</span>
-                    {typeof item.estoque === 'number' && <span className="text-xs text-slate-500">Estoque: {item.estoque}</span>}
+                    <span className="text-blue-700 font-semibold">
+                      {formatPrice(item.price)}
+                    </span>
+                    {typeof item.estoque === 'number' && (
+                      <span className="text-xs text-gray-500">
+                        Estoque: {item.estoque}
+                      </span>
+                    )}
                   </div>
                   <div className="mt-3 flex items-center gap-2">
-                    <button onClick={() => handleQtyChange(item.id, -1)} disabled={item.quantity <= 1} className="px-2 py-1 border rounded disabled:opacity-50">-</button>
-                    <span className="px-3 py-1 border rounded bg-slate-50">{item.quantity}</span>
-                    <button onClick={() => handleQtyChange(item.id, 1)} className="px-2 py-1 border rounded">+</button>
-                    <button onClick={() => removeItem(item.id)} className="ml-4 px-3 py-1.5 border border-red-200 text-red-600 rounded flex items-center gap-2 hover:bg-red-50">
-                      <FaTrash /> Remover
+                    <button
+                      onClick={() => handleQtyChange(item.id, -1)}
+                      disabled={item.quantity <= 1}
+                      className="px-2 py-1 border rounded disabled:opacity-50"
+                    >
+                      -
+                    </button>
+                    <span className="px-3 py-1 border rounded bg-gray-50">
+                      {item.quantity}
+                    </span>
+                    <button
+                      onClick={() => handleQtyChange(item.id, 1)}
+                      className="px-2 py-1 border rounded"
+                    >
+                      +
                     </button>
                   </div>
                 </div>
@@ -61,17 +156,71 @@ export default function CartPage() {
           )}
         </section>
 
-        <aside className="lg:col-span-1">
-          <div className="p-4 border border-slate-200 rounded-xl space-y-3">
+        {/* Sidebar fixa */}
+        <aside className="lg:col-span-1 sticky top-20 self-start space-y-4">
+          <div className="p-4 border border-gray-200 rounded-xl bg-white space-y-3 shadow-sm">
+            {/* Subtotal */}
             <div className="flex items-center justify-between">
-              <span className="text-slate-600">Subtotal</span>
-              <span className="font-semibold text-slate-900">{formatPrice(subtotal)}</span>
+              <span className="text-gray-600">Subtotal</span>
+              <span className="font-semibold text-gray-900">
+                {formatPrice(subtotal)}
+              </span>
             </div>
-            <button disabled={items.length === 0} className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50">
+
+            {/* Input para cupom */}
+            <div className="mt-3 space-y-2">
+              <input
+                type="text"
+                placeholder="Código do cupom"
+                value={coupon}
+                onChange={(e) => setCoupon(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+              />
+              <button
+                onClick={() => {
+                  if (coupon.trim()) {
+                    toggleCoupon(coupon);
+                    setCoupon('');
+                  }
+                }}
+                disabled={!coupon.trim()}
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                Aplicar cupom
+              </button>
+            </div>
+
+            {/* Cupons já disponíveis */}
+            {availableCoupons.length > 0 && (
+              <div className="mt-4">
+                <h3 className="font-semibold text-gray-700 mb-2">Seus cupons</h3>
+                <div className="space-y-2">
+                  {availableCoupons.map((c) => (
+                    <label
+                      key={c.code}
+                      className="flex justify-between items-center border px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-50"
+                    >
+                      <span className="text-gray-900 font-medium">
+                        {c.code} ({c.discount ? `${c.discount * 100}%` : 'Frete grátis'})
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={selectedCoupons.includes(c.code)}
+                        onChange={() => toggleCoupon(c.code)}
+                        className="h-5 w-5 text-blue-600"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Botão finalizar compra */}
+            <button
+              disabled={selectedItems.length === 0}
+              className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 mt-4"
+            >
               Finalizar compra
-            </button>
-            <button onClick={clear} disabled={items.length === 0} className="w-full px-4 py-2 border rounded-lg text-slate-700 hover:bg-slate-50 disabled:opacity-50">
-              Limpar carrinho
             </button>
           </div>
         </aside>
