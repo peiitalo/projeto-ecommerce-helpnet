@@ -1,7 +1,4 @@
 services:
-  # Banco de dados PostgreSQL
-  
-  # Backend API
   backend:
     build:
       context: ../backend
@@ -10,27 +7,16 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: development
-      DATABASE_URL: postgresql://postgres:postgres123@postgres:5432/projeto_ecommerce
+      DATABASE_URL: postgresql://postgres.jtukapbrjqxoizkhtjpi:helpnetecommerce123@aws-1-sa-east-1.pooler.supabase.com:5432/postgres
       PORT: 3001
     ports:
       - "3001:3001"
-    depends_on:
-      postgres:
-        condition: service_healthy
     networks:
       - ecommerce-network
     volumes:
       - ../backend:/app
       - /app/node_modules
-    develop:
-      watch:
-        - action: sync
-          path: ../backend/src
-          target: /app/src
-        - action: rebuild
-          path: ../backend/package.json
 
-  # Frontend React
   frontend:
     build:
       context: ../frontend
@@ -48,14 +34,6 @@ services:
     volumes:
       - ../frontend:/app
       - /app/node_modules
-    develop:
-      watch:
-        - action: sync
-          path: ../frontend/src
-          target: /app/src
-        - action: rebuild
-          path: ../frontend/package.json
-
 
 networks:
   ecommerce-network:
