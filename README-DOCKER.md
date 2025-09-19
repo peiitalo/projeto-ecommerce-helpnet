@@ -6,7 +6,7 @@ Este projeto está configurado para rodar completamente em containers Docker, in
 
 - Docker instalado
 - Docker Compose instalado
-- Portas 3001, 5173 e 5432 disponíveis
+- Portas 3001 e 5173 disponíveis
 
 ## 🚀 Como executar
 

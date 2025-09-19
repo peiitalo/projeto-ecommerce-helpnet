@@ -4,20 +4,6 @@ echo "🚀 Iniciando E-commerce para Acesso Mobile (Modo Simples)..."
 echo "📱 Seu IP local: 192.168.0.104"
 echo ""
 
-# Verificar se PostgreSQL está rodando
-if ! docker ps | grep -q postgres; then
-    echo "🔄 Iniciando PostgreSQL..."
-    docker run -d \
-        --name ecommerce-postgres-simple \
-        -e POSTGRES_DB=projeto_ecommerce_prod \
-        -e POSTGRES_USER=ecommerce_user \
-        -e POSTGRES_PASSWORD=ecommerce_secure_2024 \
-        -p 5432:5432 \
-        postgres:15-alpine
-    
-    echo "⏳ Aguardando PostgreSQL inicializar..."
-    sleep 10
-fi
 
 # Configurar variáveis de ambiente para o backend
 export NODE_ENV=production

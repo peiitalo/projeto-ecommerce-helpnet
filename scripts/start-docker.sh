@@ -12,7 +12,7 @@ if ! command -v docker &> /dev/null; then
 fi
 
 # Verificar se Docker Compose está instalado
-if ! command -v docker-compose &> /dev/null; then
+if ! command -v docker compose &> /dev/null; then
     echo "❌ Docker Compose não está instalado. Por favor, instale o Docker Compose primeiro."
     exit 1
 fi
@@ -70,8 +70,8 @@ echo "   Frontend: http://localhost:5173"
 echo "   Backend:  http://localhost:3001"
 echo ""
 echo "🛠️  Comandos úteis:"
-echo "   Ver logs:        docker-compose logs -f"
-echo "   Parar projeto:   docker-compose down"
-echo "   Reiniciar:       docker-compose restart"
+echo "   Ver logs:        docker compose logs -f"
+echo "   Parar projeto:   docker compose down"
+echo "   Reiniciar:       docker compose restart"
 echo ""
 echo "📖 Para mais informações, consulte README-DOCKER.md"
