@@ -174,6 +174,74 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// Ação em lote para produtos da empresa do vendedor
+router.post('/acao-em-lote', async (req, res) => {
+  try {
+    const { acao, produtoIds } = req.body;
+    if (!acao || !produtoIds || !Array.isArray(produtoIds)) {
+      return res.status(400).json({ erro: 'Ação e IDs dos produtos são obrigatórios' });
+    }
+
+    const ids = produtoIds.map(id => parseInt(id));
+
+    // Verificar se todos os produtos pertencem à empresa do vendedor
+    const produtos = await prisma.produto.findMany({
+      where: { ProdutoID: { in: ids } },
+      select: { ProdutoID: true, EmpresaID: true }
+    });
+
+    const produtosInvalidos = produtos.filter(p => ![req.vendorEmpresaId, null].includes(p.EmpresaID));
+    if (produtosInvalidos.length > 0) {
+      return res.status(403).json({ erro: 'Alguns produtos não pertencem à sua empresa' });
+    }
+
+    switch (acao) {
+      case 'ativar':
+        await prisma.produto.updateMany({
+          where: { ProdutoID: { in: ids } },
+          data: { Ativo: true }
+        });
+        break;
+      case 'desativar':
+        await prisma.produto.updateMany({
+          where: { ProdutoID: { in: ids } },
+          data: { Ativo: false }
+        });
+        break;
+      case 'excluir':
+        const produtosComPedidos = await prisma.itensPedido.findMany({
+          where: { ProdutoID: { in: ids } },
+          select: { ProdutoID: true }
+        });
+        const idsComPedidos = produtosComPedidos.map(i => i.ProdutoID);
+        const idsSemPedidos = ids.filter(i => !idsComPedidos.includes(i));
+
+        if (idsComPedidos.length > 0) {
+          await prisma.produto.updateMany({
+            where: { ProdutoID: { in: idsComPedidos } },
+            data: { Ativo: false }
+          });
+        }
+        if (idsSemPedidos.length > 0) {
+          await prisma.produto.deleteMany({
+            where: { ProdutoID: { in: idsSemPedidos } }
+          });
+        }
+
+        return res.json({
+          mensagem: `${idsSemPedidos.length} produtos excluídos, ${idsComPedidos.length} produtos desativados`
+        });
+      default:
+        return res.status(400).json({ erro: 'Ação inválida' });
+    }
+
+    res.json({ mensagem: `Ação '${acao}' executada com sucesso em ${ids.length} produtos` });
+  } catch (error) {
+    console.error('Erro na ação em lote (vendedor):', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
 // Excluir/desativar produto da empresa do vendedor
 router.delete('/:id', async (req, res) => {
   try {

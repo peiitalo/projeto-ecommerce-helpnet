@@ -116,11 +116,30 @@ function ProductsManagement() {
     }
   };
 
-  const handleBulkAction = (action) => {
+  const handleBulkAction = async (action) => {
+    if (selectedProducts.length === 0) return;
+
     try {
-      console.log(`Ação em lote: ${action} para produtos:`, selectedProducts);
-      // TODO: implementar ações em lote (ativar, desativar, excluir)
+      setError("");
+
+      // Chama API para executar ação em lote
+      const result = await produtoService.acaoEmLoteVendedor(EMPRESA_ID_MVP, {
+        acao: action,
+        produtoIds: selectedProducts
+      });
+
+      // Recarrega a lista a partir do servidor para refletir o estado real
+      await carregarProdutos();
+
+      // Limpa seleção
       setSelectedProducts([]);
+
+      // Feedback para o usuário
+      if (result?.mensagem) {
+        alert(result.mensagem);
+      } else {
+        alert(`Ação '${action}' executada com sucesso!`);
+      }
     } catch (error) {
       console.error("Erro na ação em lote:", error);
       setError("Erro ao executar ação em lote. Tente novamente.");

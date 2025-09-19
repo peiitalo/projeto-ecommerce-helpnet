@@ -9,6 +9,7 @@ import {
   FiCheckCircle,
 } from "react-icons/fi";
 import { clienteService } from "../services/api";
+import { useAuth } from "../context/AuthContext";
 
 // Componente para a tela de sucesso do login
 const TelaLoginSucesso = ({ dadosCliente }) => (
@@ -34,6 +35,7 @@ const TelaLoginSucesso = ({ dadosCliente }) => (
 
 function Login() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [dadosLogin, setDadosLogin] = useState({
     email: "",
     senha: "",
@@ -78,26 +80,24 @@ function Login() {
       console.log("✅ [Login] Login bem-sucedido:", data);
       setLoginSucesso(data.data);
 
-      // MVP: definir role com base no retorno do backend, aqui simulamos cliente
-      const role = data?.data?.role || 'cliente';
-      const empresaId = data?.data?.empresaId || null;
+      // Definir dados do usuário
+      const userData = {
+        id: data?.data?.id,
+        nome: data?.data?.nome,
+        email: data?.data?.email,
+        role: data?.data?.role || 'cliente',
+        empresaId: data?.data?.empresaId || null,
+        vendedorId: data?.data?.vendedorId || null,
+        token: data?.token || data?.data?.token || null,
+      };
 
-      // persistir sessão
-      try {
-        localStorage.setItem('auth:user', JSON.stringify({
-          id: data?.data?.id,
-          nome: data?.data?.nome,
-          email: data?.data?.email,
-          role,
-          empresaId,
-          token: data?.token || data?.data?.token || null,
-        }));
-      } catch (_e) {}
+      // Atualizar contexto de autenticação
+      login(userData);
 
       setTimeout(() => {
         // redirecionar por role
-        if (role === 'admin') return navigate('/admin');
-        if (role === 'vendedor') return navigate('/vendedor');
+        if (userData.role === 'admin') return navigate('/admin');
+        if (userData.role === 'vendedor') return navigate('/vendedor');
         return navigate('/home');
       }, 800);
     } catch (error) {

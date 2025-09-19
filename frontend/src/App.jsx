@@ -6,9 +6,11 @@ const Login = lazy(() => import('./pages/login'));
 const Cadastro = lazy(() => import('./pages/cadastro'));
 const Dashboard = lazy(() => import('./pages/admin/dashboard'));
 const NotFound = lazy(() => import('./pages/errors/notFound'));
-const Home = lazy(() => import('./pages/clients/home'));
+const Home = lazy(() => import('./pages/clients/Home'));
 const ProductPage = lazy(() => import('./pages/clients/ProductPage'));
 const CartPage = lazy(() => import('./pages/clients/CartPage'));
+const FavoritesPage = lazy(() => import('./pages/clients/FavoritesPage'));
+const NotificationsPage = lazy(() => import('./pages/clients/NotificationsPage'));
 const ProductsManagement = lazy(() => import('./pages/vendor/ProductsManagement'));
 const ProductForm = lazy(() => import('./pages/vendor/ProductForm'));
 const VendorDashboard = lazy(() => import('./pages/vendor/VendorDashboard'));
@@ -28,7 +30,9 @@ function App() {
           <Route path="/cadastro" element={<Cadastro />} />
 
           {/* Cliente autenticado */}
-          <Route element={<ProtectedRoute allowedRoles={["cliente"]} />}>
+          <Route element={<ProtectedRoute allowedRoles={["cliente", "vendedor"]} />}>
+            <Route path="/favoritos" element={<FavoritesPage />} />
+            <Route path="/notificacoes" element={<NotificationsPage />} />
             <Route path="/dashboard" element={<Dashboard />} />
             {/* demais rotas do cliente */}
           </Route>

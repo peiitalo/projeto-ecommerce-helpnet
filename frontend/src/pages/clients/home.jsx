@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from "react-router-dom";
-import { produtoService } from '../../services/api';
+import { produtoService, favoritoService } from '../../services/api';
 import { log } from '../../utils/logger';
 import { useCart } from '../../context/CartContext.jsx';
 import {
@@ -47,8 +47,10 @@ function Home() {
   // Contadores (mock)
   // Contador real do carrinho a partir do contexto
   const { count: cartCount, addItem, removeItem, items } = useCart();
-  const [savedCount] = useState(8);
+  const [savedCount, setSavedCount] = useState(0);
   const [notifCount] = useState(3);
+  const [favorites, setFavorites] = useState([]);
+  const [favoritesLoading, setFavoritesLoading] = useState(true);
 
   // Logo configuration - you can change this to use an image
   const logoConfig = {
@@ -126,9 +128,10 @@ function Home() {
   const goPrev = () => setActiveSlide((activeSlide - 1 + slides.length) % slides.length);
   const goNext = () => setActiveSlide((activeSlide + 1) % slides.length);
 
-  // Carregar produtos da API
+  // Carregar produtos e favoritos da API
   useEffect(() => {
     carregarProdutos();
+    carregarFavoritos();
   }, []);
 
   const carregarProdutos = async () => {
@@ -177,6 +180,21 @@ function Home() {
       ]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const carregarFavoritos = async () => {
+    try {
+      setFavoritesLoading(true);
+      const response = await favoritoService.listar();
+      setFavorites(response.favoritos || []);
+      setSavedCount((response.favoritos || []).length);
+    } catch (error) {
+      log.error('home_favorites_fetch_error', { error: error.message });
+      setFavorites([]);
+      setSavedCount(0);
+    } finally {
+      setFavoritesLoading(false);
     }
   };
 
@@ -295,6 +313,27 @@ function Home() {
 
   // Verificar se produto está no carrinho
   const isInCart = (productId) => items.some(item => item.id === productId);
+
+  // Verificar se produto está nos favoritos
+  const isFavorited = (productId) => favorites.some(fav => fav.produto.ProdutoID === productId);
+
+  // Toggle favorito
+  const handleToggleFavorite = async (productId) => {
+    try {
+      if (isFavorited(productId)) {
+        await favoritoService.remover(productId);
+        setFavorites(prev => prev.filter(fav => fav.produto.ProdutoID !== productId));
+        setSavedCount(prev => prev - 1);
+      } else {
+        await favoritoService.adicionar(productId);
+        // Since we don't have the full product data here, we'll just reload favorites
+        await carregarFavoritos();
+      }
+    } catch (error) {
+      log.error('home_toggle_favorite_error', { productId, error: error.message });
+      // Could show a toast or alert here
+    }
+  };
 
 
   return (
@@ -893,10 +932,12 @@ function Home() {
             onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            // Lógica para favoritar
+            handleToggleFavorite(p.id);
             }}
-            className="absolute top-2 right-2 p-1.5 rounded-full bg-white/90 text-slate-700 hover:bg-white shadow-sm hover:shadow-md transition-all"
-            aria-label="Salvar produto"
+            className={`absolute top-2 right-2 p-1.5 rounded-full bg-white/90 hover:bg-white shadow-sm hover:shadow-md transition-all ${
+              isFavorited(p.id) ? 'text-red-500' : 'text-slate-700'
+            }`}
+            aria-label={isFavorited(p.id) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
             >
             <FaHeart className="text-xs" />
             </button>
@@ -911,18 +952,6 @@ function Home() {
               <p className="text-slate-600 text-xs leading-tight mb-2 line-clamp-2 flex-shrink-0">{p.breveDescricao}</p>
             )}
 
-            {/* Informações do vendedor */}
-            {(p.vendedorNome || p.empresaNome) && (
-              <div className="mb-2 flex-shrink-0">
-                <span className="text-xs text-slate-500">Vendido por: </span>
-                <span className="text-xs font-semibold text-blue-600">
-                  {p.vendedorNome || p.empresaNome}
-                </span>
-                {p.empresaNome && p.vendedorNome && (
-                  <span className="text-xs text-slate-400 ml-1">({p.empresaNome})</span>
-                )}
-              </div>
-            )}
 
             <div className="flex items-center justify-between mb-2 flex-shrink-0">
             {renderStars(p.rating)}
