@@ -29,12 +29,15 @@ export const listarProdutos = async (req, res) => {
         select: {
           ProdutoID: true,
           Nome: true,
+          BreveDescricao: true,
           Preco: true,
           PrecoOriginal: true,
           Imagens: true,
           FreteGratis: true,
           Desconto: true,
           categoria: { select: { Nome: true } },
+          vendedor: { select: { VendedorID: true, Nome: true } },
+          empresa: { select: { EmpresaID: true, Nome: true } },
           criadoEm: true,
         },
         orderBy: { criadoEm: "desc" },
@@ -59,7 +62,11 @@ export const buscarProdutoPorId = async (req, res) => {
     const { id } = req.params;
     const produto = await prisma.produto.findUnique({
       where: { ProdutoID: parseInt(id) },
-      include: { categoria: true, empresa: { select: { EmpresaID: true, Nome: true } } },
+      include: {
+        categoria: true,
+        empresa: { select: { EmpresaID: true, Nome: true } },
+        vendedor: { select: { VendedorID: true, Nome: true, Email: true } }
+      },
     });
 
     if (!produto) {
@@ -80,10 +87,12 @@ export const criarProduto = async (req, res) => {
     const {
       nome,
       descricao,
+      breveDescricao,
       preco,
       precoOriginal,
       estoque,
       categoriaId,
+      vendedorId,
       codBarras,
       sku,
       peso,
@@ -125,14 +134,24 @@ export const criarProduto = async (req, res) => {
     if (!categoria)
       return res.status(400).json({ erro: "Categoria não encontrada" });
 
+    if (vendedorId) {
+      const vendedor = await prisma.vendedor.findUnique({
+        where: { VendedorID: parseInt(vendedorId) },
+      });
+      if (!vendedor)
+        return res.status(400).json({ erro: "Vendedor não encontrado" });
+    }
+
     const produto = await prisma.produto.create({
       data: {
         Nome: nome,
         Descricao: descricao,
+        BreveDescricao: breveDescricao,
         Preco: parseFloat(preco),
         PrecoOriginal: precoOriginal ? parseFloat(precoOriginal) : null,
         Estoque: parseInt(estoque) || 0,
         CategoriaID: parseInt(categoriaId),
+        VendedorID: vendedorId ? parseInt(vendedorId) : null,
         CodBarras:
           codBarras || `${Date.now()}${Math.floor(Math.random() * 1000)}`,
         SKU: sku,
@@ -150,7 +169,7 @@ export const criarProduto = async (req, res) => {
         Imagens: imagens || [],
         Ativo: ativo !== undefined ? ativo : true,
       },
-      include: { categoria: true },
+      include: { categoria: true, vendedor: { select: { VendedorID: true, Nome: true } } },
     });
 
     logger.info('criar_produto_ok', { id: produto.ProdutoID, sku: produto.SKU });
@@ -200,11 +219,22 @@ export const atualizarProduto = async (req, res) => {
         return res.status(400).json({ erro: "Categoria não encontrada" });
     }
 
+    if (data.vendedorId !== undefined) {
+      if (data.vendedorId) {
+        const vendedor = await prisma.vendedor.findUnique({
+          where: { VendedorID: parseInt(data.vendedorId) },
+        });
+        if (!vendedor)
+          return res.status(400).json({ erro: "Vendedor não encontrado" });
+      }
+    }
+
     const produto = await prisma.produto.update({
       where: { ProdutoID: parseInt(id) },
       data: {
         ...(data.nome && { Nome: data.nome }),
         ...(data.descricao !== undefined && { Descricao: data.descricao }),
+        ...(data.breveDescricao !== undefined && { BreveDescricao: data.breveDescricao }),
         ...(data.preco && { Preco: parseFloat(data.preco) }),
         ...(data.precoOriginal !== undefined && {
           PrecoOriginal: data.precoOriginal
@@ -213,6 +243,7 @@ export const atualizarProduto = async (req, res) => {
         }),
         ...(data.estoque !== undefined && { Estoque: parseInt(data.estoque) }),
         ...(data.categoriaId && { CategoriaID: parseInt(data.categoriaId) }),
+        ...(data.vendedorId !== undefined && { VendedorID: data.vendedorId ? parseInt(data.vendedorId) : null }),
         ...(data.codBarras && { CodBarras: data.codBarras }),
         ...(data.sku && { SKU: data.sku }),
         ...(data.peso !== undefined && { Peso: data.peso }),
@@ -235,7 +266,7 @@ export const atualizarProduto = async (req, res) => {
         ...(data.imagens !== undefined && { Imagens: data.imagens }),
         ...(data.ativo !== undefined && { Ativo: data.ativo }),
       },
-      include: { categoria: true },
+      include: { categoria: true, vendedor: { select: { VendedorID: true, Nome: true } } },
     });
 
     logger.info('atualizar_produto_ok', { id: produto.ProdutoID });

@@ -13,7 +13,8 @@ import {
   FaStarHalfAlt,
   FaTruck,
   FaPercent,
-  FaFilter
+  FaFilter,
+  FaCheck
 } from 'react-icons/fa';
 import {
   FiSearch,
@@ -42,10 +43,10 @@ function Home() {
   const [sortBy, setSortBy] = useState('relevance');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Contadores (mock)
   // Contador real do carrinho a partir do contexto
-  const { count: cartCount } = useCart();
+  const { count: cartCount, addItem, removeItem, items } = useCart();
   const [savedCount] = useState(8);
   const [notifCount] = useState(3);
 
@@ -147,7 +148,10 @@ function Home() {
         sales: Math.floor(Math.random() * 2000) + 100, // Mock sales - pode ser implementado depois
         category: produto.categoria?.Nome || produto.category || 'Geral',
         freeShipping: produto.FreteGratis || produto.freeShipping || false,
-        discount: produto.Desconto || produto.discount || 0
+        discount: produto.Desconto || produto.discount || 0,
+        breveDescricao: produto.BreveDescricao || produto.breveDescricao || '',
+        vendedorNome: produto.vendedor?.Nome || null,
+        empresaNome: produto.empresa?.Nome || null
       }));
 
       setProducts(produtosMapeados);
@@ -166,7 +170,9 @@ function Home() {
           sales: 1240,
           category: 'Eletrônicos',
           freeShipping: true,
-          discount: 20
+          discount: 20,
+          vendedorNome: null,
+          empresaNome: null
         }
       ]);
     } finally {
@@ -277,7 +283,20 @@ function Home() {
 
   const formatPrice = (n) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-  
+  // Função para adicionar ao carrinho
+  const handleAddToCart = (product) => {
+    addItem(product, 1);
+  };
+
+  // Função para remover do carrinho
+  const handleRemoveFromCart = (productId) => {
+    removeItem(productId);
+  };
+
+  // Verificar se produto está no carrinho
+  const isInCart = (productId) => items.some(item => item.id === productId);
+
+
   return (
     <div className="min-h-screen bg-white flex">
       {/* Overlay Mobile da sidebar */}
@@ -887,7 +906,24 @@ function Home() {
             <Link to={`/produto/${p.id}`}>
             <h4 className="font-medium text-slate-900 text-sm leading-tight mb-2 line-clamp-2 min-h-[2.5rem] flex-shrink-0 hover:text-blue-700 transition-colors">{p.name}</h4>
             </Link>
-            
+
+            {p.breveDescricao && (
+              <p className="text-slate-600 text-xs leading-tight mb-2 line-clamp-2 flex-shrink-0">{p.breveDescricao}</p>
+            )}
+
+            {/* Informações do vendedor */}
+            {(p.vendedorNome || p.empresaNome) && (
+              <div className="mb-2 flex-shrink-0">
+                <span className="text-xs text-slate-500">Vendido por: </span>
+                <span className="text-xs font-semibold text-blue-600">
+                  {p.vendedorNome || p.empresaNome}
+                </span>
+                {p.empresaNome && p.vendedorNome && (
+                  <span className="text-xs text-slate-400 ml-1">({p.empresaNome})</span>
+                )}
+              </div>
+            )}
+
             <div className="flex items-center justify-between mb-2 flex-shrink-0">
             {renderStars(p.rating)}
             <span className="text-[10px] text-slate-500">({p.sales.toLocaleString('pt-BR')})</span>
@@ -901,16 +937,27 @@ function Home() {
             )}
             <div className="flex items-center justify-between">
             <span className="text-sm font-bold text-blue-700 flex-1 mr-2">{formatPrice(p.price)}</span>
-            <button 
+            <button
             onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            // Lógica para adicionar ao carrinho
-            alert('Produto adicionado ao carrinho!');
+            if (isInCart(p.id)) {
+              handleRemoveFromCart(p.id);
+            } else {
+              handleAddToCart(p);
+            }
             }}
-            className="p-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md flex-shrink-0"
+            className={`p-1.5 rounded-lg text-white transition-colors shadow-sm hover:shadow-md flex-shrink-0 ${
+              isInCart(p.id)
+                ? 'bg-green-500 hover:bg-green-600'
+                : 'bg-blue-600 hover:bg-blue-700'
+            }`}
             >
-            <FaShoppingCart className="text-xs" />
+            {isInCart(p.id) ? (
+              <FaCheck className="text-xs" />
+            ) : (
+              <FaShoppingCart className="text-xs" />
+            )}
             </button>
             </div>
             </div>

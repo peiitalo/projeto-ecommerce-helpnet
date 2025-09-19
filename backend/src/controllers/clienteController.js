@@ -486,4 +486,29 @@ export const autoLoginClient = async (req, res) => {
       redirectTo: (clientRole === 'vendedor' || tipoPessoa === 'JURIDICA') ? '/vendedor' : '/home',
     }
   });
-}
+};
+
+export const listarEnderecos = async (req, res) => {
+  try {
+    const { user } = req;
+    const enderecos = await prisma.endereco.findMany({
+      where: { ClienteID: user.id },
+      select: {
+        EnderecoID: true,
+        Nome: true,
+        Complemento: true,
+        CEP: true,
+        Cidade: true,
+        UF: true,
+        Numero: true,
+        Bairro: true,
+      },
+    });
+
+    logger.info('listar_enderecos_ok', { clienteId: user.id, total: enderecos.length });
+    res.json({ enderecos });
+  } catch (error) {
+    logControllerError('listar_enderecos_error', error, req);
+    res.status(500).json({ error: "Erro ao listar endereços" });
+  }
+};
