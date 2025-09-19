@@ -107,11 +107,8 @@ model Produto {
   itensPedido   ItensPedido[]
   categoria     Categoria     @relation(fields: [CategoriaID], references: [CategoriaID])
   empresa       Empresa?      @relation(fields: [EmpresaID], references: [EmpresaID])
-<<<<<<< HEAD
-=======
   vendedor      Vendedor?     @relation(fields: [VendedorID], references: [VendedorID])
   // Back-relations
->>>>>>> 5125d66aa9370da3f8bc70b0fbb16174a6d403ef
   favoritos     Favorito[]
   carrinhoItens CarrinhoItem[]
   avaliacoes    Avaliacao[]
