@@ -39,7 +39,7 @@ router.get('/', async (req, res) => {
     const [produtos, total] = await prisma.$transaction([
       prisma.produto.findMany({
         where,
-        include: { categoria: true },
+        include: { categoria: true, vendedor: { select: { VendedorID: true, Nome: true } }, empresa: { select: { EmpresaID: true, Nome: true } } },
         orderBy: { criadoEm: 'desc' },
         skip,
         take: parseInt(limit),
@@ -82,6 +82,7 @@ router.post('/', async (req, res) => {
         Estoque: parseInt(data.estoque) || 0,
         CategoriaID: parseInt(data.categoriaId),
         EmpresaID: req.vendorEmpresaId,
+        VendedorID: req.vendorId,
         CodBarras: data.codBarras || `${Date.now()}${Math.floor(Math.random() * 1000)}`,
         SKU: data.sku,
         Peso: data.peso,
@@ -98,7 +99,7 @@ router.post('/', async (req, res) => {
         Imagens: Array.isArray(data.imagens) ? data.imagens : [],
         Ativo: data.ativo !== undefined ? data.ativo : true,
       },
-      include: { categoria: true },
+      include: { categoria: true, vendedor: { select: { VendedorID: true, Nome: true } }, empresa: { select: { EmpresaID: true, Nome: true } } },
     });
 
     res.status(201).json(produto);
@@ -163,7 +164,7 @@ router.put('/:id', async (req, res) => {
     const produto = await prisma.produto.update({
       where: { ProdutoID: id },
       data: updateData,
-      include: { categoria: true },
+      include: { categoria: true, vendedor: { select: { VendedorID: true, Nome: true } }, empresa: { select: { EmpresaID: true, Nome: true } } },
     });
 
     res.json(produto);

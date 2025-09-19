@@ -13,5 +13,6 @@ router.post('/login', clienteController.login);
 router.post('/refresh', clienteController.refreshToken);
 router.post('/logout', clienteController.logout);
 router.get('/auto-login', authMiddleware, clienteController.autoLoginClient);
+router.get('/enderecos', authMiddleware, clienteController.listarEnderecos);
 
 export default router;

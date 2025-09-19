@@ -1,22 +1,58 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext.jsx';
-import { FaTrash, FaArrowLeft } from 'react-icons/fa';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { freteService, clienteService } from '../../services/api.js';
+import { FaTrash, FaArrowLeft, FaTruck, FaMapMarkerAlt } from 'react-icons/fa';
 import '@fontsource/poppins/400.css'; // Regular
 import '@fontsource/poppins/600.css'; // Semibold
 
 export default function CartPage() {
   const { items, updateQuantity, removeItem } = useCart();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [selectedItems, setSelectedItems] = useState([]);
   const [coupon, setCoupon] = useState('');
   const [selectedCoupons, setSelectedCoupons] = useState([]);
 
+  // Estados para cálculo de frete
+  const [shippingInfo, setShippingInfo] = useState(null);
+  const [calculatingShipping, setCalculatingShipping] = useState(false);
+  const [shippingError, setShippingError] = useState('');
+  const [selectedAddressId, setSelectedAddressId] = useState(1); // ID do endereço padrão
+
+  // Estados para endereços
+  const [addresses, setAddresses] = useState([]);
+  const [loadingAddresses, setLoadingAddresses] = useState(false);
+
   const availableCoupons = [
     { code: 'PROMO10', discount: 0.1 },
     { code: 'FRETEGRATIS', discount: 0 }, // exemplo: frete grátis
   ];
+
+  // Buscar endereços do cliente
+  useEffect(() => {
+    const fetchAddresses = async () => {
+      if (!user) return;
+
+      setLoadingAddresses(true);
+      try {
+        const data = await clienteService.listarEnderecos();
+        setAddresses(data.enderecos || []);
+        if (data.enderecos && data.enderecos.length > 0) {
+          setSelectedAddressId(data.enderecos[0].EnderecoID);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar endereços:', error);
+        setAddresses([]);
+      } finally {
+        setLoadingAddresses(false);
+      }
+    };
+
+    fetchAddresses();
+  }, [user]);
 
   const formatPrice = (n) =>
     n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -50,6 +86,26 @@ export default function CartPage() {
     );
   };
 
+  // Função para calcular frete
+  const calculateShipping = async () => {
+    if (!user || selectedItems.length === 0) return;
+
+    setCalculatingShipping(true);
+    setShippingError('');
+
+    try {
+      const produtoIds = selectedItems;
+      const result = await freteService.calcular(user.id, selectedAddressId, produtoIds);
+      setShippingInfo(result);
+    } catch (error) {
+      console.error('Erro ao calcular frete:', error);
+      setShippingError(error.message || 'Erro ao calcular frete');
+      setShippingInfo(null);
+    } finally {
+      setCalculatingShipping(false);
+    }
+  };
+
   // Subtotal baseado em itens selecionados
   const subtotal = useMemo(() => {
     return selectedItems.reduce((acc, id) => {
@@ -58,6 +114,15 @@ export default function CartPage() {
       return acc + item.price * item.quantity;
     }, 0);
   }, [selectedItems, items]);
+
+  // Total incluindo frete
+  const total = useMemo(() => {
+    let totalValue = subtotal;
+    if (shippingInfo && shippingInfo.frete > 0) {
+      totalValue += shippingInfo.frete;
+    }
+    return totalValue;
+  }, [subtotal, shippingInfo]);
 
   return (
     <div className="min-h-screen bg-gray-50 font-poppins flex flex-col">
@@ -118,7 +183,12 @@ export default function CartPage() {
                   )}
                 </div>
                 <div className="flex-1">
-                  <h2 className="font-semibold text-gray-900">{item.name}</h2>
+                  <h2
+                    className="font-semibold text-gray-900 cursor-pointer hover:text-blue-600"
+                    onClick={() => navigate(`/produto/${item.id}`)}
+                  >
+                    {item.name}
+                  </h2>
                   {item.sku && (
                     <p className="text-xs text-gray-500">SKU: {item.sku}</p>
                   )}
@@ -159,13 +229,6 @@ export default function CartPage() {
         {/* Sidebar fixa */}
         <aside className="lg:col-span-1 sticky top-20 self-start space-y-4">
           <div className="p-4 border border-gray-200 rounded-xl bg-white space-y-3 shadow-sm">
-            {/* Subtotal */}
-            <div className="flex items-center justify-between">
-              <span className="text-gray-600">Subtotal</span>
-              <span className="font-semibold text-gray-900">
-                {formatPrice(subtotal)}
-              </span>
-            </div>
 
             {/* Input para cupom */}
             <div className="mt-3 space-y-2">
@@ -190,10 +253,20 @@ export default function CartPage() {
               </button>
             </div>
 
-            {/* Cupons já disponíveis */}
-            {availableCoupons.length > 0 && (
-              <div className="mt-4">
-                <h3 className="font-semibold text-gray-700 mb-2">Seus cupons</h3>
+            {/* Cupons */}
+            <div className="mt-4">
+              <h3 className="font-semibold text-gray-700 mb-2">Seus cupons</h3>
+              {availableCoupons.length === 0 ? (
+                <div className="p-3 border border-gray-200 rounded-lg text-center text-gray-500 text-sm">
+                  Você não tem cupons
+                  <button
+                    onClick={() => navigate('/cupons')}
+                    className="ml-2 text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    Mais detalhes
+                  </button>
+                </div>
+              ) : (
                 <div className="space-y-2">
                   {availableCoupons.map((c) => (
                     <label
@@ -212,8 +285,19 @@ export default function CartPage() {
                     </label>
                   ))}
                 </div>
+              )}
+            </div>
+
+
+            {/* Total */}
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="flex justify-between items-center">
+                <span className="text-lg font-semibold text-gray-900">Total</span>
+                <span className="text-lg font-bold text-blue-700">
+                  {formatPrice(total)}
+                </span>
               </div>
-            )}
+            </div>
 
             {/* Botão finalizar compra */}
             <button

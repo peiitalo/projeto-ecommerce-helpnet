@@ -29,7 +29,9 @@ import { useCart } from '../../context/CartContext.jsx';
 function ProductPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { addItem } = useCart();
+  const { addItem, removeItem, items } = useCart();
+  const [buttonState, setButtonState] = useState('add'); // 'add', 'added', 'remove'
+  const [addedToCartTimeout, setAddedToCartTimeout] = useState(null);
 
   // Mock do endereço do usuário (em produção, puxar do contexto do usuário logado)
   const userAddress = {
@@ -64,6 +66,10 @@ function ProductPage() {
   const [newComment, setNewComment] = useState('');
   const [newRating, setNewRating] = useState(5);
   const [comments, setComments] = useState([]);
+  const [showCommentMessage, setShowCommentMessage] = useState(false);
+  const [commentMessage, setCommentMessage] = useState('');
+  const [commentMessageTimeout, setCommentMessageTimeout] = useState(null);
+  const [showImageModal, setShowImageModal] = useState(false);
 
 
   // Estado para produto real
@@ -89,6 +95,18 @@ function ProductPage() {
     };
     fetchProduct();
   }, [id]);
+
+  // Check if product is in cart
+  const isInCart = items.some(item => item.id === (product?.ProdutoID || product?.id || id));
+
+  // Update button state based on cart status
+  useEffect(() => {
+    if (isInCart) {
+      setButtonState('remove');
+    } else {
+      setButtonState('add');
+    }
+  }, [isInCart]);
 
   // Carregar comentários mockados (manter antes de qualquer return condicional)
   useEffect(() => {
@@ -129,6 +147,7 @@ function ProductPage() {
   const price = product?.Preco || product?.preco || 0;
   const originalPrice = product?.PrecoOriginal || product?.precoOriginal || null;
   const description = product?.Descricao || product?.descricao || '';
+  const breveDescricao = product?.BreveDescricao || product?.breveDescricao || '';
   const discount = product?.Desconto || product?.desconto || 0;
   const freeShipping = product?.FreteGratis || product?.freteGratis || false;
   const estoque = product?.Estoque || product?.estoque || 0;
@@ -143,25 +162,27 @@ function ProductPage() {
   const condicao = product?.Condicao || product?.condicao || '';
   const prazoEntrega = product?.PrazoEntrega || product?.prazoEntrega || calcularPrazoEntrega(userAddress.cep);
   const categoria = (product?.categoria && (product.categoria.Nome || product.categoria.nome)) || '';
-  const vendedorEmpresaNome = product?.empresa?.Nome || product?.empresaNome || null;
-  const vendedorEmpresaId = product?.empresa?.EmpresaID || product?.empresaId || null;
+  const vendedorNome = product?.vendedor?.Nome || null;
+  const vendedorId = product?.vendedor?.VendedorID || null;
+  const empresaNome = product?.empresa?.Nome || null;
+  const empresaId = product?.empresa?.EmpresaID || null;
   const features = product?.Caracteristicas || product?.features || [];
   const entregaPromocao = product?.entregaPromocao || calcularPromocao(userAddress.cep);
   // Specs para aba de especificações
   const specs = {
     codigo: sku,
-    marca,
-    modelo,
-    cor,
-    peso,
-    dimensoes,
-    garantia,
-    origem,
-    condicao,
     estoque: `${estoque} unidades`,
     prazoEntrega,
     categoria,
-    enderecoEntrega: `${userAddress.rua}, ${userAddress.bairro}, ${userAddress.cidade} - ${userAddress.estado}`
+    enderecoEntrega: `${userAddress.rua}, ${userAddress.bairro}, ${userAddress.cidade} - ${userAddress.estado}`,
+    ...(marca && { marca }),
+    ...(modelo && { modelo }),
+    ...(cor && { cor }),
+    ...(garantia && { garantia }),
+    ...(origem && { origem }),
+    ...(condicao && { condicao }),
+    ...(peso && { peso }),
+    ...(dimensoes && { dimensoes })
   };
 
   // Avaliação e reviews (mock se não vier do backend)
@@ -210,6 +231,16 @@ function ProductPage() {
       estoque: product?.Estoque ?? product?.estoque ?? estoque ?? 0,
     };
     addItem(mapped, quantity);
+    setButtonState('added');
+    if (addedToCartTimeout) {
+      clearTimeout(addedToCartTimeout);
+    }
+    setAddedToCartTimeout(setTimeout(() => setButtonState('remove'), 3000));
+  };
+
+  const handleRemoveFromCart = () => {
+    removeItem(product?.ProdutoID || product?.id || id);
+    setButtonState('add');
   };
 
   const handleToggleFavorite = () => {
@@ -230,11 +261,21 @@ function ProductPage() {
       setComments([comment, ...comments]);
       setNewComment('');
       setNewRating(5);
+      setCommentMessage('Comentário publicado!');
+      setShowCommentMessage(true);
+      if (commentMessageTimeout) clearTimeout(commentMessageTimeout);
+      setCommentMessageTimeout(setTimeout(() => setShowCommentMessage(false), 3000));
     }
   };
 
   const handleDeleteComment = (commentId) => {
-    setComments(comments.filter(c => c.id !== commentId));
+    if (window.confirm('Tem certeza que deseja apagar o comentário?')) {
+      setComments(comments.filter(c => c.id !== commentId));
+      setCommentMessage('Comentário apagado!');
+      setShowCommentMessage(true);
+      if (commentMessageTimeout) clearTimeout(commentMessageTimeout);
+      setCommentMessageTimeout(setTimeout(() => setShowCommentMessage(false), 3000));
+    }
   };
 
   const handleLikeComment = (commentId) => {
@@ -276,7 +317,8 @@ function ProductPage() {
           {/* Galeria de Imagens */}
           <div className="space-y-4">
             {/* Imagem Principal */}
-            <div className="relative aspect-[4/3] rounded-xl overflow-hidden border border-slate-200 max-w-xs sm:max-w-sm mx-auto lg:max-w-none">
+            <div className="relative aspect-[4/3] rounded-xl overflow-hidden border border-slate-200 max-w-xs sm:max-w-sm mx-auto lg:max-w-none cursor-pointer"
+                 onClick={() => images.length > 0 && setShowImageModal(true)}>
               {images.length > 0 ? (
                 <img
                   src={images[activeImageIndex]}
@@ -378,14 +420,21 @@ function ProductPage() {
                 )}
               </div>
 
-              {/* Descrição */}
-              <p className="text-slate-600 leading-relaxed">{description}</p>
+              {/* Breve Descrição */}
+              {breveDescricao && (
+                <p className="text-slate-600 leading-relaxed mb-4">{breveDescricao}</p>
+              )}
 
               {/* Informações do vendedor */}
-              {vendedorEmpresaNome && (
+              {(vendedorNome || empresaNome) && (
                 <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-700">
                   <span className="text-sm">Vendido por: </span>
-                  <span className="font-semibold">{vendedorEmpresaNome}</span>
+                  <span className="font-semibold text-blue-600">
+                    {vendedorNome || empresaNome}
+                  </span>
+                  {empresaNome && vendedorNome && (
+                    <span className="text-sm text-slate-500 ml-2">({empresaNome})</span>
+                  )}
                 </div>
               )}
             </div>
@@ -416,11 +465,31 @@ function ProductPage() {
               {/* Botões de Ação */}
               <div className="space-y-3">
                 <button
-                  onClick={handleAddToCart}
-                  className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 hover:shadow-lg transform hover:scale-[1.02] transition-all duration-200"
+                  onClick={buttonState === 'remove' ? handleRemoveFromCart : handleAddToCart}
+                  className={`w-full flex items-center justify-center gap-2 px-6 py-3.5 font-semibold rounded-xl hover:shadow-lg transform hover:scale-[1.02] transition-all duration-200 ${
+                    buttonState === 'added'
+                      ? 'bg-green-500 text-white'
+                      : buttonState === 'remove'
+                      ? 'bg-red-500 text-white hover:bg-red-600'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
                 >
-                  <FaShoppingCart className="text-lg" />
-                  <span>Adicionar ao Carrinho</span>
+                  {buttonState === 'added' ? (
+                    <>
+                      <FaShoppingCart className="text-lg" />
+                      <span>Adicionado!</span>
+                    </>
+                  ) : buttonState === 'remove' ? (
+                    <>
+                      <FaTrash className="text-lg" />
+                      <span>Remover do Carrinho</span>
+                    </>
+                  ) : (
+                    <>
+                      <FaShoppingCart className="text-lg" />
+                      <span>Adicionar ao Carrinho</span>
+                    </>
+                  )}
                 </button>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -436,7 +505,7 @@ function ProductPage() {
                     <span className="hidden sm:inline">{isFavorite ? 'Favoritado' : 'Favoritar'}</span>
                     <span className="sm:hidden">{isFavorite ? 'Remover dos Favoritos' : 'Adicionar aos Favoritos'}</span>
                   </button>
-                  
+
                   <button className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-green-300 bg-green-50 text-green-700 rounded-xl font-medium hover:bg-green-100 hover:border-green-400 transition-all duration-200">
                     <span>Comprar Agora</span>
                   </button>
@@ -491,16 +560,6 @@ function ProductPage() {
               <div className="prose max-w-none">
                 <h3 className="text-xl font-semibold text-slate-900 mb-4">Sobre o Produto</h3>
                 <p className="text-slate-600 leading-relaxed mb-6">{description}</p>
-                
-                <h4 className="text-lg font-semibold text-slate-900 mb-3">Características Detalhadas</h4>
-                <ul className="space-y-3">
-                  {features.map((feature, index) => (
-                    <li key={index} className="flex items-start gap-3">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
-                      <span className="text-slate-600">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
               </div>
             )}
 
@@ -626,6 +685,11 @@ function ProductPage() {
                       <span className="hidden sm:inline">Enviar</span>
                     </button>
                   </div>
+                  {showCommentMessage && (
+                    <div className="mt-4 text-center text-sm font-medium text-green-600">
+                      {commentMessage}
+                    </div>
+                  )}
                 </div>
 
                 {/* Lista de Comentários */}
@@ -680,6 +744,46 @@ function ProductPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal de Visualização de Imagem */}
+      {showImageModal && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center p-4">
+          <div className="relative max-w-4xl w-full h-full flex items-center justify-center">
+            <button
+              onClick={() => setShowImageModal(false)}
+              className="absolute top-4 right-4 text-white text-3xl p-2 rounded-full bg-black/50 hover:bg-black/75 transition-colors z-50"
+            >
+              <FiX />
+            </button>
+
+            {images.length > 0 && (
+              <>
+                <img
+                  src={images[activeImageIndex]}
+                  alt={name}
+                  className="max-w-full max-h-full object-contain"
+                />
+                {images.length > 1 && (
+                  <>
+                    <button
+                      onClick={prevImage}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-white text-4xl p-3 rounded-full bg-black/50 hover:bg-black/75 transition-colors"
+                    >
+                      <FiChevronLeft />
+                    </button>
+                    <button
+                      onClick={nextImage}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-white text-4xl p-3 rounded-full bg-black/50 hover:bg-black/75 transition-colors"
+                    >
+                      <FiChevronRight />
+                    </button>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

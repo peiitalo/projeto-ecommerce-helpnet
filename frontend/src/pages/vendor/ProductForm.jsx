@@ -40,6 +40,7 @@ function ProductForm() {
   // Estados do formulário
   const [formData, setFormData] = useState({
     nome: '',
+    breveDescricao: '',
     descricao: '',
     preco: '',
     precoOriginal: '',
@@ -95,6 +96,7 @@ function ProductForm() {
       // Mapear dados do produto para o formato do formulário
       setFormData({
         nome: produto.Nome || '',
+        breveDescricao: produto.BreveDescricao || '',
         descricao: produto.Descricao || '',
         preco: produto.Preco?.toString() || '',
         precoOriginal: produto.PrecoOriginal?.toString() || '',
@@ -154,20 +156,32 @@ function ProductForm() {
 
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files);
-    
+
     files.forEach(file => {
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const newImage = e.target.result;
-          setImagePreview(prev => [...prev, newImage]);
-          setFormData(prev => ({
-            ...prev,
-            imagens: [...prev.imagens, newImage]
-          }));
-        };
-        reader.readAsDataURL(file);
+      // Validate file type
+      if (!['image/jpeg', 'image/jpg', 'image/png'].includes(file.type)) {
+        alert('Apenas imagens JPG e PNG são permitidas.');
+        return;
       }
+
+      // Validate file size (3-5 MB)
+      const minSize = 3 * 1024 * 1024; // 3 MB
+      const maxSize = 5 * 1024 * 1024; // 5 MB
+      if (file.size < minSize || file.size > maxSize) {
+        alert('A imagem deve ter entre 3MB e 5MB.');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const newImage = e.target.result;
+        setImagePreview(prev => [...prev, newImage]);
+        setFormData(prev => ({
+          ...prev,
+          imagens: [...prev.imagens, newImage]
+        }));
+      };
+      reader.readAsDataURL(file);
     });
   };
 
@@ -217,6 +231,7 @@ function ProductForm() {
       // Preparar dados para envio
       const dadosProduto = {
         nome: formData.nome,
+        breveDescricao: formData.breveDescricao,
         descricao: formData.descricao,
         preco: parseFloat(formData.preco),
         precoOriginal: formData.precoOriginal ? parseFloat(formData.precoOriginal) : null,
@@ -377,7 +392,21 @@ function ProductForm() {
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Descrição
+                      Breve Descrição
+                    </label>
+                    <textarea
+                      name="breveDescricao"
+                      value={formData.breveDescricao}
+                      onChange={handleInputChange}
+                      rows="2"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Descrição curta do produto..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Descrição Detalhada
                     </label>
                     <textarea
                       name="descricao"
@@ -648,7 +677,7 @@ function ProductForm() {
                       <input
                         type="file"
                         multiple
-                        accept="image/*"
+                        accept="image/jpeg,image/jpg,image/png"
                         onChange={handleImageUpload}
                         className="hidden"
                         id="image-upload"
@@ -656,7 +685,7 @@ function ProductForm() {
                       <label htmlFor="image-upload" className="cursor-pointer">
                         <FaUpload className="mx-auto h-12 w-12 text-slate-400 mb-4" />
                         <p className="text-slate-600 mb-2">Clique para fazer upload das imagens</p>
-                        <p className="text-sm text-slate-500">PNG, JPG, GIF até 10MB cada</p>
+                        <p className="text-sm text-slate-500">Apenas JPG e PNG, 3-5 MB cada</p>
                       </label>
                     </div>
 

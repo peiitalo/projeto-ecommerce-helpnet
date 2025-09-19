@@ -3,11 +3,12 @@ import express from 'express';
 import cors from 'cors';
 import clienteRoutes from './routes/clienteRoutes.js';
 import produtoRoutes from './routes/produtoRoutes.js';
-import categoriaRoutes from './routes/categoriaRoutes.js';  
-import vendorProdutoRoutes from './routes/vendorProdutoRoutes.js';  
+import categoriaRoutes from './routes/categoriaRoutes.js';
+import vendorProdutoRoutes from './routes/vendorProdutoRoutes.js';
 import carrinhoRoutes from './routes/carrinhoRoutes.js';
 import favoritoRoutes from './routes/favoritoRoutes.js';
 import avaliacaoRoutes from './routes/avaliacaoRoutes.js';
+import freteRoutes from './routes/freteRoutes.js';
 import { logger, requestLogger } from './utils/logger.js';
 
 const app = express();
@@ -40,6 +41,7 @@ app.use('/api/vendedor/produtos', vendorProdutoRoutes);
 app.use('/api/carrinho', carrinhoRoutes);
 app.use('/api/favoritos', favoritoRoutes);
 app.use('/api/avaliacoes', avaliacaoRoutes);
+app.use('/api/frete', freteRoutes);
 
 // Helper: healthcheck simples
 app.get('/api/health', (req, res) => res.json({ ok: true }));

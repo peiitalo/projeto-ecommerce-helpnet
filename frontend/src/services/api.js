@@ -16,8 +16,12 @@ const fetchConfig = {
   credentials: 'include', // necessário para enviar/receber cookies (refresh)
 };
 
+// Flag para evitar múltiplas tentativas de refresh simultâneas
+let isRefreshing = false;
+let refreshPromise = null;
+
 // Função auxiliar para fazer requisições
-const apiRequest = async (endpoint, options = {}) => {
+const apiRequest = async (endpoint, options = {}, retryCount = 0) => {
   try {
     const url = `${API_BASE_URL}${endpoint}`;
     const config = {
@@ -37,7 +41,29 @@ const apiRequest = async (endpoint, options = {}) => {
     } catch {}
 
     const response = await fetch(url, config);
-    
+
+    // Se receber 401 e ainda não tentou refresh, tenta renovar o token
+    if (response.status === 401 && retryCount === 0) {
+      try {
+        // Evita múltiplas tentativas simultâneas
+        if (isRefreshing) {
+          await refreshPromise;
+        } else {
+          isRefreshing = true;
+          refreshPromise = refreshToken();
+          await refreshPromise;
+          isRefreshing = false;
+          refreshPromise = null;
+        }
+
+        // Retry com novo token
+        return apiRequest(endpoint, options, retryCount + 1);
+      } catch (refreshError) {
+        console.error('Erro ao renovar token:', refreshError);
+        // Se refresh falhar, continua com o erro original
+      }
+    }
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       const serverMsg = (Array.isArray(errorData.errors) && errorData.errors.join('\n')) || errorData.error || errorData.erro || errorData.message;
@@ -47,6 +73,40 @@ const apiRequest = async (endpoint, options = {}) => {
     return await response.json();
   } catch (error) {
     console.error('Erro na requisição:', error);
+    throw error;
+  }
+};
+
+// Função auxiliar para renovar token
+const refreshToken = async () => {
+  try {
+    const refreshResponse = await fetch(`${API_BASE_URL}/clientes/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!refreshResponse.ok) {
+      throw new Error('Falha ao renovar token');
+    }
+
+    const refreshData = await refreshResponse.json();
+
+    // Atualiza o accessToken no localStorage se fornecido
+    if (refreshData?.data?.accessToken && typeof window !== 'undefined') {
+      localStorage.setItem('accessToken', refreshData.data.accessToken);
+    }
+
+    return refreshData;
+  } catch (error) {
+    // Se refresh falhar, limpa o token expirado
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('accessToken');
+      }
+    } catch {}
     throw error;
   }
 };
@@ -218,10 +278,31 @@ export const clienteService = {
     try { if (typeof window !== 'undefined') localStorage.removeItem('accessToken'); } catch {}
     return apiRequest('/clientes/logout', { method: 'POST' });
   },
+
+  // Listar endereços do cliente
+  listarEnderecos: async () => {
+    return apiRequest('/clientes/enderecos');
+  },
+};
+
+// Serviços de Frete
+export const freteService = {
+  // Calcular frete
+  calcular: async (clienteId, enderecoId, produtoIds) => {
+    return apiRequest('/frete/calcular', {
+      method: 'POST',
+      body: JSON.stringify({
+        clienteId: parseInt(clienteId),
+        enderecoId: parseInt(enderecoId),
+        produtoIds: produtoIds.map(id => parseInt(id))
+      }),
+    });
+  },
 };
 
 export default {
   produtoService,
   categoriaService,
   clienteService,
+  freteService,
 };

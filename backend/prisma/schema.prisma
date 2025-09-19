@@ -81,11 +81,13 @@ model Produto {
   ProdutoID     Int           @id @default(autoincrement())
   Nome          String
   Descricao     String?
+  BreveDescricao String?
   Preco         Float
   PrecoOriginal Float?
   Estoque       Int           @default(0)
   CategoriaID   Int
   EmpresaID     Int?
+  VendedorID    Int?
   CodBarras     String?       @unique
   SKU           String        @unique
   Peso          String?
@@ -105,6 +107,7 @@ model Produto {
   itensPedido   ItensPedido[]
   categoria     Categoria     @relation(fields: [CategoriaID], references: [CategoriaID])
   empresa       Empresa?      @relation(fields: [EmpresaID], references: [EmpresaID])
+  vendedor      Vendedor?     @relation(fields: [VendedorID], references: [VendedorID])
   // Back-relations
   favoritos     Favorito[]
   carrinhoItens CarrinhoItem[]
@@ -189,6 +192,7 @@ model Vendedor {
   Ativo      Boolean  @default(true)
   CriadoEm   DateTime @default(now())
   empresa    Empresa  @relation(fields: [EmpresaID], references: [EmpresaID])
+  produtos   Produto[]
 
   @@map("Vendedor")
 }

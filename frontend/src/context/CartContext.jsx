@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { useAuth } from './AuthContext.jsx';
 
 const CartContext = createContext(null);
-const STORAGE_KEY = 'helpnet_cart_v1';
 
 // Utilitário para ler/gravar no localStorage com segurança
 function safeStorageGet(key, fallback) {
@@ -19,12 +19,15 @@ function safeStorageSet(key, value) {
 }
 
 export function CartProvider({ children }) {
+  const { user } = useAuth();
+  const STORAGE_KEY = user ? `helpnet_cart_${user.id}` : 'helpnet_cart_guest';
+
   const [items, setItems] = useState(() => safeStorageGet(STORAGE_KEY, []));
 
   // Persiste mudanças
   useEffect(() => {
     safeStorageSet(STORAGE_KEY, items);
-  }, [items]);
+  }, [items, STORAGE_KEY]);
 
   // Adiciona item (soma quantidade se já existir)
   const addItem = (product, quantity = 1) => {
@@ -60,7 +63,7 @@ export function CartProvider({ children }) {
 
   const clear = () => setItems([]);
 
-  const count = useMemo(() => items.reduce((sum, i) => sum + (i.quantity || 0), 0), [items]);
+  const count = useMemo(() => items.length, [items]); // Conta itens únicos
   const subtotal = useMemo(() => items.reduce((sum, i) => sum + (i.price * (i.quantity || 0)), 0), [items]);
 
   const value = {
