@@ -147,6 +147,15 @@ export const criarCliente = async (req, res) => {
 
     const toUpperNoAccent = (str) => (str ? removerAcentos(str).toUpperCase() : str);
 
+    // Funções auxiliares para mascarar telefones
+    const maskPhone = (phone) => {
+      if (!phone) return null;
+      const digits = phone.replace(/\D/g, '');
+      if (digits.length === 10) return `(${digits.slice(0,2)}) ${digits.slice(2,6)}-${digits.slice(6)}`;
+      if (digits.length === 11) return `(${digits.slice(0,2)}) ${digits.slice(2,7)}-${digits.slice(7)}`;
+      return phone; // fallback
+    };
+
     const SenhaHash = await cryptoService.hashPassword(senha);
     const CpfCnpjHash = await cryptoService.hashPassword(validateDocument(CPF_CNPJ, TipoPessoa).formatted);
 
@@ -167,9 +176,9 @@ export const criarCliente = async (req, res) => {
         NomeCompleto: toUpperNoAccent(NomeCompleto),
         TipoPessoa,
         CPF_CNPJ: formattedDoc,
-        TelefoneFixo: TelefoneFixo || null,
-        TelefoneCelular: TelefoneCelular || null,
-        Whatsapp: Whatsapp || null,
+        TelefoneFixo: maskPhone(TelefoneFixo),
+        TelefoneCelular: maskPhone(TelefoneCelular),
+        Whatsapp: maskPhone(Whatsapp),
         Email: Email.toLowerCase(),
         InscricaoEstadual: InscricaoEstadual || null,
         InscricaoMunicipal: InscricaoMunicipal || null,

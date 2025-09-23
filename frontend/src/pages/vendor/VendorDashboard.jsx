@@ -22,6 +22,8 @@ function VendorDashboard() {
 
   // Dados reais (quando disponíveis)
   const [totalProdutos, setTotalProdutos] = useState(null);
+  const [faturamentoAtual, setFaturamentoAtual] = useState(0);
+  const [pedidosAtuais, setPedidosAtuais] = useState(0);
 
   // Carregar categorias para o filtro
   useEffect(() => {
@@ -39,16 +41,43 @@ function VendorDashboard() {
     return () => { mounted = false; };
   }, []);
 
-  // Carregar KPI de produtos (real), respeitando categoria
+  // Carregar KPIs reais do vendedor
   useEffect(() => {
     const fetchKpis = async () => {
       try {
-        const filtros = { limit: 1 };
-        if (category !== 'all') filtros.categoria = category;
-        const resp = await produtoService.listarVendedor(empresaId, filtros);
-        setTotalProdutos(resp?.total ?? (resp?.produtos?.length ?? 0));
+        // Carregar produtos ativos
+        const produtosAtivos = await produtoService.listarVendedor(empresaId, {
+          status: 'ativo',
+          ...(category !== 'all' && { categoria: category })
+        });
+
+        // Carregar produtos inativos
+        const produtosInativos = await produtoService.listarVendedor(empresaId, {
+          status: 'inativo',
+          ...(category !== 'all' && { categoria: category })
+        });
+
+        // Calcular métricas
+        const totalProdutos = (produtosAtivos?.total ?? produtosAtivos?.produtos?.length ?? 0) +
+                             (produtosInativos?.total ?? produtosInativos?.produtos?.length ?? 0);
+
+        setTotalProdutos(totalProdutos);
+
+        // Calcular receita estimada baseada nos produtos (mock por enquanto)
+        const produtos = produtosAtivos?.produtos || [];
+        const receitaEstimada = produtos.reduce((sum, p) => {
+          const preco = p.Preco || p.preco || 0;
+          const vendas = p.vendas || 0;
+          return sum + (preco * vendas);
+        }, 0);
+
+        // Atualizar métricas mock com dados reais onde possível
+        setFaturamentoAtual(receitaEstimada);
+        setPedidosAtuais(Math.floor(receitaEstimada / (ticketMedio || 50))); // Estimativa baseada no ticket médio
+
       } catch (e) {
         console.error('Erro carregando KPIs vendedor:', e);
+        setTotalProdutos(0);
       }
     };
     fetchKpis();
@@ -104,9 +133,7 @@ function VendorDashboard() {
     return labels.map((label, i) => ({ label, value: vals[i] }));
   }, [labels, period]);
 
-  // KPIs calculados a partir das séries mockadas
-  const faturamentoAtual = receitaData.at(-1)?.value ?? 0;
-  const pedidosAtuais = pedidosData.at(-1)?.value ?? 0;
+  // Ticket médio calculado
   const ticketMedio = pedidosAtuais > 0 ? (faturamentoAtual / pedidosAtuais) : 0;
 
   // Top produtos (mock) com leve variação conforme categoria

@@ -1,4 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
+import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function seedCategorias() {
@@ -14,10 +14,14 @@ async function seedCategorias() {
       { Nome: 'Outras' }
     ];
 
+    console.log('Tentando conectar ao banco de dados...');
+
     for (const categoria of categorias) {
+      console.log(`Processando categoria: ${categoria.Nome}`);
+
       // Verificar se categoria já existe
       const existente = await prisma.categoria.findFirst({
-        where: { 
+        where: {
           Nome: {
             equals: categoria.Nome,
             mode: 'insensitive'
@@ -25,27 +29,30 @@ async function seedCategorias() {
         }
       });
 
+      console.log(`Categoria existente? ${existente ? 'Sim' : 'Não'}`);
+
       if (!existente) {
-        await prisma.categoria.create({
+        const novaCategoria = await prisma.categoria.create({
           data: categoria
         });
-        console.log(`Categoria '${categoria.Nome}' criada com sucesso`);
+        console.log(`Categoria '${categoria.Nome}' criada com sucesso (ID: ${novaCategoria.CategoriaID})`);
       } else {
-        console.log(`Categoria '${categoria.Nome}' já existe`);
+        console.log(`Categoria '${categoria.Nome}' já existe (ID: ${existente.CategoriaID})`);
       }
     }
 
     console.log('Seed das categorias concluído!');
   } catch (error) {
     console.error('Erro no seed das categorias:', error);
+    console.error('Stack trace:', error.stack);
   } finally {
     await prisma.$disconnect();
   }
 }
 
 // Executar se chamado diretamente
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   seedCategorias();
 }
 
-module.exports = seedCategorias;
+export default seedCategorias;

@@ -13,7 +13,8 @@ import {
   FaTrash,
   FaUser,
   FaRegHeart,
-  FaImage
+  FaImage,
+  FaSearchPlus
 } from 'react-icons/fa';
 import {
   FiChevronLeft,
@@ -21,7 +22,7 @@ import {
   FiX,
   FiSend
 } from 'react-icons/fi';
-import { produtoService } from '../../services/api';
+import { produtoService, favoritoService } from '../../services/api';
 import { log } from '../../utils/logger';
 import { useCart } from '../../context/CartContext.jsx';
 
@@ -93,7 +94,20 @@ function ProductPage() {
         setLoading(false);
       }
     };
+
+    const checkFavoriteStatus = async () => {
+      try {
+        const favorites = await favoritoService.listar();
+        const isFav = (favorites.favoritos || []).some(fav => fav.produto.ProdutoID === parseInt(id));
+        setIsFavorite(isFav);
+      } catch (error) {
+        log.error('product_check_favorite_error', { id, error: error.message });
+        setIsFavorite(false);
+      }
+    };
+
     fetchProduct();
+    checkFavoriteStatus();
   }, [id]);
 
   // Check if product is in cart
@@ -243,8 +257,20 @@ function ProductPage() {
     setButtonState('add');
   };
 
-  const handleToggleFavorite = () => {
-    setIsFavorite(!isFavorite);
+  const handleToggleFavorite = async () => {
+    try {
+      const produtoId = product?.ProdutoID || product?.id || id;
+      if (isFavorite) {
+        await favoritoService.remover(produtoId);
+        setIsFavorite(false);
+      } else {
+        await favoritoService.adicionar(produtoId);
+        setIsFavorite(true);
+      }
+    } catch (error) {
+      log.error('product_toggle_favorite_error', { produtoId: product?.ProdutoID || id, error: error.message });
+      // Could show error message
+    }
   };
 
   const handleAddComment = () => {
@@ -331,6 +357,18 @@ function ProductPage() {
                 </div>
               )}
               
+              {/* Zoom Icon */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowImageModal(true);
+                }}
+                className="absolute top-4 right-4 p-2 bg-white/90 text-slate-700 hover:bg-white rounded-full shadow-lg transition-all z-10"
+                title="Ampliar imagem"
+              >
+                <FaSearchPlus className="text-lg" />
+              </button>
+
               {/* Badges + Promoções de entrega */}
                 <div className="absolute top-4 left-4 flex flex-col gap-2">
                   {discount > 0 && (
@@ -430,11 +468,10 @@ function ProductPage() {
                 <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-700">
                   <span className="text-sm">Vendido por: </span>
                   <span className="font-semibold text-blue-600">
-                    {vendedorNome || empresaNome}
+                    {vendedorNome && empresaNome && vendedorNome !== empresaNome
+                      ? `${vendedorNome} (${empresaNome})`
+                      : vendedorNome || empresaNome}
                   </span>
-                  {empresaNome && vendedorNome && (
-                    <span className="text-sm text-slate-500 ml-2">({empresaNome})</span>
-                  )}
                 </div>
               )}
             </div>

@@ -190,6 +190,9 @@ export const produtoService = {
   excluirVendedor: async (empresaId, id) => {
     return apiRequest(`/vendedor/produtos/${id}`, withEmpresaHeader(empresaId, { method: 'DELETE' }));
   },
+  acaoEmLoteVendedor: async (empresaId, dados) => {
+    return apiRequest('/vendedor/produtos/acao-em-lote', withEmpresaHeader(empresaId, { method: 'POST', body: JSON.stringify(dados) }));
+  },
 };
 
 // Serviços de Categorias
@@ -285,6 +288,29 @@ export const clienteService = {
   },
 };
 
+// Serviços de Favoritos
+export const favoritoService = {
+  // Listar favoritos
+  listar: async () => {
+    return apiRequest('/favoritos');
+  },
+
+  // Adicionar favorito
+  adicionar: async (produtoId) => {
+    return apiRequest('/favoritos', {
+      method: 'POST',
+      body: JSON.stringify({ produtoId }),
+    });
+  },
+
+  // Remover favorito
+  remover: async (produtoId) => {
+    return apiRequest(`/favoritos/${produtoId}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 // Serviços de Frete
 export const freteService = {
   // Calcular frete
@@ -304,5 +330,6 @@ export default {
   produtoService,
   categoriaService,
   clienteService,
+  favoritoService,
   freteService,
 };

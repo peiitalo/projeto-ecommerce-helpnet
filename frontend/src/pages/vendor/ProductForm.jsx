@@ -164,11 +164,11 @@ function ProductForm() {
         return;
       }
 
-      // Validate file size (3-5 MB)
-      const minSize = 3 * 1024 * 1024; // 3 MB
-      const maxSize = 5 * 1024 * 1024; // 5 MB
+      // Validate file size (1KB-3MB)
+      const minSize = 1 * 1024; // 1 KB
+      const maxSize = 3 * 1024 * 1024; // 3 MB
       if (file.size < minSize || file.size > maxSize) {
-        alert('A imagem deve ter entre 3MB e 5MB.');
+        alert('A imagem deve ter entre 1KB e 3MB.');
         return;
       }
 
@@ -685,7 +685,7 @@ function ProductForm() {
                       <label htmlFor="image-upload" className="cursor-pointer">
                         <FaUpload className="mx-auto h-12 w-12 text-slate-400 mb-4" />
                         <p className="text-slate-600 mb-2">Clique para fazer upload das imagens</p>
-                        <p className="text-sm text-slate-500">Apenas JPG e PNG, 3-5 MB cada</p>
+                        <p className="text-sm text-slate-500">Apenas JPG e PNG, 1KB-3MB cada</p>
                       </label>
                     </div>
 
