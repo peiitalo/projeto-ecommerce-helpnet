@@ -62,6 +62,40 @@ export const webhookPagamento = async (req, res) => {
   }
 };
 
+export const simularPagamentoSandbox = async (req, res) => {
+  try {
+    const { pedidoId } = req.params;
+    const { status = 'approved' } = req.body || {};
+
+    const pedido = await prisma.pedido.findUnique({ where: { PedidoID: parseInt(pedidoId) } });
+    if (!pedido) return res.status(404).json({ success: false, errors: ["Pedido não encontrado"] });
+
+    let statusPagamento;
+    let statusPedido;
+    if (status === 'approved') { statusPagamento = 'Aprovado'; statusPedido = 'Pago'; }
+    else if (status === 'rejected') { statusPagamento = 'Rejeitado'; statusPedido = 'Cancelado'; }
+    else { statusPagamento = 'Pendente'; statusPedido = 'AguardandoPagamento'; }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.pagamentosPedido.updateMany({
+        where: { PedidoID: parseInt(pedidoId) },
+        data: { StatusPagamento: statusPagamento, DataPagamento: statusPagamento === 'Aprovado' ? new Date() : null }
+      });
+      await tx.pedido.update({ where: { PedidoID: parseInt(pedidoId) }, data: { Status: statusPedido } });
+    });
+
+    if (statusPagamento === 'Aprovado') {
+      await notificarVendedorPedidoPago(pedidoId);
+      await criarEntregasAutomaticas(pedidoId);
+    }
+
+    return res.json({ success: true, pedidoId, status: statusPagamento });
+  } catch (error) {
+    logControllerError('simular_pagamento_error', error, req);
+    res.status(500).json({ success: false, errors: ["Erro interno do servidor"] });
+  }
+};
+
 export const verificarStatusPagamento = async (req, res) => {
   try {
     const { pedidoId } = req.params;
@@ -229,3 +263,185 @@ async function criarEntregasAutomaticas(pedidoId) {
     });
   }
 }
+
+// ===== Novos endpoints: registrar pagamento parcial e obter resumo =====
+
+function formatCurrencyBRL(value) {
+  return `R$ ${Number(value).toFixed(2)}`;
+}
+
+async function montarResumoPagamento(pedidoId) {
+  const pedido = await prisma.pedido.findUnique({
+    where: { PedidoID: parseInt(pedidoId) },
+    include: {
+      distribuicoes: { include: { MetodoPagamento: true } },
+      pagamentosPedido: { include: { MetodoPagamento: true }, orderBy: { DataPagamento: 'desc' } }
+    }
+  });
+  if (!pedido) return null;
+  const totalRestante = Math.max(0, pedido.Total - pedido.TotalPago);
+  const metodos = pedido.distribuicoes.map(d => ({
+    metodoId: d.MetodoID,
+    metodo: d.MetodoPagamento?.Nome,
+    alocado: d.ValorAlocado,
+    pago: d.ValorPagoAcumulado,
+    restante: Math.max(0, d.ValorAlocado - d.ValorPagoAcumulado)
+  }));
+  return {
+    pedidoId: pedido.PedidoID,
+    total: pedido.Total,
+    totalPago: pedido.TotalPago,
+    totalRestante,
+    statusPagamento: pedido.StatusPagamento,
+    expiraEm: pedido.ExpiraEm,
+    metodos,
+    historico: pedido.pagamentosPedido.map(p => ({
+      id: p.PagamentoID,
+      metodoId: p.MetodoID,
+      metodo: p.MetodoPagamento?.Nome,
+      valor: p.ValorPago,
+      status: p.StatusPagamento,
+      data: p.DataPagamento
+    }))
+  };
+}
+
+function calcularNovoStatus(total, totalPago, expiraEm) {
+  const quitado = (totalPago + 1e-6) >= total;
+  if (quitado) return 'PAGO';
+  const agora = new Date();
+  if (expiraEm && agora > new Date(expiraEm)) return 'EXPIRADO';
+  if (totalPago > 0) return 'PARCIAL';
+  return 'PENDENTE';
+}
+
+export const obterResumoPagamentos = async (req, res) => {
+  try {
+    const { pedidoId } = req.params;
+    const { user } = req;
+
+    const pedido = await prisma.pedido.findFirst({
+      where: { PedidoID: parseInt(pedidoId), ClienteID: user.id }
+    });
+    if (!pedido) return res.status(404).json({ success: false, errors: ['Pedido não encontrado'] });
+
+    // Atualiza status on-the-fly se necessário
+    const novoStatus = calcularNovoStatus(pedido.Total, pedido.TotalPago, pedido.ExpiraEm);
+    if (novoStatus !== pedido.StatusPagamento) {
+      await prisma.pedido.update({ where: { PedidoID: pedido.PedidoID }, data: { StatusPagamento: novoStatus } });
+    }
+
+    const resumo = await montarResumoPagamento(pedidoId);
+    return res.json({ success: true, resumo });
+  } catch (error) {
+    logControllerError('obter_resumo_pagamentos_error', error, req);
+    res.status(500).json({ success: false, errors: ['Erro interno do servidor'] });
+  }
+};
+
+export const registrarPagamentoParcial = async (req, res) => {
+  try {
+    const { pedidoId } = req.params;
+    const { metodoId, valor } = req.body || {};
+    const { user } = req;
+
+    const valorPago = parseFloat(valor);
+    if (!metodoId || !valorPago || valorPago <= 0) {
+      return res.status(400).json({ success: false, errors: ['Parâmetros inválidos: metodoId e valor > 0 são obrigatórios'] });
+    }
+
+    const pedido = await prisma.pedido.findFirst({ where: { PedidoID: parseInt(pedidoId), ClienteID: user.id } });
+    if (!pedido) return res.status(404).json({ success: false, errors: ['Pedido não encontrado'] });
+
+    if (pedido.StatusPagamento === 'PAGO') {
+      return res.status(400).json({ success: false, errors: ['Pedido já está totalmente pago'] });
+    }
+
+    const agora = new Date();
+    if (pedido.ExpiraEm && agora > new Date(pedido.ExpiraEm)) {
+      return res.status(400).json({ success: false, errors: ['Pedido expirado. Não é possível registrar pagamento.'] });
+    }
+
+    const dist = await prisma.distribuicaoPagamentoPedido.findFirst({
+      where: { PedidoID: pedido.PedidoID, MetodoID: parseInt(metodoId) },
+      include: { MetodoPagamento: true }
+    });
+    if (!dist) return res.status(400).json({ success: false, errors: ['Método de pagamento não alocado neste pedido'] });
+
+    const restanteMetodo = Math.max(0, dist.ValorAlocado - dist.ValorPagoAcumulado);
+    const restantePedido = Math.max(0, pedido.Total - pedido.TotalPago);
+
+    if (valorPago - restanteMetodo > 1e-6) {
+      return res.status(400).json({ success: false, errors: [`Pagamento excede o restante do método (${formatCurrencyBRL(restanteMetodo)})`] });
+    }
+    if (valorPago - restantePedido > 1e-6) {
+      return res.status(400).json({ success: false, errors: [`Pagamento excede o restante do pedido (${formatCurrencyBRL(restantePedido)})`] });
+    }
+
+    let novoStatus;
+    await prisma.$transaction(async (tx) => {
+      // Registrar transação como Aprovado (simulação)
+      await tx.pagamentosPedido.create({
+        data: {
+          PedidoID: pedido.PedidoID,
+          MetodoID: dist.MetodoID,
+          ValorPago: valorPago,
+          StatusPagamento: 'Aprovado',
+          DataPagamento: new Date()
+        }
+      });
+
+      // Atualizar acumulados
+      await tx.distribuicaoPagamentoPedido.update({
+        where: { DistribuicaoID: dist.DistribuicaoID },
+        data: { ValorPagoAcumulado: { increment: valorPago } }
+      });
+
+      const totalPagoNovo = pedido.TotalPago + valorPago;
+      novoStatus = calcularNovoStatus(pedido.Total, totalPagoNovo, pedido.ExpiraEm);
+
+      await tx.pedido.update({
+        where: { PedidoID: pedido.PedidoID },
+        data: {
+          TotalPago: totalPagoNovo,
+          StatusPagamento: novoStatus,
+          // Opcional: ajustar Status textual
+          Status: novoStatus === 'PAGO' ? 'Pago' : (novoStatus === 'PARCIAL' ? 'AguardandoPagamento' : pedido.Status)
+        }
+      });
+    });
+
+    // Pós-processamento quando quitado (fora da transação para evitar timeout)
+    if (novoStatus === 'PAGO') {
+      await notificarVendedorPedidoPago(pedido.PedidoID);
+      await criarEntregasAutomaticas(pedido.PedidoID);
+    }
+
+    const resumo = await montarResumoPagamento(pedidoId);
+    return res.json({ success: true, message: 'Pagamento registrado', resumo });
+  } catch (error) {
+    logControllerError('registrar_pagamento_parcial_error', error, req);
+    res.status(500).json({ success: false, errors: ['Erro interno do servidor'] });
+  }
+};
+
+export const atualizarStatusPagamento = async (req, res) => {
+  try {
+    const { pedidoId } = req.params;
+    const { status } = req.body || {};
+    const permitidos = ['PENDENTE', 'PARCIAL', 'PAGO', 'EXPIRADO'];
+    if (!permitidos.includes(status)) {
+      return res.status(400).json({ success: false, errors: ['Status inválido'] });
+    }
+
+    const pedido = await prisma.pedido.findUnique({ where: { PedidoID: parseInt(pedidoId) } });
+    if (!pedido) return res.status(404).json({ success: false, errors: ['Pedido não encontrado'] });
+
+    await prisma.pedido.update({ where: { PedidoID: pedido.PedidoID }, data: { StatusPagamento: status } });
+    const resumo = await montarResumoPagamento(pedidoId);
+    return res.json({ success: true, resumo });
+  } catch (error) {
+    logControllerError('atualizar_status_pagamento_error', error, req);
+    res.status(500).json({ success: false, errors: ['Erro interno do servidor'] });
+  }
+};

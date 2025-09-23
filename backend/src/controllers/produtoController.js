@@ -2,6 +2,14 @@
 import prisma from "../config/prisma.js";
 import { logControllerError, logger } from "../utils/logger.js";
 
+/**
+ * Lista produtos com filtros opcionais de categoria, status e busca.
+ * Suporta paginação e retorna apenas campos necessários para performance.
+ * @param {Object} req - Requisição Express
+ * @param {Object} req.query - Query parameters: categoria, status, busca, pagina, limit
+ * @param {Object} res - Resposta Express
+ * @returns {Object} JSON com produtos e total
+ */
 export const listarProdutos = async (req, res) => {
   try {
     const { categoria, status, busca, pagina = 1, limit = 10 } = req.query;
@@ -83,10 +91,49 @@ export const buscarProdutoPorId = async (req, res) => {
     const { id } = req.params;
     const produto = await prisma.produto.findUnique({
       where: { ProdutoID: parseInt(id) },
-      include: {
-        categoria: true,
-        empresa: { select: { EmpresaID: true, Nome: true } },
-        vendedor: { select: { VendedorID: true, Nome: true, Email: true } }
+      select: {
+        ProdutoID: true,
+        Nome: true,
+        Descricao: true,
+        BreveDescricao: true,
+        Preco: true,
+        PrecoOriginal: true,
+        Estoque: true,
+        CodBarras: true,
+        SKU: true,
+        Peso: true,
+        Dimensoes: true,
+        Marca: true,
+        Modelo: true,
+        Cor: true,
+        Garantia: true,
+        Origem: true,
+        Condicao: true,
+        FreteGratis: true,
+        Desconto: true,
+        PrazoEntrega: true,
+        Imagens: true,
+        Ativo: true,
+        criadoEm: true,
+        categoria: {
+          select: {
+            CategoriaID: true,
+            Nome: true
+          }
+        },
+        empresa: {
+          select: {
+            EmpresaID: true,
+            Nome: true
+          }
+        },
+        vendedor: {
+          select: {
+            VendedorID: true,
+            Nome: true,
+            Email: true
+          }
+        }
       },
     });
 

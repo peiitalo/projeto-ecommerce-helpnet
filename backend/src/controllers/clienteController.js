@@ -65,6 +65,14 @@ function parseCookies(req) {
   }));
 }
 
+/**
+ * Cria um novo cliente no sistema com validações completas.
+ * Realiza cadastro de cliente, endereços e vinculação automática a vendedor se pessoa jurídica.
+ * @param {Object} req - Requisição Express
+ * @param {Object} req.body - Dados do cliente e endereços
+ * @param {Object} res - Resposta Express
+ * @returns {Object} JSON com sucesso ou erros de validação
+ */
 export const criarCliente = async (req, res) => {
   const {
     NomeCompleto,

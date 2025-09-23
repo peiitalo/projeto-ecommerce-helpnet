@@ -1,17 +1,23 @@
 // backend/src/controllers/categoriaController.js
-import prisma from "../config/prisma.js"; 
+import prisma from "../config/prisma.js";
 import { logControllerError, logger } from "../utils/logger.js";
+import cache from "../utils/cache.js";
 
 // Listar todas as categorias
 export const listarCategorias = async (req, res) => {
   try {
-    const categorias = await prisma.categoria.findMany({
-      orderBy: { Nome: 'asc' },
-      include: { 
-        _count: { select: { produtos: true } } 
-      }
-    });
-    logger.info('listar_categorias_ok', { total: categorias.length });
+    const cacheKey = 'categorias_list';
+    const categorias = await cache.getOrSet(cacheKey, async () => {
+      return await prisma.categoria.findMany({
+        orderBy: { Nome: 'asc' },
+        include: {
+          _count: { select: { produtos: true } }
+        }
+      });
+    }, 15 * 60 * 1000); // 15 minutes cache
+
+    logger.info('listar_categorias_ok', { total: categorias.length, cached: true });
+    res.set('Cache-Control', 'public, max-age=900, s-maxage=1800'); // 15min browser cache
     res.json(categorias);
   } catch (error) {
     logControllerError('listar_categorias_error', error, req, { query: req.query });
@@ -55,6 +61,10 @@ export const criarCategoria = async (req, res) => {
     if (categoriaExistente) return res.status(400).json({ erro: 'Categoria já existe' });
 
     const categoria = await prisma.categoria.create({ data: { Nome: nome } });
+
+    // Clear cache
+    cache.delete('categorias_list');
+
     logger.info('criar_categoria_ok', { id: categoria.CategoriaID });
     res.status(201).json(categoria);
   } catch (error) {
@@ -74,7 +84,7 @@ export const atualizarCategoria = async (req, res) => {
     if (!categoriaExistente) return res.status(404).json({ erro: 'Categoria não encontrada' });
 
     const nomeExistente = await prisma.categoria.findFirst({
-      where: { 
+      where: {
         Nome: { equals: nome, mode: 'insensitive' },
         CategoriaID: { not: parseInt(id) }
       }
@@ -85,6 +95,10 @@ export const atualizarCategoria = async (req, res) => {
       where: { CategoriaID: parseInt(id) },
       data: { Nome: nome }
     });
+
+    // Clear cache
+    cache.delete('categorias_list');
+
     logger.info('atualizar_categoria_ok', { id: categoria.CategoriaID });
     res.json(categoria);
   } catch (error) {
@@ -105,6 +119,10 @@ export const excluirCategoria = async (req, res) => {
     if (temProdutos) return res.status(400).json({ erro: 'Não é possível excluir categoria que possui produtos associados' });
 
     await prisma.categoria.delete({ where: { CategoriaID: parseInt(id) } });
+
+    // Clear cache
+    cache.delete('categorias_list');
+
     logger.info('excluir_categoria_ok', { id: parseInt(id) });
     res.json({ mensagem: 'Categoria excluída com sucesso' });
   } catch (error) {

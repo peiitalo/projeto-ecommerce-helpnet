@@ -18,7 +18,7 @@ import {
   FiPlus
 } from 'react-icons/fi';
 import { produtoService } from '../../services/api';
-import AdminLayout from '../../components/AdminLayout';
+import AdminLayout from '../../layouts/AdminLayout';
 
 function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);

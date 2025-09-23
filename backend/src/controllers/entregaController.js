@@ -281,6 +281,192 @@ export const buscarEntregaCliente = async (req, res) => {
   }
 };
 
+export const buscarEntregaVendedor = async (req, res) => {
+  try {
+    const { user } = req;
+    const { pedidoId } = req.params;
+
+    // Verificar se o usuário é vendedor
+    if (user.role !== 'vendedor' && user.role !== 'VENDEDOR') {
+      return res.status(403).json({
+        success: false,
+        errors: ["Acesso negado. Apenas vendedores podem buscar entregas."]
+      });
+    }
+
+    // Verificar se o pedido existe e o vendedor tem produtos neste pedido
+    const pedido = await prisma.pedido.findFirst({
+      where: {
+        PedidoID: parseInt(pedidoId),
+        itensPedido: {
+          some: {
+            produto: {
+              VendedorID: user.vendedorId
+            }
+          }
+        }
+      }
+    });
+
+    if (!pedido) {
+      return res.status(404).json({
+        success: false,
+        errors: ["Pedido não encontrado ou você não tem permissão para visualizá-lo."]
+      });
+    }
+
+    // Buscar entrega do pedido
+    const entrega = await prisma.entrega.findFirst({
+      where: {
+        PedidoID: parseInt(pedidoId)
+      },
+      include: {
+        rastreamentos: {
+          orderBy: { DataHora: 'desc' }
+        }
+      }
+    });
+
+    if (!entrega) {
+      return res.json({
+        success: true,
+        entrega: null,
+        message: "Entrega ainda não foi criada para este pedido"
+      });
+    }
+
+    res.json({
+      success: true,
+      entrega: {
+        ...entrega,
+        rastreamentos: entrega.rastreamentos.map(r => ({
+          status: r.Status,
+          local: r.Local,
+          dataHora: r.DataHora,
+          observacoes: r.Observacoes
+        }))
+      }
+    });
+
+  } catch (error) {
+    logControllerError('buscar_entrega_vendedor_error', error, req);
+    res.status(500).json({
+      success: false,
+      errors: ["Erro interno do servidor"]
+    });
+  }
+};
+
+export const atualizarStatusEntregaPorPedido = async (req, res) => {
+  try {
+    const { user } = req;
+    const { pedidoId } = req.params;
+    const { status } = req.body;
+
+    // Verificar se o usuário é vendedor
+    if (user.role !== 'vendedor' && user.role !== 'VENDEDOR') {
+      return res.status(403).json({
+        success: false,
+        errors: ["Acesso negado. Apenas vendedores podem atualizar entregas."]
+      });
+    }
+
+    // Validar status
+    const statusValidos = ['AguardandoEnvio', 'EmTransito', 'SaiuParaEntrega', 'Entregue', 'Cancelado'];
+    if (!statusValidos.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Status inválido."]
+      });
+    }
+
+    // Verificar se o pedido existe e o vendedor tem produtos neste pedido
+    const pedido = await prisma.pedido.findFirst({
+      where: {
+        PedidoID: parseInt(pedidoId),
+        itensPedido: {
+          some: {
+            produto: {
+              VendedorID: user.vendedorId
+            }
+          }
+        }
+      }
+    });
+
+    if (!pedido) {
+      return res.status(404).json({
+        success: false,
+        errors: ["Pedido não encontrado ou você não tem permissão para gerenciá-lo."]
+      });
+    }
+
+    // Buscar ou criar entrega para o pedido
+    let entrega = await prisma.entrega.findFirst({
+      where: { PedidoID: parseInt(pedidoId) }
+    });
+
+    if (!entrega) {
+      // Criar entrega se não existir
+      entrega = await prisma.entrega.create({
+        data: {
+          PedidoID: parseInt(pedidoId),
+          StatusEntrega: status,
+          Observacoes: 'Status atualizado manualmente pelo vendedor'
+        }
+      });
+    } else {
+      // Atualizar entrega existente
+      entrega = await prisma.entrega.update({
+        where: { EntregaID: entrega.EntregaID },
+        data: {
+          StatusEntrega: status,
+          ...(status === 'Entregue' && { DataEntrega: new Date() })
+        }
+      });
+    }
+
+    // Criar rastreamento para o novo status
+    await prisma.rastreamento.create({
+      data: {
+        EntregaID: entrega.EntregaID,
+        Status: getStatusDescription(status),
+        Local: 'Atualizado pelo vendedor',
+        Observacoes: 'Status alterado manualmente'
+      }
+    });
+
+    // Notificar cliente sobre atualização
+    await prisma.notificacao.create({
+      data: {
+        Titulo: 'Atualização de Entrega',
+        Mensagem: `Status da entrega do pedido #${pedidoId} atualizado para: ${getStatusDescription(status)}`,
+        Tipo: 'info',
+        ClienteID: pedido.ClienteID
+      }
+    });
+
+    logger.info('status_entrega_atualizado_por_pedido', {
+      pedidoId,
+      novoStatus: status,
+      vendedorId: user.vendedorId
+    });
+
+    res.json({
+      success: true,
+      message: 'Status da entrega atualizado com sucesso',
+      entrega
+    });
+
+  } catch (error) {
+    logControllerError('atualizar_status_entrega_por_pedido_error', error, req);
+    res.status(500).json({
+      success: false,
+      errors: ["Erro interno do servidor"]
+    });
+  }
+};
+
 export const listarEntregasVendedor = async (req, res) => {
   try {
     const { user } = req;

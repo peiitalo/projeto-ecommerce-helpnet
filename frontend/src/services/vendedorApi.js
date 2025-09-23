@@ -34,6 +34,12 @@ const vendedorApi = {
     return apiRequest(`/vendedor/vendedores/${vendedorId}`, {
       method: 'DELETE'
     });
+  },
+
+  // Listar pedidos do vendedor (todos os pedidos de produtos da sua empresa)
+  listarPedidos: (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return apiRequest(`/vendedor/pedidos${queryString ? `?${queryString}` : ''}`);
   }
 };
 

@@ -41,14 +41,21 @@ export const criarPedido = async (req, res) => {
       });
     }
 
+    // Buscar todos os produtos de uma vez para evitar N+1 queries
+    const produtoIds = itens.map(item => parseInt(item.produtoId));
+    const produtos = await prisma.produto.findMany({
+      where: { ProdutoID: { in: produtoIds } }
+    });
+
+    // Criar mapa de produtos para acesso rápido
+    const produtosMap = new Map(produtos.map(p => [p.ProdutoID, p]));
+
     // Calcular total e verificar estoque
     let totalItens = 0;
     const itensComPreco = [];
 
     for (const item of itens) {
-      const produto = await prisma.produto.findUnique({
-        where: { ProdutoID: parseInt(item.produtoId) }
-      });
+      const produto = produtosMap.get(parseInt(item.produtoId));
 
       if (!produto) {
         return res.status(400).json({
@@ -119,13 +126,20 @@ export const criarPedido = async (req, res) => {
 
     // Criar pedido em transação
     const resultado = await prisma.$transaction(async (tx) => {
-      // Criar pedido
+      // Criar pedido com expiração e status de pagamento inicial
+      const expiracaoHoras = 24; // ajuste para 24h/48h conforme regra
+      const expiraEm = new Date();
+      expiraEm.setHours(expiraEm.getHours() + expiracaoHoras);
+
       const pedido = await tx.pedido.create({
         data: {
           ClienteID: user.id,
           EnderecoID: parseInt(enderecoId),
           Total: totalPedido,
-          Status: 'AguardandoPagamento'
+          Status: 'AguardandoPagamento',
+          StatusPagamento: 'PENDENTE',
+          ExpiraEm: expiraEm,
+          TotalPago: 0
         }
       });
 
@@ -147,7 +161,7 @@ export const criarPedido = async (req, res) => {
         });
       }
 
-      // Criar pagamentos com status inicial
+      // Salvar distribuição de pagamento (não cria pagamento ainda)
       for (const metodo of metodosPagamento) {
         // Mapear tipos do frontend para nomes do banco
         const tipoMapeado = {
@@ -165,12 +179,12 @@ export const criarPedido = async (req, res) => {
           throw new Error(`Método de pagamento ${metodo.tipo} não encontrado`);
         }
 
-        await tx.pagamentosPedido.create({
+        await tx.distribuicaoPagamentoPedido.create({
           data: {
             PedidoID: pedido.PedidoID,
             MetodoID: metodoPagamento.MetodoID,
-            ValorPago: parseFloat(metodo.valor),
-            StatusPagamento: 'AguardandoPagamento'
+            ValorAlocado: parseFloat(metodo.valor),
+            ValorPagoAcumulado: 0
           }
         });
       }
@@ -178,65 +192,19 @@ export const criarPedido = async (req, res) => {
       return pedido;
     });
 
-    // Criar preferência de pagamento no Mercado Pago
+    // Não cria preferências externas aqui. Fluxo será a tela de pagamento interna por método.
+    let paymentPreference = null;
     try {
-      const paymentData = {
-        id: resultado.PedidoID,
-        total: totalPedido,
-        cliente: {
-          nome: clienteData.NomeCompleto,
-          email: clienteData.Email,
-          cpf: clienteData.CPF_CNPJ
-        },
-        itens: itensComPreco,
-        endereco: enderecoData,
-        metodosPagamento
-      };
-
-      const paymentPreference = await paymentService.criarPreferenciaPagamento(paymentData);
-
-      // Atualizar pedido com dados do pagamento
+      // Opcionalmente, poderíamos criar preferências individuais por método no futuro.
       await prisma.pedido.update({
         where: { PedidoID: resultado.PedidoID },
-        data: {
-          Status: 'PagamentoIniciado'
-        }
+        data: { Status: 'PagamentoIniciado' }
       });
-
-      logger.info('pagamento_mercado_pago_criado', {
-        pedidoId: resultado.PedidoID,
-        preferenceId: paymentPreference.preferenceId
-      });
-
     } catch (paymentError) {
-      logger.error('erro_criar_pagamento_mercado_pago', {
+      logger.error('erro_configurar_pagamento', {
         pedidoId: resultado.PedidoID,
         error: paymentError.message
       });
-
-      // Se falhar o pagamento, cancelar o pedido e devolver estoque
-      await prisma.$transaction(async (tx) => {
-        await tx.pedido.update({
-          where: { PedidoID: resultado.PedidoID },
-          data: { Status: 'Cancelado' }
-        });
-
-        // Devolver itens ao estoque
-        for (const item of itensComPreco) {
-          await tx.produto.update({
-            where: { ProdutoID: item.produtoId },
-            data: { Estoque: { increment: item.quantidade } }
-          });
-        }
-
-        // Cancelar pagamentos
-        await tx.pagamentosPedido.updateMany({
-          where: { PedidoID: resultado.PedidoID },
-          data: { StatusPagamento: 'Cancelado' }
-        });
-      });
-
-      throw new Error('Erro ao processar pagamento. Pedido cancelado.');
     }
 
     // Roteamento do pedido para vendedores
@@ -263,8 +231,9 @@ export const criarPedido = async (req, res) => {
         pedidoId: resultado.PedidoID,
         total: totalPedido,
         status: 'PagamentoIniciado',
-        paymentUrl: paymentPreference.initPoint,
-        sandboxPaymentUrl: paymentPreference.sandboxInitPoint
+        // Direcionar o cliente para a tela interna de pagamento do pedido
+        paymentUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/checkout/pagamento/${resultado.PedidoID}`,
+        sandboxPaymentUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/checkout/pagamento/${resultado.PedidoID}`
       }
     });
 
@@ -319,26 +288,30 @@ async function rotearPedidoParaVendedores(pedidoId, clienteId, itensComPreco) {
     // Para cada vendedor, adicionar cliente à lista e criar notificação
     for (const [vendedorId, dados] of produtosPorVendedor) {
       // Adicionar cliente à lista do vendedor
-      await prisma.clienteVendedor.upsert({
-        where: {
-          ClienteID_VendedorID: {
+      if (prisma?.clienteVendedor?.upsert) {
+        await prisma.clienteVendedor.upsert({
+          where: {
+            ClienteID_VendedorID: {
+              ClienteID: clienteId,
+              VendedorID: vendedorId
+            }
+          },
+          update: {
+            UltimoPedidoEm: new Date(),
+            TotalPedidos: { increment: 1 },
+            ValorTotal: { increment: dados.valorTotal }
+          },
+          create: {
             ClienteID: clienteId,
-            VendedorID: vendedorId
+            VendedorID: vendedorId,
+            UltimoPedidoEm: new Date(),
+            TotalPedidos: 1,
+            ValorTotal: dados.valorTotal
           }
-        },
-        update: {
-          UltimoPedidoEm: new Date(),
-          TotalPedidos: { increment: 1 },
-          ValorTotal: { increment: dados.valorTotal }
-        },
-        create: {
-          ClienteID: clienteId,
-          VendedorID: vendedorId,
-          UltimoPedidoEm: new Date(),
-          TotalPedidos: 1,
-          ValorTotal: dados.valorTotal
-        }
-      });
+        });
+      } else {
+        await prisma.$executeRaw`INSERT INTO "ClienteVendedor" ("ClienteID","VendedorID","AdicionadoEm","UltimoPedidoEm","TotalPedidos","ValorTotal") VALUES (${clienteId}, ${vendedorId}, NOW(), NOW(), 1, ${dados.valorTotal}) ON CONFLICT ("ClienteID","VendedorID") DO UPDATE SET "UltimoPedidoEm" = EXCLUDED."UltimoPedidoEm", "TotalPedidos" = "ClienteVendedor"."TotalPedidos" + 1, "ValorTotal" = "ClienteVendedor"."ValorTotal" + EXCLUDED."ValorTotal";`;
+      }
 
       // Criar notificação para o vendedor
       const produtosTexto = dados.produtos.map(p =>
@@ -382,28 +355,48 @@ export const listarPedidosCliente = async (req, res) => {
     const [pedidos, total] = await prisma.$transaction([
       prisma.pedido.findMany({
         where: { ClienteID: user.id },
-        include: {
+        select: {
+          PedidoID: true,
+          DataPedido: true,
+          Status: true,
+          Total: true,
+          TotalPago: true,
+          StatusPagamento: true,
+          ExpiraEm: true,
           itensPedido: {
-            include: {
+            select: {
+              Quantidade: true,
+              PrecoUnitario: true,
               produto: {
                 select: {
                   ProdutoID: true,
                   Nome: true,
                   Imagens: true,
-                  SKU: true,
-                  VendedorID: true
+                  SKU: true
                 }
               }
             }
           },
           pagamentosPedido: {
-            include: {
+            select: {
+              ValorPago: true,
+              StatusPagamento: true,
+              DataPagamento: true,
               MetodoPagamento: {
                 select: { Nome: true }
               }
             }
           },
-          Endereco: true
+          Endereco: {
+            select: {
+              Nome: true,
+              CEP: true,
+              Cidade: true,
+              UF: true,
+              Bairro: true,
+              Numero: true
+            }
+          }
         },
         orderBy: { DataPedido: 'desc' },
         skip,
@@ -431,26 +424,51 @@ export const buscarPedidoPorId = async (req, res) => {
         PedidoID: parseInt(id),
         ClienteID: user.id
       },
-      include: {
+      select: {
+        PedidoID: true,
+        DataPedido: true,
+        Status: true,
+        Total: true,
+        TotalPago: true,
+        StatusPagamento: true,
+        ExpiraEm: true,
         itensPedido: {
-          include: {
+          select: {
+            Quantidade: true,
+            PrecoUnitario: true,
             produto: {
               select: {
                 ProdutoID: true,
                 Nome: true,
                 Imagens: true,
-                SKU: true,
-                VendedorID: true
+                SKU: true
               }
             }
           }
         },
         pagamentosPedido: {
-          include: {
-            MetodoPagamento: true
+          select: {
+            ValorPago: true,
+            StatusPagamento: true,
+            DataPagamento: true,
+            MetodoPagamento: {
+              select: { MetodoID: true, Nome: true }
+            }
           }
         },
-        Endereco: true
+        Endereco: {
+          select: {
+            Nome: true,
+            Complemento: true,
+            CEP: true,
+            CodigoIBGE: true,
+            Cidade: true,
+            UF: true,
+            TipoEndereco: true,
+            Numero: true,
+            Bairro: true
+          }
+        }
       }
     });
 
@@ -546,9 +564,20 @@ export const obterEstatisticasDashboardVendedor = async (req, res) => {
   try {
     const { user } = req;
 
+    // Verificar se o usuário é vendedor
+    if (user.role !== 'vendedor' && user.role !== 'VENDEDOR') {
+      return res.status(403).json({ error: "Acesso negado. Apenas vendedores podem acessar esta funcionalidade." });
+    }
+
+    // Usar o vendedorId do JWT payload
+    const vendedorId = user.vendedorId;
+    if (!vendedorId) {
+      return res.status(404).json({ error: "Vendedor não encontrado" });
+    }
+
     // Buscar empresa do vendedor
     const vendedor = await prisma.vendedor.findUnique({
-      where: { VendedorID: user.id },
+      where: { VendedorID: vendedorId },
       select: { EmpresaID: true }
     });
 
@@ -589,7 +618,7 @@ export const obterEstatisticasDashboardVendedor = async (req, res) => {
     ]);
 
     logger.info('estatisticas_dashboard_vendedor_ok', {
-      vendedorId: user.id,
+      vendedorId,
       totalPedidos,
       totalClientes
     });
@@ -614,9 +643,20 @@ export const listarPedidosVendedor = async (req, res) => {
     const { pagina = 1, limit = 10 } = req.query;
     const skip = (pagina - 1) * limit;
 
+    // Verificar se o usuário é vendedor
+    if (user.role !== 'vendedor' && user.role !== 'VENDEDOR') {
+      return res.status(403).json({ error: "Acesso negado. Apenas vendedores podem acessar esta funcionalidade." });
+    }
+
+    // Usar o vendedorId do JWT payload
+    const vendedorId = user.vendedorId;
+    if (!vendedorId) {
+      return res.status(404).json({ error: "Vendedor não encontrado" });
+    }
+
     // Buscar empresa do vendedor
     const vendedor = await prisma.vendedor.findUnique({
-      where: { VendedorID: user.id },
+      where: { VendedorID: vendedorId },
       select: { EmpresaID: true }
     });
 
@@ -636,22 +676,37 @@ export const listarPedidosVendedor = async (req, res) => {
             }
           }
         },
-        include: {
+        select: {
+          PedidoID: true,
+          DataPedido: true,
+          Status: true,
+          Total: true,
+          TotalPago: true,
+          StatusPagamento: true,
           itensPedido: {
-            include: {
+            where: {
+              produto: {
+                EmpresaID: vendedor.EmpresaID
+              }
+            },
+            select: {
+              Quantidade: true,
+              PrecoUnitario: true,
               produto: {
                 select: {
                   ProdutoID: true,
                   Nome: true,
                   Imagens: true,
-                  SKU: true,
-                  EmpresaID: true
+                  SKU: true
                 }
               }
             }
           },
           pagamentosPedido: {
-            include: {
+            select: {
+              ValorPago: true,
+              StatusPagamento: true,
+              DataPagamento: true,
               MetodoPagamento: {
                 select: { Nome: true }
               }
@@ -689,7 +744,7 @@ export const listarPedidosVendedor = async (req, res) => {
       })
     ]);
 
-    logger.info('listar_pedidos_vendedor_ok', { vendedorId: user.id, total });
+    logger.info('listar_pedidos_vendedor_ok', { vendedorId, total });
     res.json({ pedidos, total });
 
   } catch (error) {

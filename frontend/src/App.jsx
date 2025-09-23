@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
+import LoadingSkeleton from './components/LoadingSkeleton';
 
 const LandingPage = lazy(() => import('./pages/landingPage'));
 const Login = lazy(() => import('./pages/login'));
@@ -18,6 +19,8 @@ const AddressPage = lazy(() => import('./pages/clients/AddressPage'));
 const OrdersPage = lazy(() => import('./pages/clients/OrdersPage'));
 const HistoryPage = lazy(() => import('./pages/clients/HistoryPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
+const PaymentSimulator = lazy(() => import('./pages/clients/PaymentSimulator'));
+const PaymentCheckout = lazy(() => import('./pages/clients/PaymentCheckout'));
 const ProductsManagement = lazy(() => import('./pages/vendor/ProductsManagement'));
 const ProductForm = lazy(() => import('./pages/vendor/ProductForm'));
 const VendorDashboard = lazy(() => import('./pages/vendor/VendorDashboard'));
@@ -29,7 +32,7 @@ import ProtectedRoute from './components/ProtectedRoute.jsx';
 function App() {
   return (
     <Router>
-      <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p>Carregando...</p></div>}>
+      <Suspense fallback={<LoadingSkeleton type="page" message="Carregando página..." />}>
         <Routes>
           {/* Público */}
           <Route path="/" element={<LandingPage />} />
@@ -72,6 +75,10 @@ function App() {
 
           {/* Demais páginas placeholder */}
           <Route path="/pedidos" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">Pedidos - Em desenvolvimento</h1></div>} />
+          {/* Fluxo de pagamento simulado realista */}
+          <Route path="/checkout/pagamento/:id" element={<PaymentCheckout />} />
+          {/* Simulador de Pagamento (dev/sandbox) */}
+          <Route path="/pedido/simulado/:id" element={<PaymentSimulator />} />
           <Route path="/configuracoes" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">Configurações - Em desenvolvimento</h1></div>} />
           <Route path="/contato" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">Contato - Em desenvolvimento</h1></div>} />
           <Route path="/ajuda" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">Ajuda - Em desenvolvimento</h1></div>} />

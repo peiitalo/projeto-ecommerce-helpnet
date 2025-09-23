@@ -2,14 +2,16 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import VendorLayout from '../../components/VendorLayout.jsx';
-import { clienteService, entregaApi } from '../../services/api';
+import { entregaApi } from '../../services/api';
+import vendedorApi from '../../services/vendedorApi.js';
 import {
   FaBox,
   FaTruck,
   FaCheck,
   FaClock,
   FaArrowLeft,
-  FaMapMarkerAlt
+  FaMapMarkerAlt,
+  FaTimes
 } from 'react-icons/fa';
 import {
   FiPackage
@@ -20,6 +22,10 @@ function VendorOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [deliveryTracking, setDeliveryTracking] = useState({});
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [selectedDeliveryOrder, setSelectedDeliveryOrder] = useState(null);
+  const [deliveryStatus, setDeliveryStatus] = useState('');
+  const [updatingDelivery, setUpdatingDelivery] = useState(false);
   const { logout } = useAuth();
 
   // Carregar pedidos do vendedor
@@ -31,7 +37,7 @@ function VendorOrdersPage() {
     try {
       setLoading(true);
       // API call for vendor orders - adjust based on backend
-      const response = await clienteService.listarPedidosVendedor();
+      const response = await vendedorApi.listarPedidos();
       const pedidos = response.pedidos || [];
 
       // Transformar dados da API para o formato esperado pelo componente
@@ -41,6 +47,12 @@ function VendorOrdersPage() {
         date: pedido.DataPedido,
         status: pedido.Status,
         total: parseFloat(pedido.Total),
+        totalPago: parseFloat(pedido.TotalPago || 0),
+        statusPagamento: pedido.StatusPagamento,
+        customer: {
+          name: pedido.cliente?.NomeCompleto || 'Cliente não informado',
+          email: pedido.cliente?.Email || ''
+        },
         items: pedido.itensPedido.map(item => ({
           name: item.produto.Nome,
           quantity: item.Quantidade,
@@ -53,7 +65,7 @@ function VendorOrdersPage() {
           city: `${pedido.Endereco.Cidade} - ${pedido.Endereco.UF}`,
           cep: pedido.Endereco.CEP
         },
-        paymentMethod: pedido.pagamentosPedido[0]?.MetodoPagamento?.Nome || 'N/A',
+        paymentMethods: (pedido.pagamentosPedido || []).map(pg => pg.MetodoPagamento?.Nome).filter(Boolean),
         estimatedDelivery: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // Simular 5 dias
       }));
 
@@ -85,6 +97,53 @@ function VendorOrdersPage() {
     }
 
     setDeliveryTracking(trackingInfo);
+  };
+
+  const abrirModalEntrega = (order) => {
+    setSelectedDeliveryOrder(order);
+    // Set current status if delivery exists
+    const currentDelivery = deliveryTracking[order.id];
+    setDeliveryStatus(currentDelivery?.StatusEntrega || 'AguardandoEnvio');
+    setShowDeliveryModal(true);
+  };
+
+  const fecharModalEntrega = () => {
+    setShowDeliveryModal(false);
+    setSelectedDeliveryOrder(null);
+    setDeliveryStatus('');
+  };
+
+  const atualizarStatusEntrega = async () => {
+    if (!selectedDeliveryOrder || !deliveryStatus) return;
+
+    setUpdatingDelivery(true);
+    try {
+      const response = await entregaApi.atualizarStatusEntregaPorPedido(selectedDeliveryOrder.pedidoId, deliveryStatus);
+
+      if (response.success) {
+        // Update local state
+        setDeliveryTracking(prev => ({
+          ...prev,
+          [selectedDeliveryOrder.id]: {
+            ...prev[selectedDeliveryOrder.id],
+            StatusEntrega: deliveryStatus
+          }
+        }));
+
+        // Close modal
+        fecharModalEntrega();
+
+        // Show success message (you can implement a toast system later)
+        alert('Status da entrega atualizado com sucesso!');
+      } else {
+        throw new Error(response.errors?.join(', ') || 'Erro ao atualizar status');
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar status da entrega:', error);
+      alert('Erro ao atualizar status da entrega: ' + error.message);
+    } finally {
+      setUpdatingDelivery(false);
+    }
   };
 
 
@@ -164,6 +223,7 @@ function VendorOrdersPage() {
                         <div>
                           <h3 className="font-semibold text-slate-900">Pedido {order.id}</h3>
                           <p className="text-sm text-slate-600">{formatDate(order.date)}</p>
+                          <p className="text-sm text-slate-500">Cliente: {order.customer.name}</p>
                         </div>
                       </div>
                       <div className="text-right">
@@ -223,6 +283,22 @@ function VendorOrdersPage() {
                       )}
                     </div>
 
+                    {/* Status de pagamento agregado */}
+                    <div className="bg-slate-50 rounded-lg p-4 mb-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-slate-900">Pagamento</span>
+                        <span className="text-xs px-2 py-1 rounded-full bg-slate-200">{order.statusPagamento || 'PENDENTE'}</span>
+                      </div>
+                      <div className="mt-2 text-sm text-slate-700">
+                        <div>Total: <span className="font-medium">{formatPrice(order.total)}</span></div>
+                        <div>Pago: <span className="font-medium text-green-700">{formatPrice(order.totalPago)}</span> • Restante: <span className="font-medium text-red-700">{formatPrice(order.total - order.totalPago)}</span></div>
+                        <div className="text-xs text-slate-600 mt-1">Status: {order.statusPagamento}</div>
+                        {order.paymentMethods?.length > 0 && (
+                          <div className="text-xs text-slate-600">Métodos: {order.paymentMethods.join(', ')}</div>
+                        )}
+                      </div>
+                    </div>
+
                     {/* Itens do pedido */}
                     <div className="border-t border-slate-200 pt-4">
                       <div className="space-y-2">
@@ -265,6 +341,13 @@ function VendorOrdersPage() {
                           <FaBox />
                           <span>Ver Detalhes</span>
                         </button>
+                        <button
+                          onClick={() => abrirModalEntrega(order)}
+                          className="flex items-center gap-2 px-4 py-2 text-orange-600 hover:bg-orange-50 rounded-lg border border-orange-200"
+                        >
+                          <FaTruck />
+                          <span>Gerenciar Entrega</span>
+                        </button>
                         {order.status === 'Em trânsito' && (
                           <button className="flex items-center gap-2 px-4 py-2 text-green-600 hover:bg-green-50 rounded-lg border border-green-200">
                             <FaMapMarkerAlt />
@@ -303,7 +386,7 @@ function VendorOrdersPage() {
                      onClick={() => setSelectedOrder(null)}
                      className="p-2 rounded-lg text-slate-600 hover:bg-slate-50"
                    >
-                     <FiX />
+                     <FaTimes />
                    </button>
                  </div>
                </div>
@@ -318,6 +401,7 @@ function VendorOrdersPage() {
                    </div>
                    <div className="text-right text-sm">
                      <p className="text-slate-600">Pedido em {formatDate(selectedOrder.date)}</p>
+                     <p className="font-medium">Cliente: {selectedOrder.customer.name}</p>
                      {deliveryTracking[selectedOrder.id] ? (
                        <div>
                          <p className="font-medium">
@@ -422,8 +506,110 @@ function VendorOrdersPage() {
              </div>
            </div>
          )}
+
+         {/* Modal de Gerenciamento de Entrega */}
+         {showDeliveryModal && selectedDeliveryOrder && (
+           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+             <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+               <div className="p-6 border-b border-slate-200">
+                 <div className="flex items-center justify-between">
+                   <h2 className="text-xl font-semibold text-slate-900">Gerenciar Entrega - Pedido {selectedDeliveryOrder.id}</h2>
+                   <button
+                     onClick={fecharModalEntrega}
+                     className="p-2 rounded-lg text-slate-600 hover:bg-slate-50"
+                   >
+                     <FaTimes />
+                   </button>
+                 </div>
+               </div>
+               <div className="p-6 space-y-6">
+                 {/* Informações do pedido */}
+                 <div className="bg-slate-50 rounded-lg p-4">
+                   <h3 className="font-medium text-slate-900 mb-3">Informações do Pedido</h3>
+                   <div className="grid grid-cols-2 gap-4 text-sm">
+                     <div>
+                       <p className="font-medium text-slate-900">Cliente</p>
+                       <p className="text-slate-600">{selectedDeliveryOrder.customer.name}</p>
+                     </div>
+                     <div>
+                       <p className="font-medium text-slate-900">Data do Pedido</p>
+                       <p className="text-slate-600">{formatDate(selectedDeliveryOrder.date)}</p>
+                     </div>
+                   </div>
+                 </div>
+
+                 {/* Itens do pedido */}
+                 <div>
+                   <h3 className="font-medium text-slate-900 mb-3">Itens do Pedido</h3>
+                   <div className="space-y-2">
+                     {selectedDeliveryOrder.items.map((item, index) => (
+                       <div key={index} className="flex justify-between text-sm p-2 bg-slate-50 rounded">
+                         <span className="text-slate-600">{item.name} (x{item.quantity})</span>
+                         <span className="font-medium">{formatPrice(item.price * item.quantity)}</span>
+                       </div>
+                     ))}
+                   </div>
+                   <div className="border-t border-slate-200 pt-2 mt-3">
+                     <div className="flex justify-between font-semibold">
+                       <span>Total</span>
+                       <span>{formatPrice(selectedDeliveryOrder.total)}</span>
+                     </div>
+                   </div>
+                 </div>
+
+                 {/* Status da entrega */}
+                 <div>
+                   <h3 className="font-medium text-slate-900 mb-3">Status da Entrega</h3>
+                   <div className="space-y-3">
+                     <div>
+                       <label className="block text-sm font-medium text-slate-700 mb-2">
+                         Novo Status
+                       </label>
+                       <select
+                         value={deliveryStatus}
+                         onChange={(e) => setDeliveryStatus(e.target.value)}
+                         className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                       >
+                         <option value="AguardandoEnvio">Aguardando envio</option>
+                         <option value="EmTransito">Em transporte</option>
+                         <option value="SaiuParaEntrega">Saiu para entrega</option>
+                         <option value="Entregue">Entregue</option>
+                         <option value="Cancelado">Cancelado</option>
+                       </select>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+               <div className="p-6 border-t border-slate-200">
+                 <div className="flex gap-3 justify-end">
+                   <button
+                     onClick={fecharModalEntrega}
+                     className="px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg border border-slate-200"
+                     disabled={updatingDelivery}
+                   >
+                     Cancelar
+                   </button>
+                   <button
+                     onClick={atualizarStatusEntrega}
+                     disabled={updatingDelivery}
+                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                   >
+                     {updatingDelivery ? (
+                       <>
+                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                         <span>Salvando...</span>
+                       </>
+                     ) : (
+                       <span>Salvar Alterações</span>
+                     )}
+                   </button>
+                 </div>
+               </div>
+             </div>
+           </div>
+         )}
        </VendorLayout>
-  );
+ );
 }
 
 export default VendorOrdersPage;

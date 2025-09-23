@@ -75,7 +75,10 @@ function OrdersPage() {
         pedidoId: pedido.PedidoID,
         date: pedido.DataPedido,
         status: pedido.Status,
+        statusPagamento: pedido.StatusPagamento || 'PENDENTE',
         total: parseFloat(pedido.Total),
+        totalPago: parseFloat(pedido.TotalPago || 0),
+        totalRestante: Math.max(0, parseFloat(pedido.Total) - parseFloat(pedido.TotalPago || 0)),
         items: pedido.itensPedido.map(item => ({
           name: item.produto.Nome,
           quantity: item.Quantidade,
@@ -88,8 +91,8 @@ function OrdersPage() {
           city: `${pedido.Endereco.Cidade} - ${pedido.Endereco.UF}`,
           cep: pedido.Endereco.CEP
         },
-        paymentMethod: pedido.pagamentosPedido[0]?.MetodoPagamento?.Nome || 'N/A',
-        estimatedDelivery: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // Simular 5 dias
+        paymentMethods: (pedido.pagamentosPedido || []).map(pg => pg.MetodoPagamento?.Nome).filter(Boolean),
+        estimatedDelivery: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
       }));
 
       setOrders(pedidosFormatados);
@@ -411,6 +414,25 @@ function OrdersPage() {
                           <span className="text-sm text-slate-600">
                             {new Date(order.estimatedDelivery).toLocaleDateString('pt-BR')}
                           </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Status de pagamento agregado */}
+                    <div className="bg-slate-50 rounded-lg p-4 mb-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-slate-900">Pagamento</span>
+                        <span className="text-xs px-2 py-1 rounded-full bg-slate-200">{order.statusPagamento}</span>
+                      </div>
+                      <div className="mt-2 text-sm text-slate-700">
+                        <div>Pago: <span className="font-medium text-green-700">{formatPrice(order.totalPago)}</span> • Restante: <span className="font-medium text-red-700">{formatPrice(order.totalRestante)}</span></div>
+                        {order.paymentMethods?.length > 0 && (
+                          <div className="text-xs text-slate-600 mt-1">Métodos: {order.paymentMethods.join(', ')}</div>
+                        )}
+                      </div>
+                      {(order.statusPagamento === 'PENDENTE' || order.statusPagamento === 'PARCIAL') && (
+                        <div className="mt-3">
+                          <Link to={`/checkout/pagamento/${order.pedidoId}`} className="inline-block px-3 py-2 text-blue-700 border border-blue-200 rounded hover:bg-blue-50 text-sm">Retomar Pagamento</Link>
                         </div>
                       )}
                     </div>

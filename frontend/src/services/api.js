@@ -414,6 +414,47 @@ export const freteService = {
   },
 };
 
+// Serviços de Carrinho
+export const carrinhoService = {
+  // Listar itens do carrinho
+  listar: async () => {
+    return apiRequest('/carrinho');
+  },
+
+  // Adicionar item ao carrinho
+  adicionar: async (produtoId, quantidade = 1) => {
+    return apiRequest('/carrinho', {
+      method: 'POST',
+      body: JSON.stringify({
+        produtoId: parseInt(produtoId),
+        quantidade: parseInt(quantidade || 1)
+      }),
+    });
+  },
+
+  // Atualizar quantidade de um item
+  atualizar: async (produtoId, quantidade) => {
+    return apiRequest(`/carrinho/produto/${parseInt(produtoId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ quantidade: parseInt(quantidade) }),
+    });
+  },
+
+  // Remover item do carrinho
+  remover: async (produtoId) => {
+    return apiRequest(`/carrinho/produto/${parseInt(produtoId)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Limpar carrinho
+  limpar: async () => {
+    return apiRequest('/carrinho', {
+      method: 'DELETE',
+    });
+  },
+};
+
 // Serviços de Notificações
 export const notificacaoService = {
   // Listar notificações do cliente
@@ -478,12 +519,21 @@ export const notificacaoService = {
   },
 };
 
+// Serviços de Vendedor
+export const vendedorService = {
+  // Dashboard do vendedor
+  dashboard: async () => {
+    return apiRequest('/vendedor/dashboard');
+  },
+};
+
 export default {
   produtoService,
   categoriaService,
   clienteService,
   favoritoService,
   freteService,
+  carrinhoService,
   notificacaoService,
 };
 

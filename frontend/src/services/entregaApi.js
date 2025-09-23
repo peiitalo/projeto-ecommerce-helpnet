@@ -13,6 +13,11 @@ const entregaApi = {
     return apiRequest(`/entregas/vendedor?${queryString}`);
   },
 
+  // Vendedor: buscar entrega específica
+  buscarEntregaVendedor: (pedidoId) => {
+    return apiRequest(`/entregas/vendedor/${pedidoId}`);
+  },
+
   // Vendedor: criar entrega
   criarEntrega: (dadosEntrega) => {
     return apiRequest('/entregas', {
@@ -26,6 +31,14 @@ const entregaApi = {
     return apiRequest(`/entregas/${entregaId}/status`, {
       method: 'PUT',
       body: JSON.stringify(dadosStatus)
+    });
+  },
+
+  // Vendedor: atualizar status da entrega por pedido
+  atualizarStatusEntregaPorPedido: (pedidoId, status) => {
+    return apiRequest(`/entregas/pedido/${pedidoId}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status })
     });
   }
 };

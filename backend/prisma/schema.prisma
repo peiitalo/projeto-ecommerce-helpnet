@@ -12,6 +12,13 @@ enum Role {
   VENDEDOR
 }
 
+enum PedidoStatusPagamento {
+  PENDENTE
+  PARCIAL
+  PAGO
+  EXPIRADO
+}
+
 model Administrador {
   AdminID     Int      @id @default(autoincrement())
   Nome        String
@@ -59,6 +66,9 @@ model Cliente {
   clientesVendedor   ClienteVendedor[]
   resetTokens        PasswordResetToken[]
 
+  @@index([Email])
+  @@index([DataCadastro])
+  @@index([role])
   @@map("Cliente")
 }
 
@@ -125,18 +135,25 @@ model Produto {
 }
 
 model Pedido {
-  PedidoID         Int                @id @default(autoincrement())
+  PedidoID         Int                   @id @default(autoincrement())
   ClienteID        Int
   EnderecoID       Int
-  DataPedido       DateTime           @default(now())
+  DataPedido       DateTime              @default(now())
   Status           String?
   Total            Float
+  TotalPago        Float                 @default(0)
+  StatusPagamento  PedidoStatusPagamento @default(PENDENTE)
+  ExpiraEm         DateTime?
   itensPedido      ItensPedido[]
   pagamentosPedido PagamentosPedido[]
-  cliente          Cliente            @relation(fields: [ClienteID], references: [ClienteID])
-  Endereco         Endereco           @relation(fields: [EnderecoID], references: [EnderecoID])
+  distribuicoes    DistribuicaoPagamentoPedido[]
+  cliente          Cliente               @relation(fields: [ClienteID], references: [ClienteID])
+  Endereco         Endereco              @relation(fields: [EnderecoID], references: [EnderecoID])
   entregas         Entrega[]
 
+  @@index([ClienteID])
+  @@index([Status])
+  @@index([StatusPagamento])
   @@map("Pedido")
 }
 
@@ -149,14 +166,17 @@ model ItensPedido {
   pedido        Pedido  @relation(fields: [PedidoID], references: [PedidoID])
   produto       Produto @relation(fields: [ProdutoID], references: [ProdutoID])
 
+  @@index([PedidoID])
+  @@index([ProdutoID])
   @@map("ItensPedido")
 }
 
 model MetodoPagamento {
-  MetodoID         Int                @id @default(autoincrement())
+  MetodoID         Int                        @id @default(autoincrement())
   Nome             String
-  Ativo            Boolean            @default(true)
+  Ativo            Boolean                    @default(true)
   PagamentosPedido PagamentosPedido[]
+  distribuicoes    DistribuicaoPagamentoPedido[]
 
   @@map("MetodoPagamento")
 }
@@ -171,7 +191,23 @@ model PagamentosPedido {
   MetodoPagamento MetodoPagamento @relation(fields: [MetodoID], references: [MetodoID])
   pedido          Pedido          @relation(fields: [PedidoID], references: [PedidoID])
 
+  @@index([PedidoID])
+  @@index([MetodoID])
   @@map("PagamentosPedido")
+}
+
+model DistribuicaoPagamentoPedido {
+  DistribuicaoID     Int             @id @default(autoincrement())
+  PedidoID           Int
+  MetodoID           Int
+  ValorAlocado       Float
+  ValorPagoAcumulado Float           @default(0)
+  MetodoPagamento    MetodoPagamento @relation(fields: [MetodoID], references: [MetodoID])
+  pedido             Pedido          @relation(fields: [PedidoID], references: [PedidoID])
+
+  @@index([PedidoID])
+  @@unique([PedidoID, MetodoID])
+  @@map("DistribuicaoPagamentoPedido")
 }
 
 model Empresa {
@@ -185,6 +221,8 @@ model Empresa {
   produtos   Produto[]
   vendedores Vendedor[]
 
+  @@index([Ativo])
+  @@index([CriadoEm])
   @@map("Empresa")
 }
 
@@ -201,6 +239,9 @@ model Vendedor {
   notificacoes Notificacao[]
   clientesVendedor ClienteVendedor[]
 
+  @@index([EmpresaID])
+  @@index([Ativo])
+  @@index([CriadoEm])
   @@map("Vendedor")
 }
 
@@ -214,6 +255,8 @@ model Favorito {
   produto Produto @relation(fields: [ProdutoID], references: [ProdutoID])
 
   @@unique([ClienteID, ProdutoID], name: "ClienteID_ProdutoID")
+  @@index([ClienteID])
+  @@index([ProdutoID])
   @@map("Favorito")
 }
 
@@ -228,6 +271,8 @@ model CarrinhoItem {
   produto Produto @relation(fields: [ProdutoID], references: [ProdutoID])
 
   @@unique([ClienteID, ProdutoID], name: "ClienteID_ProdutoID")
+  @@index([ClienteID])
+  @@index([ProdutoID])
   @@map("CarrinhoItem")
 }
 
@@ -243,6 +288,8 @@ model Avaliacao {
   produto Produto @relation(fields: [ProdutoID], references: [ProdutoID])
 
   @@unique([ClienteID, ProdutoID], name: "ClienteID_ProdutoID")
+  @@index([ClienteID])
+  @@index([ProdutoID])
   @@map("Avaliacao")
 }
 
@@ -261,6 +308,9 @@ model Notificacao {
   Produto          Produto?  @relation(fields: [produtoProdutoID], references: [ProdutoID])
   produtoProdutoID Int?
 
+  @@index([VendedorID])
+  @@index([ClienteID])
+  @@index([Lida])
   @@map("Notificacao")
 }
 
@@ -278,6 +328,8 @@ model ClienteVendedor {
   vendedor  Vendedor  @relation(fields: [VendedorID], references: [VendedorID])
 
   @@unique([ClienteID, VendedorID])
+  @@index([ClienteID])
+  @@index([VendedorID])
   @@map("ClienteVendedor")
 }
 
@@ -298,6 +350,8 @@ model Entrega {
   pedido          Pedido         @relation(fields: [PedidoID], references: [PedidoID])
   rastreamentos   Rastreamento[]
 
+  @@index([PedidoID])
+  @@index([StatusEntrega])
   @@map("Entrega")
 }
 
@@ -311,6 +365,7 @@ model Rastreamento {
 
   entrega         Entrega  @relation(fields: [EntregaID], references: [EntregaID])
 
+  @@index([EntregaID])
   @@map("Rastreamento")
 }
 
@@ -324,5 +379,8 @@ model PasswordResetToken {
 
   cliente     Cliente  @relation(fields: [ClienteID], references: [ClienteID])
 
+  @@index([ClienteID])
+  @@index([Token])
+  @@index([ExpiresAt])
   @@map("PasswordResetToken")
 }

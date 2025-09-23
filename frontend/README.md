@@ -1,12 +1,43 @@
-# React + Vite
+# Frontend - Organização de Pastas
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Estrutura geral (React + Vite)
+- src/
+  - layouts/: componentes de layout de alto nível (ex.: AdminLayout, VendorLayout)
+    - AdminLayout/
+      - index.jsx
+    - VendorLayout/
+      - index.jsx
+  - components/: componentes reutilizáveis e pequenos (inputs, botões, ProtectedRoute, etc.)
+  - pages/: páginas da aplicação, organizadas por área (admin, clients, vendor, errors)
+  - services/: chamadas à API e lógica externa (api.js e serviços por domínio)
+  - hooks/: hooks customizados (ex.: useDebounce, useBuscarCep)
+  - context/: contextos globais (ex.: AuthContext, CartContext)
+  - utils/: funções utilitárias (logger, validações, máscaras)
+  - assets/: imagens/ícones/fontes (no Vite, arquivos públicos ficam em /public)
+  - styles/: estilos globais (ex.: index.css)
+  - App.jsx, main.jsx
 
-Currently, two official plugins are available:
+Padrões e convenções
+- Componentes grandes devem ser quebrados em uma pasta própria com:
+  - ComponentName/index.jsx
+  - ComponentName/styles.css (se aplicável)
+- Evitar lógica de API dentro de componentes; centralizar em src/services
+- Reutilizar serviços existentes via src/services/api.js que já encapsula autenticação/refresh, erros e cabeçalhos
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Serviços de API
+- Fonte única em src/services/api.js
+- Removido o uso de src/config/api.js para evitar duplicidade conceitual
 
-## Expanding the ESLint configuration
+Rotas e layouts
+- Layouts são importados de src/layouts
+- ProtectedRoute permanece em components por ser um wrapper reutilizável leve
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Start
+- npm run dev
+
+Build
+- npm run build
+
+Lint/format
+- npm run lint
+- npm run format

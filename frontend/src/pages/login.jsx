@@ -51,7 +51,7 @@ function Login() {
   // Logo configuration
   const logoConfig = {
     useImage: true,
-    imageUrl: '/logo.png',
+    imageUrl: 'frontend/public/logo-horizontal.png', 
     altText: 'HelpNet Logo',
     textLogo: 'HelpNet'
   };

@@ -4,6 +4,10 @@ import axios from 'axios';
 const MERCADO_PAGO_ACCESS_TOKEN = process.env.MERCADO_PAGO_ACCESS_TOKEN;
 const MERCADO_PAGO_BASE_URL = 'https://api.mercadopago.com';
 
+// URLs padrão para ambiente de desenvolvimento
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3001';
+
 class PaymentService {
   constructor() {
     this.httpClient = axios.create({
@@ -24,8 +28,8 @@ class PaymentService {
         // Retornar dados simulados para desenvolvimento
         return {
           preferenceId: `simulado_${pedidoData.id}`,
-          initPoint: `${process.env.FRONTEND_URL}/pedido/simulado/${pedidoData.id}`,
-          sandboxInitPoint: `${process.env.FRONTEND_URL}/pedido/simulado/${pedidoData.id}`
+          initPoint: `${FRONTEND_URL}/checkout/pagamento/${pedidoData.id}`,
+          sandboxInitPoint: `${FRONTEND_URL}/checkout/pagamento/${pedidoData.id}`
         };
       }
 
@@ -60,9 +64,9 @@ class PaymentService {
 
       // URLs de retorno
       const back_urls = {
-        success: `${process.env.FRONTEND_URL}/pedido/sucesso/${id}`,
-        failure: `${process.env.FRONTEND_URL}/pedido/falha/${id}`,
-        pending: `${process.env.FRONTEND_URL}/pedido/pendente/${id}`
+        success: `${FRONTEND_URL}/pedido/sucesso/${id}`,
+        failure: `${FRONTEND_URL}/pedido/falha/${id}`,
+        pending: `${FRONTEND_URL}/pedido/pendente/${id}`
       };
 
       // Criar preferência
@@ -72,7 +76,7 @@ class PaymentService {
         back_urls,
         auto_return: 'approved',
         external_reference: id.toString(),
-        notification_url: `${process.env.BACKEND_URL}/api/pagamentos/webhook`,
+        notification_url: `${BACKEND_URL}/api/pagamentos/webhook`,
         payment_methods: {
           excluded_payment_types: [],
           installments: 12
@@ -95,8 +99,8 @@ class PaymentService {
         console.warn('Token do Mercado Pago inválido. Usando modo simulado.');
         return {
           preferenceId: `simulado_${pedidoData.id}`,
-          initPoint: `${process.env.FRONTEND_URL}/pedido/simulado/${pedidoData.id}`,
-          sandboxInitPoint: `${process.env.FRONTEND_URL}/pedido/simulado/${pedidoData.id}`
+          initPoint: `${FRONTEND_URL}/checkout/pagamento/${pedidoData.id}`,
+          sandboxInitPoint: `${FRONTEND_URL}/checkout/pagamento/${pedidoData.id}`
         };
       }
 

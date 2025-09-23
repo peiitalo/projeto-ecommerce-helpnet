@@ -1,10 +1,10 @@
 import express from 'express';
-import { 
-  listarCategorias, 
-  buscarCategoriaPorId, 
-  criarCategoria, 
-  atualizarCategoria, 
-  excluirCategoria 
+import {
+  listarCategorias,
+  buscarCategoriaPorId,
+  criarCategoria,
+  atualizarCategoria,
+  excluirCategoria
 } from '../controllers/categoriaController.js';
 
 const router = express.Router();

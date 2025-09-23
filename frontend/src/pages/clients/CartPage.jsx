@@ -19,6 +19,7 @@ export default function CartPage() {
   const [calculatingShipping, setCalculatingShipping] = useState(false);
   const [shippingError, setShippingError] = useState('');
   const [selectedAddressId, setSelectedAddressId] = useState(1); // ID do endereço padrão
+  const [isFinalizing, setIsFinalizing] = useState(false); // Estado de carregamento para finalização
 
   // Estados para endereços
   const [addresses, setAddresses] = useState([]);
@@ -121,6 +122,15 @@ export default function CartPage() {
     }
     return totalValue;
   }, [subtotal, shippingInfo]);
+
+  const handleFinalizePurchase = () => {
+    if (selectedItems.length === 0) return;
+    try {
+      // Opcional: persistir seleção para uso no checkout
+      sessionStorage.setItem('helpnet_checkout_selected', JSON.stringify(selectedItems));
+    } catch {}
+    navigate('/checkout');
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -302,6 +312,8 @@ export default function CartPage() {
             </div>
 
 
+            {/* Método de Pagamento removido: a seleção e distribuição ocorrerá no checkout */}
+
             {/* Total */}
             <div className="mt-4 pt-4 border-t border-slate-200">
               <div className="flex justify-between items-center">
@@ -314,11 +326,12 @@ export default function CartPage() {
 
             {/* Botão finalizar compra */}
             <button
-              onClick={() => navigate('/checkout')}
-              disabled={selectedItems.length === 0}
+              onClick={handleFinalizePurchase}
+              disabled={selectedItems.length === 0 || isFinalizing}
               className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 mt-4"
+              aria-label="Finalizar compra"
             >
-              Finalizar compra
+              {isFinalizing ? 'Finalizando...' : 'Finalizar compra'}
             </button>
           </div>
         </aside>

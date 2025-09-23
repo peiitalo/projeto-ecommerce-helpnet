@@ -17,7 +17,16 @@ import vendorPedidoRoutes from './routes/vendorPedidoRoutes.js';
 import entregaRoutes from './routes/entregaRoutes.js';
 import vendedorRoutes from './routes/vendedorRoutes.js';
 import relatoriosRoutes from './routes/relatoriosRoutes.js';
+import vendorRoutes from './routes/vendorRoutes.js';
 import { logger, requestLogger } from './utils/logger.js';
+// Middlewares de erro centralizados
+import { notFound, errorHandler } from './middleware/errorHandler.js';
+// Middlewares de cache e performance
+import { cacheMiddleware, etagMiddleware } from './middleware/cacheMiddleware.js';
+// Segurança HTTP: adiciona cabeçalhos padrão de proteção (XSS, clickjacking, etc.)
+import helmet from 'helmet';
+// Rate limiting: mitiga brute-force e abusos (limita requisições por IP)
+import rateLimit from 'express-rate-limit';
 
 const app = express();
 
@@ -31,9 +40,37 @@ app.use(cors({
 }));
 
 // Middlewares
+// Parser de JSON e URL-encoded com limites (previne DoS por payloads grandes)
 app.use(express.json({ limit: '10mb' })); // Aumentar limite para upload de imagens
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+/**
+ * Middlewares de performance e cache
+ * Aplicados antes de outros middlewares para otimizar resposta
+ */
+app.use(cacheMiddleware); // Cache headers inteligentes
+// app.use(etagMiddleware);  // ETags temporariamente desabilitadas para debug
+
+// Logger de requisições (correlaciona erros/diagnóstico)
 app.use(requestLogger);
+
+// Segurança HTTP (helmet):
+// - Desabilita CSP padrão no dev para evitar conflitos com Vite/React; habilitar em produção com política definida
+// - Libera CORP para servir uploads entre domínios quando necessário
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
+
+// Rate limiting (aplicado apenas em produção)
+const isProd = process.env.NODE_ENV === 'production';
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 1000, // mais permissivo em prod para evitar falsos positivos
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => !isProd, // ignora rate limit em desenvolvimento
+});
+app.use(limiter);
 
 // Respostas comprimidas e cache curto para assets (quando servido estático)
 try {
@@ -64,28 +101,29 @@ app.use('/api/vendedor/pedidos', vendorPedidoRoutes);
 app.use('/api/entregas', entregaRoutes);
 app.use('/api/vendedor/vendedores', vendedorRoutes);
 app.use('/api/vendedor/relatorios', relatoriosRoutes);
+app.use('/api/vendedor', vendorRoutes);
 
 // Helper: healthcheck simples
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+
+// Cache performance monitoring
+app.get('/api/cache/stats', (req, res) => {
+  const stats = apiCache.getStats();
+  res.json({
+    cache: stats,
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Rota de teste
 app.get('/', (req, res) => {
   res.json({ message: 'API HelpNet funcionando!' });
 });
 
-// Middleware de tratamento de erros (único, com logger)
-app.use((error, req, res, next) => {
-  logger.error('unhandled_error', {
-    error: { message: error.message, stack: error.stack, code: error.code },
-    method: req.method,
-    url: req.originalUrl,
-    params: req.params,
-    query: req.query,
-    // Sanitizado em logger util
-    body: req.body,
-  });
-  res.status(500).json({ erro: 'Erro interno do servidor' });
-});
+// 404 para rotas não mapeadas
+app.use(notFound);
+// Tratamento centralizado de erros com logging e respostas padronizadas
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
