@@ -34,27 +34,30 @@ model Categoria {
 }
 
 model Cliente {
-  ClienteID          Int             @id @default(autoincrement())
-  CodigoCliente      Int             @unique
+  ClienteID          Int            @id @default(autoincrement())
+  CodigoCliente      Int            @unique
   NomeCompleto       String
   TipoPessoa         String?
-  CPF_CNPJ           String          @unique @db.VarChar(255)
+  CPF_CNPJ           String         @unique @db.VarChar(255)
   TelefoneFixo       String?
   TelefoneCelular    String?
   Whatsapp           String?
-  Email              String          @unique
+  Email              String         @unique
   InscricaoEstadual  String?
   InscricaoMunicipal String?
   RazaoSocial        String?
   SenhaHash          String
-  DataCadastro       DateTime        @default(now())
+  DataCadastro       DateTime       @default(now())
   enderecos          Endereco[]
   pedidos            Pedido[]
-  role               Role            @default(CLIENTE)
+  role               Role           @default(CLIENTE)
   // Back-relations
   favoritos          Favorito[]
   carrinhoItens      CarrinhoItem[]
   avaliacoes         Avaliacao[]
+  Notificacao        Notificacao[]
+  clientesVendedor   ClienteVendedor[]
+  resetTokens        PasswordResetToken[]
 
   @@map("Cliente")
 }
@@ -78,40 +81,41 @@ model Endereco {
 }
 
 model Produto {
-  ProdutoID     Int           @id @default(autoincrement())
-  Nome          String
-  Descricao     String?
+  ProdutoID      Int            @id @default(autoincrement())
+  Nome           String
+  Descricao      String?
   BreveDescricao String?
-  Preco         Float
-  PrecoOriginal Float?
-  Estoque       Int           @default(0)
-  CategoriaID   Int
-  EmpresaID     Int?
-  VendedorID    Int?
-  CodBarras     String?       @unique
-  SKU           String        @unique
-  Peso          String?
-  Dimensoes     String?
-  Marca         String?
-  Modelo        String?
-  Cor           String?
-  Garantia      String?
-  Origem        String?       @default("Nacional")
-  Condicao      String?       @default("Novo")
-  FreteGratis   Boolean?      @default(false)
-  Desconto      Int?          @default(0)
-  PrazoEntrega  String?
-  Imagens       String[]      @default([])
-  Ativo         Boolean       @default(true)
-  criadoEm      DateTime      @default(now())
-  itensPedido   ItensPedido[]
-  categoria     Categoria     @relation(fields: [CategoriaID], references: [CategoriaID])
-  empresa       Empresa?      @relation(fields: [EmpresaID], references: [EmpresaID])
-  vendedor      Vendedor?     @relation(fields: [VendedorID], references: [VendedorID])
+  Preco          Float
+  PrecoOriginal  Float?
+  Estoque        Int            @default(0)
+  CategoriaID    Int
+  EmpresaID      Int?
+  VendedorID     Int?
+  CodBarras      String?        @unique
+  SKU            String         @unique
+  Peso           String?
+  Dimensoes      String?
+  Marca          String?
+  Modelo         String?
+  Cor            String?
+  Garantia       String?
+  Origem         String?        @default("Nacional")
+  Condicao       String?        @default("Novo")
+  FreteGratis    Boolean?       @default(false)
+  Desconto       Int?           @default(0)
+  PrazoEntrega   String?
+  Imagens        String[]       @default([])
+  Ativo          Boolean        @default(true)
+  criadoEm       DateTime       @default(now())
+  itensPedido    ItensPedido[]
+  categoria      Categoria      @relation(fields: [CategoriaID], references: [CategoriaID])
+  empresa        Empresa?       @relation(fields: [EmpresaID], references: [EmpresaID])
+  vendedor       Vendedor?      @relation(fields: [VendedorID], references: [VendedorID])
   // Back-relations
-  favoritos     Favorito[]
-  carrinhoItens CarrinhoItem[]
-  avaliacoes    Avaliacao[]
+  favoritos      Favorito[]
+  carrinhoItens  CarrinhoItem[]
+  avaliacoes     Avaliacao[]
+  notificacoes   Notificacao[]
 
   @@index([CategoriaID])
   @@index([Ativo])
@@ -131,6 +135,7 @@ model Pedido {
   pagamentosPedido PagamentosPedido[]
   cliente          Cliente            @relation(fields: [ClienteID], references: [ClienteID])
   Endereco         Endereco           @relation(fields: [EnderecoID], references: [EnderecoID])
+  entregas         Entrega[]
 
   @@map("Pedido")
 }
@@ -184,15 +189,17 @@ model Empresa {
 }
 
 model Vendedor {
-  VendedorID Int      @id @default(autoincrement())
-  Nome       String
-  Email      String   @unique
-  SenhaHash  String
-  EmpresaID  Int
-  Ativo      Boolean  @default(true)
-  CriadoEm   DateTime @default(now())
-  empresa    Empresa  @relation(fields: [EmpresaID], references: [EmpresaID])
-  produtos   Produto[]
+  VendedorID   Int           @id @default(autoincrement())
+  Nome         String
+  Email        String        @unique
+  SenhaHash    String
+  EmpresaID    Int
+  Ativo        Boolean       @default(true)
+  CriadoEm     DateTime      @default(now())
+  empresa      Empresa       @relation(fields: [EmpresaID], references: [EmpresaID])
+  produtos     Produto[]
+  notificacoes Notificacao[]
+  clientesVendedor ClienteVendedor[]
 
   @@map("Vendedor")
 }
@@ -237,4 +244,85 @@ model Avaliacao {
 
   @@unique([ClienteID, ProdutoID], name: "ClienteID_ProdutoID")
   @@map("Avaliacao")
+}
+
+model Notificacao {
+  NotificacaoID Int      @id @default(autoincrement())
+  Titulo        String
+  Mensagem      String
+  Tipo          String   @default("info") // info, warning, success, error
+  VendedorID    Int?
+  ClienteID     Int?
+  Lida          Boolean  @default(false)
+  CriadoEm      DateTime @default(now())
+
+  vendedor         Vendedor? @relation(fields: [VendedorID], references: [VendedorID])
+  cliente          Cliente?  @relation(fields: [ClienteID], references: [ClienteID])
+  Produto          Produto?  @relation(fields: [produtoProdutoID], references: [ProdutoID])
+  produtoProdutoID Int?
+
+  @@map("Notificacao")
+}
+
+// Relacionamento entre clientes e vendedores para gestão de clientes
+model ClienteVendedor {
+  ClienteVendedorID Int      @id @default(autoincrement())
+  ClienteID         Int
+  VendedorID        Int
+  AdicionadoEm      DateTime @default(now())
+  UltimoPedidoEm    DateTime?
+  TotalPedidos      Int      @default(0)
+  ValorTotal        Float    @default(0)
+
+  cliente   Cliente   @relation(fields: [ClienteID], references: [ClienteID])
+  vendedor  Vendedor  @relation(fields: [VendedorID], references: [VendedorID])
+
+  @@unique([ClienteID, VendedorID])
+  @@map("ClienteVendedor")
+}
+
+// Sistema de rastreamento de entregas
+model Entrega {
+  EntregaID       Int            @id @default(autoincrement())
+  PedidoID        Int
+  Transportadora  String?
+  CodigoRastreio  String?        @unique
+  StatusEntrega   String         @default("AguardandoEnvio") // AguardandoEnvio, Enviado, EmTransito, Entregue, Cancelado
+  DataEnvio       DateTime?
+  DataEntrega     DateTime?
+  PrevisaoEntrega DateTime?
+  Observacoes     String?
+  CriadoEm        DateTime       @default(now())
+  AtualizadoEm    DateTime       @updatedAt
+
+  pedido          Pedido         @relation(fields: [PedidoID], references: [PedidoID])
+  rastreamentos   Rastreamento[]
+
+  @@map("Entrega")
+}
+
+model Rastreamento {
+  RastreamentoID  Int      @id @default(autoincrement())
+  EntregaID       Int
+  Status          String   // Descrição do status (Ex: "Postado", "Em trânsito", "Saiu para entrega")
+  Local           String?  // Local onde ocorreu o evento
+  DataHora        DateTime @default(now())
+  Observacoes     String?
+
+  entrega         Entrega  @relation(fields: [EntregaID], references: [EntregaID])
+
+  @@map("Rastreamento")
+}
+
+model PasswordResetToken {
+  TokenID     Int      @id @default(autoincrement())
+  ClienteID   Int
+  Token       String   @unique
+  ExpiresAt   DateTime
+  Used        Boolean  @default(false)
+  CriadoEm    DateTime @default(now())
+
+  cliente     Cliente  @relation(fields: [ClienteID], references: [ClienteID])
+
+  @@map("PasswordResetToken")
 }

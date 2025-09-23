@@ -40,7 +40,6 @@ function ProductForm() {
   // Estados do formulário
   const [formData, setFormData] = useState({
     nome: '',
-    breveDescricao: '',
     descricao: '',
     preco: '',
     precoOriginal: '',
@@ -96,7 +95,6 @@ function ProductForm() {
       // Mapear dados do produto para o formato do formulário
       setFormData({
         nome: produto.Nome || '',
-        breveDescricao: produto.BreveDescricao || '',
         descricao: produto.Descricao || '',
         preco: produto.Preco?.toString() || '',
         precoOriginal: produto.PrecoOriginal?.toString() || '',
@@ -231,7 +229,6 @@ function ProductForm() {
       // Preparar dados para envio
       const dadosProduto = {
         nome: formData.nome,
-        breveDescricao: formData.breveDescricao,
         descricao: formData.descricao,
         preco: parseFloat(formData.preco),
         precoOriginal: formData.precoOriginal ? parseFloat(formData.precoOriginal) : null,
@@ -303,7 +300,7 @@ function ProductForm() {
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6 lg:mb-8">
           <div className="flex items-center gap-4 mb-4">
             <button
               onClick={() => navigate(`${basePath}/produtos`)}
@@ -312,10 +309,10 @@ function ProductForm() {
               <FaArrowLeft />
             </button>
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
                 {isEditing ? 'Editar Produto' : 'Novo Produto'}
               </h1>
-              <p className="text-slate-600">
+              <p className="text-slate-600 text-sm sm:text-base">
                 {isEditing ? 'Atualize as informações do produto' : 'Preencha os dados do novo produto'}
               </p>
             </div>
@@ -326,20 +323,21 @@ function ProductForm() {
           {/* Navegação das abas */}
           <div className="bg-white rounded-lg border border-slate-200 mb-6">
             <div className="border-b border-slate-200">
-              <nav className="flex space-x-8 px-6">
+              <nav className="flex overflow-x-auto px-4 sm:px-6">
                 {tabs.map((tab) => (
                   <button
                     key={tab.id}
                     type="button"
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap flex-shrink-0 ${
                       activeTab === tab.id
                         ? 'border-blue-500 text-blue-600'
                         : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
                     }`}
                   >
                     {tab.icon}
-                    {tab.label}
+                    <span className="hidden sm:inline">{tab.label}</span>
+                    <span className="sm:hidden">{tab.label.split(' ')[0]}</span>
                   </button>
                 ))}
               </nav>
@@ -390,19 +388,6 @@ function ProductForm() {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Breve Descrição
-                    </label>
-                    <textarea
-                      name="breveDescricao"
-                      value={formData.breveDescricao}
-                      onChange={handleInputChange}
-                      rows="2"
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Descrição curta do produto..."
-                    />
-                  </div>
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">

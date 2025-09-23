@@ -11,9 +11,19 @@ const ProductPage = lazy(() => import('./pages/clients/ProductPage'));
 const CartPage = lazy(() => import('./pages/clients/CartPage'));
 const FavoritesPage = lazy(() => import('./pages/clients/FavoritesPage'));
 const NotificationsPage = lazy(() => import('./pages/clients/NotificationsPage'));
+const ProfilePage = lazy(() => import('./pages/clients/ProfilePage'));
+const ExplorePage = lazy(() => import('./pages/clients/ExplorePage'));
+const CheckoutPage = lazy(() => import('./pages/clients/CheckoutPage'));
+const AddressPage = lazy(() => import('./pages/clients/AddressPage'));
+const OrdersPage = lazy(() => import('./pages/clients/OrdersPage'));
+const HistoryPage = lazy(() => import('./pages/clients/HistoryPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const ProductsManagement = lazy(() => import('./pages/vendor/ProductsManagement'));
 const ProductForm = lazy(() => import('./pages/vendor/ProductForm'));
 const VendorDashboard = lazy(() => import('./pages/vendor/VendorDashboard'));
+const VendorOrdersPage = lazy(() => import('./pages/vendor/VendorOrdersPage'));
+const VendorClientsPage = lazy(() => import('./pages/vendor/VendorClientsPage'));
+const VendorProfilePage = lazy(() => import('./pages/vendor/VendorProfilePage'));
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
 function App() {
@@ -28,11 +38,18 @@ function App() {
           <Route path="/produto/:id" element={<ProductPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/cadastro" element={<Cadastro />} />
+          <Route path="/esqueci-senha" element={<ForgotPasswordPage />} />
 
           {/* Cliente autenticado */}
           <Route element={<ProtectedRoute allowedRoles={["cliente", "vendedor"]} />}>
             <Route path="/favoritos" element={<FavoritesPage />} />
             <Route path="/notificacoes" element={<NotificationsPage />} />
+            <Route path="/perfil" element={<ProfilePage />} />
+            <Route path="/explorer/:category?" element={<ExplorePage />} />
+            <Route path="/enderecos" element={<AddressPage />} />
+            <Route path="/checkout" element={<CheckoutPage />} />
+            <Route path="/meus-pedidos" element={<OrdersPage />} />
+            <Route path="/historico" element={<HistoryPage />} />
             <Route path="/dashboard" element={<Dashboard />} />
             {/* demais rotas do cliente */}
           </Route>
@@ -45,14 +62,15 @@ function App() {
           {/* Vendedor */}
           <Route element={<ProtectedRoute allowedRoles={["vendedor", "juridico"]} />}>
             <Route path="/vendedor" element={<VendorDashboard />} />
+            <Route path="/vendedor/perfil" element={<VendorProfilePage />} />
             <Route path="/vendedor/produtos" element={<ProductsManagement />} />
             <Route path="/vendedor/produtos/novo" element={<ProductForm />} />
             <Route path="/vendedor/produtos/:id/editar" element={<ProductForm />} />
+            <Route path="/vendedor/pedidos" element={<VendorOrdersPage />} />
+            <Route path="/vendedor/clientes" element={<VendorClientsPage />} />
           </Route>
 
           {/* Demais páginas placeholder */}
-          <Route path="/produtos" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">Produtos - Em desenvolvimento</h1></div>} />
-          <Route path="/perfil" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">Perfil - Em desenvolvimento</h1></div>} />
           <Route path="/pedidos" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">Pedidos - Em desenvolvimento</h1></div>} />
           <Route path="/configuracoes" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">Configurações - Em desenvolvimento</h1></div>} />
           <Route path="/contato" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">Contato - Em desenvolvimento</h1></div>} />

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FaEnvelope, FaLock, FaUser, FaBuilding } from "react-icons/fa";
 import {
@@ -45,6 +45,30 @@ function Login() {
   const [carregando, setCarregando] = useState(false);
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [loginSucesso, setLoginSucesso] = useState(null);
+  const [showAutoLogin, setShowAutoLogin] = useState(false);
+  const [savedUser, setSavedUser] = useState(null);
+
+  // Logo configuration
+  const logoConfig = {
+    useImage: true,
+    imageUrl: '/logo.png',
+    altText: 'HelpNet Logo',
+    textLogo: 'HelpNet'
+  };
+
+  // Check for saved user on mount
+  useEffect(() => {
+    try {
+      const user = localStorage.getItem('auth:user');
+      if (user) {
+        const parsedUser = JSON.parse(user);
+        setSavedUser(parsedUser);
+        setShowAutoLogin(true);
+      }
+    } catch (error) {
+      console.error('Erro ao verificar usuário salvo:', error);
+    }
+  }, []);
 
   const lidarComAlteracao = (e) => {
     const { name, value } = e.target;
@@ -52,6 +76,45 @@ function Login() {
     if (erros.length > 0) {
       setErros([]);
     }
+  };
+
+  const handleAutoLogin = async () => {
+    try {
+      setCarregando(true);
+      const data = await clienteService.autoLogin();
+      setLoginSucesso(data.data);
+
+      const userData = {
+        id: data?.data?.id,
+        nome: data?.data?.nome,
+        email: data?.data?.email,
+        role: data?.data?.role || 'cliente',
+        empresaId: data?.data?.empresaId || null,
+        vendedorId: data?.data?.vendedorId || null,
+        token: data?.token || data?.data?.token || null,
+      };
+
+      login(userData);
+
+      setTimeout(() => {
+        if (userData.role === 'admin') return navigate('/admin');
+        if (userData.role === 'vendedor') return navigate('/vendedor');
+        return navigate('/home');
+      }, 800);
+    } catch (error) {
+      console.error('Erro no auto-login:', error);
+      setShowAutoLogin(false);
+      setSavedUser(null);
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  const handleCancelAutoLogin = () => {
+    setShowAutoLogin(false);
+    setSavedUser(null);
+    // Clear saved user
+    localStorage.removeItem('auth:user');
   };
 
   const enviarLogin = async (e) => {
@@ -120,6 +183,46 @@ function Login() {
     return <TelaLoginSucesso dadosCliente={loginSucesso} />;
   }
 
+  // Auto-login modal
+  if (showAutoLogin && savedUser) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <FaUser className="text-blue-600 text-2xl" />
+            </div>
+
+            <h1 className="text-2xl font-bold text-slate-900 mb-4">
+              Detectamos uma conta
+            </h1>
+
+            <p className="text-slate-600 mb-6">
+              Deseja fazer login com a conta <strong>{savedUser.nome}</strong> ({savedUser.email})?
+            </p>
+
+            <div className="space-y-3">
+              <button
+                onClick={handleAutoLogin}
+                disabled={carregando}
+                className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium"
+              >
+                {carregando ? 'Entrando...' : 'Confirmar'}
+              </button>
+
+              <button
+                onClick={handleCancelAutoLogin}
+                className="w-full text-slate-600 hover:text-slate-700 font-medium"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const classeGrupoInput = "relative mb-6";
   const classeInput =
     "w-full pl-12 pr-4 py-3 bg-white border-2 border-slate-200 rounded-lg shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300";
@@ -135,6 +238,19 @@ function Login() {
         {/* Sidebar com informações */}
         <aside className="w-full md:w-1/3 lg:w-1/4 p-4 sm:p-6 md:p-8 bg-gradient-to-br from-blue-600 to-sky-500 text-white border-b md:border-b-0">
           <div className="md:sticky md:top-8">
+            <div className="mb-4">
+              {logoConfig.useImage ? (
+                <img
+                  src={logoConfig.imageUrl}
+                  alt={logoConfig.altText}
+                  className="h-12 w-auto mx-auto"
+                />
+              ) : (
+                <span className="text-3xl font-bold bg-gradient-to-r from-blue-700 to-sky-500 bg-clip-text text-transparent">
+                  {logoConfig.textLogo}
+                </span>
+              )}
+            </div>
             <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2">
               Fazer Login
             </h1>

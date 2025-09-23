@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { produtoService, favoritoService } from '../../services/api';
 import { log } from '../../utils/logger';
 import { useCart } from '../../context/CartContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
+import useDebounce from '../../hooks/useDebounce';
+import apiCache from '../../utils/cache';
 import {
   FaShoppingCart,
   FaUser,
@@ -14,7 +17,8 @@ import {
   FaTruck,
   FaPercent,
   FaFilter,
-  FaCheck
+  FaCheck,
+  FaSignOutAlt
 } from 'react-icons/fa';
 import {
   FiSearch,
@@ -39,14 +43,21 @@ function Home() {
 
   // Estados para pesquisa e filtros
   const [query, setQuery] = useState('');
+  const debouncedQuery = useDebounce(query, 300); // 300ms debounce
   const [selectedFilters, setSelectedFilters] = useState([]);
   const [sortBy, setSortBy] = useState('relevance');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const productsPerPage = 12;
+
   // Contadores (mock)
   // Contador real do carrinho a partir do contexto
   const { count: cartCount, addItem, removeItem, items } = useCart();
+  const { logout } = useAuth();
+  const navigate = useNavigate();
   const [savedCount, setSavedCount] = useState(0);
   const [notifCount] = useState(3);
   const [favorites, setFavorites] = useState([]);
@@ -54,8 +65,8 @@ function Home() {
 
   // Logo configuration - you can change this to use an image
   const logoConfig = {
-    useImage: false, // Set to true to use image instead of text
-    imageUrl: '/logo.png', // Path to your logo image
+    useImage: true, // Set to true to use image instead of text
+    imageUrl: '/logo-vertical.png', // Path to your logo image
     altText: 'HelpNet Logo',
     textLogo: 'HelpNet'
   };
@@ -67,6 +78,7 @@ function Home() {
     { type: 'category', label: 'Beleza e Saúde', value: 'Beleza e Saúde' },
     { type: 'category', label: 'Moda e Acessórios', value: 'Moda e Acessórios' },
     { type: 'category', label: 'Esportes e Lazer', value: 'Esportes e Lazer' },
+    { type: 'category', label: 'Livros e Entretenimento', value: 'Livros e Entretenimento' },
     { type: 'category', label: 'Outras', value: 'Outras' },
     { type: 'price', label: 'Até R$ 100', value: 'price-100' },
     { type: 'price', label: 'R$ 100 - R$ 500', value: 'price-100-500' },
@@ -80,7 +92,7 @@ function Home() {
 
   // Menu lateral do cliente (sem perfil/carrinho/favoritos)
   const clienteMenu = [
-    { label: 'Explore', to: '/produtos', icon: <FiSearch className="text-slate-500" /> },
+    { label: 'Explore', to: '/explorer', icon: <FiSearch className="text-slate-500" /> },
     { label: 'Pedidos', to: '/meus-pedidos', icon: <FiPackage className="text-slate-500" /> },
     { label: 'Histórico', to: '/historico', icon: <FiClock className="text-slate-500" /> },
     { label: 'Categorias', to: '/categorias', icon: <FiTag className="text-slate-500" /> },
@@ -96,21 +108,21 @@ function Home() {
       id: 1,
       title: 'Ofertas da Semana',
       subtitle: 'Descontos exclusivos em eletrônicos e acessórios',
-      cta: { label: 'Ver Ofertas', to: '/produtos?categoria=eletronicos' },
+      cta: { label: 'Ver Ofertas', to: '/explorer?categoria=eletronicos' },
       image: 'https://images.unsplash.com/photo-1518779578993-ec3579fee39f?q=80&w=1600&auto=format&fit=crop'
     },
     {
       id: 2,
       title: 'Novidades em Moda',
       subtitle: 'Coleção outono com até 40% OFF',
-      cta: { label: 'Explorar Moda', to: '/produtos?categoria=moda' },
+      cta: { label: 'Explorar Moda', to: '/explorer?categoria=moda' },
       image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1600&auto=format&fit=crop'
     },
     {
       id: 3,
       title: 'Casa e Decoração',
       subtitle: 'Renove seus ambientes com estilo e economia',
-      cta: { label: 'Ver Casa & Decor', to: '/produtos?categoria=casa' },
+      cta: { label: 'Ver Casa & Decor', to: '/explorer?categoria=casa' },
       image: 'https://images.unsplash.com/photo-1505692794403-34d4982f88aa?q=80&w=1600&auto=format&fit=crop'
     }
   ];
@@ -134,12 +146,28 @@ function Home() {
     carregarFavoritos();
   }, []);
 
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedQuery, selectedFilters, sortBy]);
+
   const carregarProdutos = async () => {
+    const cacheKey = 'home_products';
+
+    // Check cache first
+    const cachedProducts = apiCache.get(cacheKey);
+    if (cachedProducts) {
+      setProducts(cachedProducts);
+      setLoading(false);
+      log.info('home_products_cache_hit', { total: cachedProducts.length });
+      return;
+    }
+
     try {
       setLoading(true);
       log.info('home_products_fetch_start');
       const response = await produtoService.listar({ status: 'ativo' });
-      
+
       // Mapear produtos da API para o formato esperado pelo frontend
       const produtosMapeados = (response.produtos || response).map(produto => ({
         id: produto.ProdutoID || produto.id,
@@ -158,6 +186,8 @@ function Home() {
       }));
 
       setProducts(produtosMapeados);
+      // Cache the results for 10 minutes
+      apiCache.set(cacheKey, produtosMapeados, 10 * 60 * 1000);
       log.info('home_products_fetch_success', { total: produtosMapeados.length });
     } catch (error) {
       log.error('home_products_fetch_error', { error: { message: error?.message } });
@@ -184,11 +214,26 @@ function Home() {
   };
 
   const carregarFavoritos = async () => {
+    const cacheKey = 'home_favorites';
+
+    // Check cache first
+    const cachedFavorites = apiCache.get(cacheKey);
+    if (cachedFavorites) {
+      setFavorites(cachedFavorites);
+      setSavedCount(cachedFavorites.length);
+      setFavoritesLoading(false);
+      log.info('home_favorites_cache_hit', { total: cachedFavorites.length });
+      return;
+    }
+
     try {
       setFavoritesLoading(true);
       const response = await favoritoService.listar();
-      setFavorites(response.favoritos || []);
-      setSavedCount((response.favoritos || []).length);
+      const favoritesData = response.favoritos || [];
+      setFavorites(favoritesData);
+      setSavedCount(favoritesData.length);
+      // Cache favorites for 2 minutes (shorter TTL since favorites change more frequently)
+      apiCache.set(cacheKey, favoritesData, 2 * 60 * 1000);
     } catch (error) {
       log.error('home_favorites_fetch_error', { error: error.message });
       setFavorites([]);
@@ -219,11 +264,11 @@ function Home() {
   const filteredProducts = useMemo(() => {
     let filtered = products;
 
-    // Filtro por texto
-    if (query.trim()) {
-      const q = query.trim().toLowerCase();
-      filtered = filtered.filter(p => 
-        p.name.toLowerCase().includes(q) || 
+    // Filtro por texto (usando valor debounced para performance)
+    if (debouncedQuery.trim()) {
+      const q = debouncedQuery.trim().toLowerCase();
+      filtered = filtered.filter(p =>
+        p.name.toLowerCase().includes(q) ||
         p.category.toLowerCase().includes(q)
       );
     }
@@ -286,7 +331,16 @@ function Home() {
     }
 
     return result;
-  }, [products, query, selectedFilters, sortBy]);
+  }, [products, debouncedQuery, selectedFilters, sortBy]);
+
+  // Paginated products
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * productsPerPage;
+    return filteredProducts.slice(startIndex, startIndex + productsPerPage);
+  }, [filteredProducts, currentPage, productsPerPage]);
+
+  // Total pages
+  const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
 
   const renderStars = (rating) => {
     const stars = [];
@@ -324,6 +378,8 @@ function Home() {
         await favoritoService.remover(productId);
         setFavorites(prev => prev.filter(fav => fav.produto.ProdutoID !== productId));
         setSavedCount(prev => prev - 1);
+        // Clear favorites cache since data changed
+        apiCache.delete('home_favorites');
       } else {
         await favoritoService.adicionar(productId);
         // Since we don't have the full product data here, we'll just reload favorites
@@ -332,6 +388,14 @@ function Home() {
     } catch (error) {
       log.error('home_toggle_favorite_error', { productId, error: error.message });
       // Could show a toast or alert here
+    }
+  };
+
+  // Função para logout
+  const handleLogout = () => {
+    if (window.confirm('Deseja realmente sair?')) {
+      logout();
+      navigate('/login');
     }
   };
 
@@ -348,15 +412,25 @@ function Home() {
         className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-200 transform transition-transform duration-200 ease-in-out md:hidden ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div className="h-16 px-4 border-b border-slate-200 flex items-center justify-between">
-          <Link to="/" className="text-lg font-semibold text-blue-700">HelpNet</Link>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="p-2 rounded-lg text-blue-700 hover:bg-blue-50 border border-transparent hover:border-blue-200"
-            aria-label="Fechar menu"
-          >
-            <FiX />
-          </button>
-        </div>
+           <div className="flex items-center">
+             {logoConfig.useImage ? (
+               <img
+                 src={logoConfig.imageUrl}
+                 alt={logoConfig.altText}
+                 className="h-8 w-auto"
+               />
+             ) : (
+               <span className="text-lg font-semibold text-blue-700">{logoConfig.textLogo}</span>
+             )}
+           </div>
+           <button
+             onClick={() => setSidebarOpen(false)}
+             className="p-2 rounded-lg text-blue-700 hover:bg-blue-50 border border-transparent hover:border-blue-200"
+             aria-label="Fechar menu"
+           >
+             <FiX />
+           </button>
+         </div>
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           <p className="px-3 text-xs font-semibold tracking-wide text-slate-500 uppercase">Navegação</p>
           {clienteMenu.map((item) => (
@@ -371,23 +445,32 @@ function Home() {
             </Link>
           ))}
         </nav>
+        <div className="p-4 border-t border-slate-200">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 border border-red-200"
+          >
+            <FaSignOutAlt />
+            <span className="text-sm font-medium">Sair da conta</span>
+          </button>
+        </div>
       </div>
 
       {/* Sidebar Desktop (fixa e sempre aberta) */}
       <aside className="hidden md:flex md:w-72 bg-white border-r border-slate-200 flex-col fixed h-screen">
         <div className="h-16 px-6 border-b border-slate-200 flex items-center sticky top-0 bg-white z-10">
-          <Link to="/" className="flex items-center gap-2">
-            {logoConfig.useImage ? (
-              <img 
-                src={logoConfig.imageUrl} 
-                alt={logoConfig.altText}
-                className="h-8 w-auto"
-              />
-            ) : (
-              <span className="text-xl font-semibold text-blue-700">{logoConfig.textLogo}</span>
-            )}
-          </Link>
-        </div>
+           <div className="flex items-center gap-2">
+             {logoConfig.useImage ? (
+               <img
+                 src={logoConfig.imageUrl}
+                 alt={logoConfig.altText}
+                 className="h-8 w-auto"
+               />
+             ) : (
+               <span className="text-xl font-semibold text-blue-700">{logoConfig.textLogo}</span>
+             )}
+           </div>
+         </div>
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           <p className="px-3 text-xs font-semibold tracking-wide text-slate-500 uppercase">Navegação</p>
           {clienteMenu.map((item) => (
@@ -401,6 +484,15 @@ function Home() {
             </Link>
           ))}
         </nav>
+        <div className="p-4 border-t border-slate-200">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 border border-red-200"
+          >
+            <FaSignOutAlt />
+            <span className="text-sm font-medium">Sair da conta</span>
+          </button>
+        </div>
       </aside>
 
       {/* Conteúdo Principal */}
@@ -409,21 +501,26 @@ function Home() {
         <header className="bg-white sticky top-0 z-40 border-b border-slate-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between gap-4 h-16">
-              <div className="flex items-center gap-2">
-                {/* Abrir sidebar no mobile */}
-                <button
-                  onClick={() => setSidebarOpen(true)}
-                  className="md:hidden p-2 rounded-lg text-blue-700 hover:bg-blue-50 border border-transparent hover:border-blue-200"
-                  aria-label="Abrir menu"
-                >
-                  <FiMenu />
-                </button>
-                {/* Logo */}
-                <Link to="/" className="shrink-0">
-                  <span className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-700 to-sky-500 bg-clip-text text-transparent">
-                    HelpNet
-                  </span>
-                </Link>
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="md:hidden p-2 rounded-lg text-blue-700 hover:bg-blue-50 border border-transparent hover:border-blue-200"
+                aria-label="Abrir menu"
+              >
+                <FiMenu />
+              </button>
+              <div className="hidden md:flex items-center gap-2 shrink-0">
+                <img
+                  src="/logo-horizontal.png"
+                  alt="HelpNet Logo"
+                  className="h-6 w-auto"
+                />
+              </div>
+              <div className="md:hidden shrink-0">
+                <img
+                  src="/logo-horizontal.png"
+                  alt="HelpNet Logo"
+                  className="h-6 w-auto"
+                />
               </div>
 
               {/* Barra de pesquisa (desktop) */}
@@ -469,10 +566,14 @@ function Home() {
                           className="flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors"
                           onClick={() => setSearchResultsOpen(false)}
                         >
-                          <img 
-                            src={product.image} 
+                          <img
+                            src={product.image}
                             alt={product.name}
                             className="w-12 h-12 object-cover rounded-lg"
+                            onError={(e) => {
+                              e.target.src = '/placeholder-image.svg';
+                              e.target.alt = 'Imagem não disponível';
+                            }}
                           />
                           <div className="flex-1 min-w-0">
                             <h4 className="text-sm font-medium text-slate-900 truncate">{product.name}</h4>
@@ -486,7 +587,7 @@ function Home() {
                       {filteredProducts.length > 5 && (
                         <div className="p-3 border-t border-slate-100">
                           <Link
-                            to={`/produtos?q=${encodeURIComponent(query)}`}
+                            to={`/explorer?q=${encodeURIComponent(query)}`}
                             className="block text-center text-sm text-blue-600 hover:text-blue-700 font-medium"
                             onClick={() => setSearchResultsOpen(false)}
                           >
@@ -624,7 +725,7 @@ function Home() {
                       {filteredProducts.length > 5 && (
                         <div className="p-3 border-t border-slate-100">
                           <Link
-                            to={`/produtos?q=${encodeURIComponent(query)}`}
+                            to={`/explorer?q=${encodeURIComponent(query)}`}
                             className="block text-center text-sm text-blue-600 hover:text-blue-700 font-medium"
                             onClick={() => setSearchResultsOpen(false)}
                           >
@@ -702,7 +803,15 @@ function Home() {
                   className={`absolute inset-0 transition-opacity duration-700 ${idx === activeSlide ? 'opacity-100' : 'opacity-0'}`}
                   aria-hidden={idx !== activeSlide}
                 >
-                  <img src={slide.image} alt={slide.title} className="w-full h-[260px] sm:h-[360px] lg:h-[440px] object-cover" />
+                  <img
+                    src={slide.image}
+                    alt={slide.title}
+                    className="w-full h-[260px] sm:h-[360px] lg:h-[440px] object-cover"
+                    onError={(e) => {
+                      e.target.src = '/placeholder-image.svg';
+                      e.target.alt = 'Imagem não disponível';
+                    }}
+                  />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-slate-900/20 to-transparent" />
                   <div className="absolute inset-0 p-6 sm:p-10 lg:p-14 flex flex-col justify-end">
                     <h2 className="text-2xl sm:text-4xl font-bold text-white drop-shadow">{slide.title}</h2>
@@ -749,7 +858,15 @@ function Home() {
 
               {/* Espaço reservando altura para o carrossel */}
               <div className="invisible">
-                <img src={slides[0].image} alt="placeholder" className="w-full h-[260px] sm:h-[360px] lg:h-[440px] object-cover" />
+                <img
+                  src={slides[0].image}
+                  alt="placeholder"
+                  className="w-full h-[260px] sm:h-[360px] lg:h-[440px] object-cover"
+                  onError={(e) => {
+                    e.target.src = '/placeholder-image.svg';
+                    e.target.alt = 'Imagem não disponível';
+                  }}
+                />
               </div>
             </div>
 
@@ -907,10 +1024,18 @@ function Home() {
             ) : (
               /* Grid de produtos */
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
-              {filteredProducts.map((p) => (
+              {paginatedProducts.map((p) => (
             <div key={p.id} className="group bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition flex flex-col h-full">
             <Link to={`/produto/${p.id}`} className="relative aspect-square overflow-hidden">
-            <img src={p.image} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+            <img
+              src={p.image}
+              alt={p.name}
+              className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+              onError={(e) => {
+                e.target.src = '/placeholder-image.svg';
+                e.target.alt = 'Imagem não disponível';
+              }}
+            />
             
             {/* Badges */}
             <div className="absolute top-2 left-2 flex flex-col gap-1">
@@ -994,6 +1119,45 @@ function Home() {
             </div>
             ))}
             </div>
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && !loading && filteredProducts.length > 0 && (
+              <div className="flex items-center justify-center gap-2 mt-8">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Anterior
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                    if (pageNum > totalPages) return null;
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`px-3 py-2 rounded-lg border ${
+                          currentPage === pageNum
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Próximo
+                </button>
+              </div>
             )}
 
             {/* Caso não encontre produtos */}

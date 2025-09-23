@@ -209,7 +209,7 @@ function LandingPage() {
               <ul className="space-y-2 text-slate-300">
                 <li><Link to="/login" className="hover:text-white transition-colors">Login</Link></li>
                 <li><Link to="/cadastro" className="hover:text-white transition-colors">Cadastro</Link></li>
-                <li><Link to="/produtos" className="hover:text-white transition-colors">Produtos</Link></li>
+                <li><Link to="/explorer" className="hover:text-white transition-colors">Produtos</Link></li>
               </ul>
             </div>
             <div>

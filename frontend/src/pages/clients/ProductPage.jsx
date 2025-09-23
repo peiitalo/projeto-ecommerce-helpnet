@@ -349,7 +349,11 @@ function ProductPage() {
                 <img
                   src={images[activeImageIndex]}
                   alt={name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    e.target.src = '/placeholder-image.png'; // Fallback image
+                    e.target.alt = 'Imagem não disponível';
+                  }}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-slate-100 text-slate-400">
@@ -426,6 +430,10 @@ function ProductPage() {
                       src={image}
                       alt={`${name} ${index + 1}`}
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.src = '/placeholder-image.svg';
+                        e.target.alt = 'Imagem não disponível';
+                      }}
                     />
                   </button>
                 ))
@@ -543,7 +551,13 @@ function ProductPage() {
                     <span className="sm:hidden">{isFavorite ? 'Remover dos Favoritos' : 'Adicionar aos Favoritos'}</span>
                   </button>
 
-                  <button className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-green-300 bg-green-50 text-green-700 rounded-xl font-medium hover:bg-green-100 hover:border-green-400 transition-all duration-200">
+                  <button
+                    onClick={() => {
+                      handleAddToCart();
+                      navigate('/checkout');
+                    }}
+                    className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-green-300 bg-green-50 text-green-700 rounded-xl font-medium hover:bg-green-100 hover:border-green-400 transition-all duration-200"
+                  >
                     <span>Comprar Agora</span>
                   </button>
                 </div>
@@ -799,6 +813,10 @@ function ProductPage() {
                   src={images[activeImageIndex]}
                   alt={name}
                   className="max-w-full max-h-full object-contain"
+                  onError={(e) => {
+                    e.target.src = '/placeholder-image.png';
+                    e.target.alt = 'Imagem não disponível';
+                  }}
                 />
                 {images.length > 1 && (
                   <>

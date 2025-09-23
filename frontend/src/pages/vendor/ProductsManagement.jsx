@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import AdminLayout from "../../components/AdminLayout";
+import VendorLayout from "../../components/VendorLayout";
 import { Link, useLocation } from "react-router-dom";
 import {
   FaPlus,
@@ -208,7 +208,7 @@ function ProductsManagement() {
   };
 
   return (
-    <AdminLayout>
+    <VendorLayout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -254,47 +254,10 @@ function ProductsManagement() {
                 <FiX />
               </button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Categoria
-                </label>
-                <select
-                  value={filterCategory}
-                  onChange={(e) => setFilterCategory(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Todas as categorias</option>
-                  {categories.map((cat) => (
-                    <option
-                      key={cat.CategoriaID ?? cat.id}
-                      value={cat.CategoriaID ?? cat.id}
-                    >
-                      {cat.Nome ?? cat.name ?? "—"}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Status
-                </label>
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Todos os status</option>
-                  <option value="ativo">Ativo</option>
-                  <option value="inativo">Inativo</option>
-                  <option value="sem-estoque">Sem estoque</option>
-                </select>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex items-end">
                 <button
                   onClick={() => {
-                    setFilterCategory("");
-                    setFilterStatus("");
                     setSearchTerm("");
                   }}
                   className="px-4 py-2 text-slate-600 hover:text-slate-800 transition-colors"
@@ -323,34 +286,34 @@ function ProductsManagement() {
         {/* Ações em lote */}
         {selectedProducts.length > 0 && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <span className="text-blue-700 font-medium">
                 {selectedProducts.length} produto
                 {selectedProducts.length !== 1 ? "s" : ""} selecionado
                 {selectedProducts.length !== 1 ? "s" : ""}
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => handleBulkAction("ativar")}
-                  className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+                  className="px-4 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 min-w-[80px]"
                 >
                   Ativar
                 </button>
                 <button
                   onClick={() => handleBulkAction("desativar")}
-                  className="px-3 py-1 text-sm bg-yellow-600 text-white rounded hover:bg-yellow-700"
+                  className="px-4 py-2 text-sm bg-yellow-600 text-white rounded hover:bg-yellow-700 min-w-[80px]"
                 >
                   Desativar
                 </button>
                 <button
                   onClick={() => handleBulkAction("excluir")}
-                  className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+                  className="px-4 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700 min-w-[80px]"
                 >
                   Excluir
                 </button>
                 <button
                   onClick={() => setSelectedProducts([])}
-                  className="px-3 py-1 text-sm text-slate-600 hover:text-slate-800"
+                  className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 min-w-[80px]"
                 >
                   Cancelar
                 </button>
@@ -361,11 +324,11 @@ function ProductsManagement() {
 
         {/* Tabela de produtos */}
         <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-hidden">
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-6 py-3 text-left">
+                  <th className="px-2 py-2 md:px-6 md:py-3 text-left">
                     <input
                       type="checkbox"
                       checked={
@@ -376,28 +339,28 @@ function ProductsManagement() {
                       className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                     />
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  <th className="px-2 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Produto
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                     SKU
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  <th className="px-2 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Preço
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  <th className="px-2 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Estoque
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Categoria
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  <th className="px-2 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Vendas
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  <th className="px-2 py-2 md:px-6 md:py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Ações
                   </th>
                 </tr>
@@ -415,7 +378,7 @@ function ProductsManagement() {
 
                   return (
                     <tr key={productId} className="hover:bg-slate-50">
-                      <td className="px-6 py-4">
+                      <td className="px-2 py-2 md:px-6 md:py-4">
                         <input
                           type="checkbox"
                           checked={selectedProducts.includes(productId)}
@@ -423,7 +386,7 @@ function ProductsManagement() {
                           className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                         />
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-2 py-2 md:px-6 md:py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-12 h-12 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0">
                             {Array.isArray(product.imagens) &&
@@ -461,12 +424,12 @@ function ProductsManagement() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="hidden md:table-cell px-6 py-4">
                         <span className="font-mono text-sm text-slate-600">
                           {sku}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-2 py-2 md:px-6 md:py-4">
                         <div>
                           <span className="font-semibold text-slate-900">
                             {formatPrice(preco)}
@@ -478,7 +441,7 @@ function ProductsManagement() {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-2 py-2 md:px-6 md:py-4">
                         <span
                           className={`font-medium ${
                             estoque === 0
@@ -491,34 +454,34 @@ function ProductsManagement() {
                           {estoque}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="hidden md:table-cell px-6 py-4">
                         <span className="text-slate-600">{categoriaNome}</span>
                       </td>
-                      <td className="px-6 py-4">{getStatusBadge(product)}</td>
-                      <td className="px-6 py-4">
+                      <td className="px-2 py-2 md:px-6 md:py-4">{getStatusBadge(product)}</td>
+                      <td className="hidden md:table-cell px-6 py-4">
                         <span className="text-slate-600">
                           {vendas.toLocaleString("pt-BR")}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-2 py-2 md:px-6 md:py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <Link
                             to={`/produto/${productId}`}
-                            className="p-2 text-slate-400 hover:text-blue-600 transition-colors"
+                            className="p-3 md:p-2 text-slate-400 hover:text-blue-600 transition-colors"
                             title="Visualizar"
                           >
                             <FaEye />
                           </Link>
                           <Link
                             to={`${basePath}/produtos/${productId}/editar`}
-                            className="p-2 text-slate-400 hover:text-blue-600 transition-colors"
+                            className="p-3 md:p-2 text-slate-400 hover:text-blue-600 transition-colors"
                             title="Editar"
                           >
                             <FaEdit />
                           </Link>
                           <button
                             onClick={() => handleDeleteProduct(productId)}
-                            className="p-2 text-slate-400 hover:text-red-600 transition-colors"
+                            className="p-3 md:p-2 text-slate-400 hover:text-red-600 transition-colors"
                             title="Excluir"
                           >
                             <FaTrash />
@@ -615,7 +578,7 @@ function ProductsManagement() {
           </div>
         </div>
       </div>
-    </AdminLayout>
+    </VendorLayout>
   );
 }
 

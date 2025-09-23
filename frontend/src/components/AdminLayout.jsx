@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FaUser, FaSignOutAlt } from 'react-icons/fa';
+import { useAuth } from '../context/AuthContext.jsx';
 import {
   FiPackage,
   FiCreditCard,
@@ -20,6 +21,8 @@ import {
 function AdminLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
 
   // Usuário admin mockado - em produção viriam do contexto/estado global
   // Usuário do contexto (MVP: ainda mantém fallback visual)
@@ -81,6 +84,19 @@ function AdminLayout({ children }) {
     return location.pathname.startsWith(path);
   };
 
+  const handleLogout = async () => {
+    if (window.confirm('Tem certeza que deseja sair da conta?')) {
+      try {
+        await logout();
+        navigate('/login');
+      } catch (error) {
+        console.error('Erro ao fazer logout:', error);
+        // Mesmo com erro, redireciona para login
+        navigate('/login');
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex">
       {/* Overlay Mobile */}
@@ -96,15 +112,19 @@ function AdminLayout({ children }) {
         className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-200 transform transition-transform duration-200 ease-in-out md:hidden ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div className="h-16 px-4 border-b border-slate-200 flex items-center justify-between">
-          <Link to="/" className="text-lg font-semibold text-blue-700">{brandName}</Link>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="p-2 rounded-lg text-blue-700 hover:bg-blue-50 border border-transparent hover:border-blue-200"
-            aria-label="Fechar menu"
-          >
-            <FiX />
-          </button>
-        </div>
+           <img
+             src="/logo-vertical.png"
+             alt="HelpNet Logo"
+             className="h-12 w-auto"
+           />
+           <button
+             onClick={() => setSidebarOpen(false)}
+             className="p-2 rounded-lg text-blue-700 hover:bg-blue-50 border border-transparent hover:border-blue-200"
+             aria-label="Fechar menu"
+           >
+             <FiX />
+           </button>
+         </div>
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           <p className="px-3 text-xs font-semibold tracking-wide text-slate-500 uppercase">Administração</p>
           {menuAdministrativo.map((item) => (
@@ -124,7 +144,10 @@ function AdminLayout({ children }) {
           ))}
         </nav>
         <div className="p-4 border-t border-slate-200">
-          <button className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-blue-700 hover:bg-blue-50 border border-blue-200">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 border border-red-200"
+          >
             <FaSignOutAlt />
             <span className="text-sm font-medium">Sair</span>
           </button>
@@ -134,9 +157,11 @@ function AdminLayout({ children }) {
       {/* Sidebar Desktop (sempre aberta) */}
       <aside className="hidden md:flex md:w-72 bg-white border-r border-slate-200 flex-col">
         <div className="h-16 px-6 border-b border-slate-200 flex items-center">
-          <Link to="/" className="text-xl font-semibold text-blue-700">
-            {brandName}
-          </Link>
+          <img
+            src="/logo-vertical.png"
+            alt="HelpNet Logo"
+            className="h-12 w-auto"
+          />
         </div>
         <nav className="flex-1 p-4 space-y-1">
           <p className="px-3 text-xs font-semibold tracking-wide text-slate-500 uppercase">Administração</p>
@@ -156,7 +181,10 @@ function AdminLayout({ children }) {
           ))}
         </nav>
         <div className="p-4 border-t border-slate-200">
-          <button className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-blue-700 hover:bg-blue-50 border border-blue-200">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 border border-red-200"
+          >
             <FaSignOutAlt />
             <span className="text-sm font-medium">Sair</span>
           </button>
@@ -181,13 +209,27 @@ function AdminLayout({ children }) {
                 <h1 className="text-lg lg:text-xl font-semibold text-slate-900">{isVendor ? 'Painel do Vendedor' : 'Painel Administrativo'}</h1>
               </div>
               <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <p className="text-sm font-medium text-slate-900">{adminUser.nome}</p>
-                  <p className="text-xs text-slate-500">{adminUser.email}</p>
-                </div>
-                <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center text-blue-700">
-                  <FaUser />
-                </div>
+                {isVendor ? (
+                  // Para vendedores: apenas ícone de perfil clicável
+                  <button
+                    onClick={() => navigate(`${basePath}/perfil`)}
+                    className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center text-blue-700 hover:bg-blue-100 transition-colors"
+                    title="Ver perfil"
+                  >
+                    <FaUser />
+                  </button>
+                ) : (
+                  // Para admins: nome e ícone
+                  <>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-slate-900">{adminUser.nome}</p>
+                      <p className="text-xs text-slate-500">{adminUser.email}</p>
+                    </div>
+                    <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center text-blue-700">
+                      <FaUser />
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
