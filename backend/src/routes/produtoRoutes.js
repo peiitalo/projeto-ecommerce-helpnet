@@ -9,7 +9,6 @@ import {
   gerarSKU,
   acaoEmLote
 } from '../controllers/produtoController.js';
-import { listarCategorias, buscarCategoriaPorId, criarCategoria, atualizarCategoria, excluirCategoria } from '../controllers/categoriaController.js';
 
 const router = express.Router();
 

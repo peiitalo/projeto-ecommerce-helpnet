@@ -50,7 +50,7 @@ export const listarProdutos = async (req, res) => {
         select: {
           ProdutoID: true,
           Nome: true,
-          BreveDescricao: true,
+          Descricao: true,
           Preco: true,
           PrecoOriginal: true,
           Imagens: true,
