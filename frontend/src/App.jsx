@@ -6,7 +6,7 @@ const Login = lazy(() => import('./pages/login'));
 const Cadastro = lazy(() => import('./pages/cadastro'));
 const Dashboard = lazy(() => import('./pages/admin/dashboard'));
 const NotFound = lazy(() => import('./pages/errors/notFound'));
-const Home = lazy(() => import('./pages/clients/Home'));
+const Home = lazy(() => import('./pages/clients/home'));
 const ProductPage = lazy(() => import('./pages/clients/ProductPage'));
 const CartPage = lazy(() => import('./pages/clients/CartPage'));
 const FavoritesPage = lazy(() => import('./pages/clients/FavoritesPage'));

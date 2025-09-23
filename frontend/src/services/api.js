@@ -326,10 +326,61 @@ export const freteService = {
   },
 };
 
+// Serviços de Carrinho
+export const carrinhoService = {
+  // Listar itens do carrinho
+  listar: async () => {
+    return apiRequest('/carrinho');
+  },
+
+  // Adicionar item ao carrinho
+  adicionar: async (produtoId, quantidade) => {
+    return apiRequest('/carrinho', {
+      method: 'POST',
+      body: JSON.stringify({ produtoId, quantidade }),
+    });
+  },
+
+  // Atualizar quantidade
+  atualizar: async (produtoId, quantidade) => {
+    return apiRequest(`/carrinho/produto/${produtoId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ quantidade }),
+    });
+  },
+
+  // Remover item
+  remover: async (produtoId) => {
+    return apiRequest(`/carrinho/produto/${produtoId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Limpar carrinho
+  limpar: async () => {
+    return apiRequest('/carrinho', {
+      method: 'DELETE',
+    });
+  },
+};
+
+// Serviços de Pedidos
+export const pedidoService = {
+  // Criar pedido
+  criar: async (dadosPedido) => {
+    return apiRequest('/pedidos', {
+      method: 'POST',
+      body: JSON.stringify(dadosPedido),
+    });
+  },
+};
+
 export default {
   produtoService,
   categoriaService,
   clienteService,
   favoritoService,
   freteService,
+  carrinhoService,
+  pedidoService,
 };

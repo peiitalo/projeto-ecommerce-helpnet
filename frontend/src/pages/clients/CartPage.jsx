@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../../context/CartContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { freteService, clienteService } from '../../services/api.js';
+import { freteService, clienteService, pedidoService } from '../../services/api.js';
 import { FaTrash, FaArrowLeft, FaTruck, FaMapMarkerAlt, FaShoppingCart } from 'react-icons/fa';
 
 export default function CartPage() {
@@ -121,6 +121,23 @@ export default function CartPage() {
     }
     return totalValue;
   }, [subtotal, shippingInfo]);
+
+  const handleFinalizePurchase = async () => {
+    if (selectedItems.length === 0) return;
+
+    try {
+      await pedidoService.criar({
+        produtoIds: selectedItems,
+        enderecoId: selectedAddressId,
+      });
+      alert('Compra finalizada com sucesso!');
+      // Refresh the page to update cart
+      window.location.reload();
+    } catch (error) {
+      console.error('Erro ao finalizar compra:', error);
+      alert('Erro ao finalizar compra: ' + error.message);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -314,6 +331,7 @@ export default function CartPage() {
 
             {/* Botão finalizar compra */}
             <button
+              onClick={handleFinalizePurchase}
               disabled={selectedItems.length === 0}
               className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 mt-4"
             >
