@@ -65,7 +65,7 @@ function NotFound() {
               Cadastro
             </Link>
             <Link 
-              to="/produtos" 
+              to="/explorer"
               className="text-blue-600 hover:text-blue-700 hover:underline font-medium"
             >
               Produtos

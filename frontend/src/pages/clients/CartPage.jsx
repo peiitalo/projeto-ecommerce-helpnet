@@ -129,7 +129,7 @@ export default function CartPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-4 h-16">
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => navigate('/home')}
               className="p-2 text-slate-600 hover:text-blue-700 transition-colors"
               aria-label="Voltar"
             >
@@ -314,6 +314,7 @@ export default function CartPage() {
 
             {/* Botão finalizar compra */}
             <button
+              onClick={() => navigate('/checkout')}
               disabled={selectedItems.length === 0}
               className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 mt-4"
             >
@@ -325,3 +326,4 @@ export default function CartPage() {
     </div>
   );
 }
+

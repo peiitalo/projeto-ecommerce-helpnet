@@ -11,6 +11,7 @@ async function seedCategorias() {
       { Nome: 'Beleza e Saúde' },
       { Nome: 'Moda e Acessórios' },
       { Nome: 'Esportes e Lazer' },
+      { Nome: 'Livros e Entretenimento' },
       { Nome: 'Outras' }
     ];
 

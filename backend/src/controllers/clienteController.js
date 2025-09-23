@@ -1,6 +1,7 @@
 // backend/src/controllers/clienteController.js
 import prisma from "../config/prisma.js";
 import cryptoService from "../services/cryptoService.js";
+import { enviarEmailResetSenha } from "../services/emailService.js";
 import removerAcentos from "remove-accents";
 import {
   validatePassword,
@@ -11,6 +12,18 @@ import {
 } from "../utils/validators.js";
 import { logControllerError, logger } from "../utils/logger.js";
 import jwt from 'jsonwebtoken'
+
+// Helper function
+const toUpperNoAccent = (str) => (str ? removerAcentos(str).toUpperCase() : str);
+
+// Helper function for phone masking
+const maskPhone = (phone) => {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 10) return `(${digits.slice(0,2)}) ${digits.slice(2,6)}-${digits.slice(6)}`;
+  if (digits.length === 11) return `(${digits.slice(0,2)}) ${digits.slice(2,7)}-${digits.slice(7)}`;
+  return phone; // fallback
+};
 
 // Helpers para tokens
 const ACCESS_SECRET = process.env.JWT_SECRET || 'seu_segredo';
@@ -144,8 +157,6 @@ export const criarCliente = async (req, res) => {
     }
 
     if (errors.length > 0) return res.status(400).json({ success: false, errors });
-
-    const toUpperNoAccent = (str) => (str ? removerAcentos(str).toUpperCase() : str);
 
     // Funções auxiliares para mascarar telefones
     const maskPhone = (phone) => {
@@ -497,6 +508,54 @@ export const autoLoginClient = async (req, res) => {
   });
 };
 
+export const buscarPerfil = async (req, res) => {
+  try {
+    const { user } = req;
+    const cliente = await prisma.cliente.findUnique({
+      where: { ClienteID: user.id },
+      select: {
+        ClienteID: true,
+        CodigoCliente: true,
+        NomeCompleto: true,
+        TipoPessoa: true,
+        CPF_CNPJ: true,
+        TelefoneFixo: true,
+        TelefoneCelular: true,
+        Whatsapp: true,
+        Email: true,
+        InscricaoEstadual: true,
+        InscricaoMunicipal: true,
+        RazaoSocial: true,
+        DataCadastro: true,
+        role: true,
+        enderecos: {
+          select: {
+            EnderecoID: true,
+            Nome: true,
+            Complemento: true,
+            CEP: true,
+            Cidade: true,
+            UF: true,
+            Numero: true,
+            Bairro: true,
+            TipoEndereco: true,
+          },
+        },
+      },
+    });
+
+    if (!cliente) {
+      return res.status(404).json({ success: false, errors: ['Cliente não encontrado'] });
+    }
+
+    logger.info('buscar_perfil_ok', { clienteId: user.id });
+    res.json({ success: true, cliente });
+  } catch (error) {
+    logControllerError('buscar_perfil_error', error, req);
+    res.status(500).json({ success: false, errors: ["Erro interno do servidor"] });
+  }
+};
+
 export const listarEnderecos = async (req, res) => {
   try {
     const { user } = req;
@@ -519,5 +578,461 @@ export const listarEnderecos = async (req, res) => {
   } catch (error) {
     logControllerError('listar_enderecos_error', error, req);
     res.status(500).json({ error: "Erro ao listar endereços" });
+  }
+};
+
+export const atualizarPerfil = async (req, res) => {
+  const {
+    NomeCompleto,
+    Email,
+    TelefoneCelular,
+    TelefoneFixo,
+    Whatsapp,
+    RazaoSocial,
+    InscricaoEstadual,
+    InscricaoMunicipal
+  } = req.body;
+
+  try {
+    const { user } = req;
+
+    // Validações básicas
+    const errors = [];
+    if (!NomeCompleto || NomeCompleto.trim() === "") errors.push("Nome completo é obrigatório");
+    if (!Email || Email.trim() === "") errors.push("Email é obrigatório");
+
+    if (Email) {
+      const emailValidation = validateEmail(Email);
+      if (!emailValidation.isValid) errors.push(...emailValidation.errors);
+    }
+
+    if (errors.length > 0) return res.status(400).json({ success: false, errors });
+
+    // Atualizar cliente
+    const clienteAtualizado = await prisma.cliente.update({
+      where: { ClienteID: user.id },
+      data: {
+        NomeCompleto: toUpperNoAccent(NomeCompleto),
+        Email: Email.toLowerCase(),
+        TelefoneCelular: TelefoneCelular ? maskPhone(TelefoneCelular) : null,
+        TelefoneFixo: TelefoneFixo ? maskPhone(TelefoneFixo) : null,
+        Whatsapp: Whatsapp ? maskPhone(Whatsapp) : null,
+        RazaoSocial: RazaoSocial ? toUpperNoAccent(RazaoSocial) : null,
+        InscricaoEstadual: InscricaoEstadual || null,
+        InscricaoMunicipal: InscricaoMunicipal || null,
+      },
+      select: {
+        ClienteID: true,
+        CodigoCliente: true,
+        NomeCompleto: true,
+        TipoPessoa: true,
+        CPF_CNPJ: true,
+        TelefoneFixo: true,
+        TelefoneCelular: true,
+        Whatsapp: true,
+        Email: true,
+        InscricaoEstadual: true,
+        InscricaoMunicipal: true,
+        RazaoSocial: true,
+        DataCadastro: true,
+        role: true,
+      },
+    });
+
+    logger.info('atualizar_perfil_ok', { clienteId: user.id });
+    res.json({ success: true, message: 'Perfil atualizado com sucesso', cliente: clienteAtualizado });
+  } catch (error) {
+    logControllerError('atualizar_perfil_error', error, req);
+
+    if (error.code === "P2002") {
+      return res.status(400).json({ success: false, errors: ["Este email já está sendo usado por outro usuário"] });
+    }
+
+    res.status(500).json({ success: false, errors: ["Erro interno do servidor"] });
+  }
+};
+
+export const validarSenhaAtual = async (req, res) => {
+  const { senhaAtual } = req.body;
+
+  try {
+    const { user } = req;
+
+    // Validações básicas
+    const errors = [];
+    if (!senhaAtual || senhaAtual.trim() === "") errors.push("Senha atual é obrigatória");
+
+    if (errors.length > 0) return res.status(400).json({ success: false, errors });
+
+    // Buscar cliente atual
+    const cliente = await prisma.cliente.findUnique({
+      where: { ClienteID: user.id },
+      select: { SenhaHash: true }
+    });
+
+    if (!cliente) {
+      return res.status(404).json({ success: false, errors: ["Cliente não encontrado"] });
+    }
+
+    // Verificar senha atual
+    const senhaAtualValida = await cryptoService.comparePassword(senhaAtual, cliente.SenhaHash);
+
+    logger.info('validar_senha_atual_ok', { clienteId: user.id, valida: senhaAtualValida });
+    res.json({ success: true, valida: senhaAtualValida });
+  } catch (error) {
+    logControllerError('validar_senha_atual_error', error, req);
+    res.status(500).json({ success: false, errors: ["Erro interno do servidor"] });
+  }
+};
+
+export const alterarSenha = async (req, res) => {
+  const { senhaAtual, novaSenha } = req.body;
+
+  try {
+    const { user } = req;
+
+    // Validações básicas
+    const errors = [];
+    if (!senhaAtual || senhaAtual.trim() === "") errors.push("Senha atual é obrigatória");
+    if (!novaSenha || novaSenha.trim() === "") errors.push("Nova senha é obrigatória");
+
+    if (novaSenha) {
+      const passwordValidation = validatePassword(novaSenha);
+      if (!passwordValidation.isValid) errors.push(...passwordValidation.errors);
+    }
+
+    if (errors.length > 0) return res.status(400).json({ success: false, errors });
+
+    // Buscar cliente atual
+    const cliente = await prisma.cliente.findUnique({
+      where: { ClienteID: user.id },
+      select: { SenhaHash: true }
+    });
+
+    if (!cliente) {
+      return res.status(404).json({ success: false, errors: ["Cliente não encontrado"] });
+    }
+
+    // Verificar senha atual
+    const senhaAtualValida = await cryptoService.comparePassword(senhaAtual, cliente.SenhaHash);
+    if (!senhaAtualValida) {
+      return res.status(400).json({ success: false, errors: ["Senha atual incorreta"] });
+    }
+
+    // Hash da nova senha
+    const novaSenhaHash = await cryptoService.hashPassword(novaSenha);
+
+    // Atualizar senha
+    await prisma.cliente.update({
+      where: { ClienteID: user.id },
+      data: { SenhaHash: novaSenhaHash },
+    });
+
+    logger.info('alterar_senha_ok', { clienteId: user.id });
+    res.json({ success: true, message: 'Senha alterada com sucesso' });
+  } catch (error) {
+    logControllerError('alterar_senha_error', error, req);
+    res.status(500).json({ success: false, errors: ["Erro interno do servidor"] });
+  }
+};
+
+export const criarEndereco = async (req, res) => {
+  const {
+    Nome,
+    Complemento,
+    CEP,
+    Cidade,
+    UF,
+    TipoEndereco,
+    Numero,
+    Bairro
+  } = req.body;
+
+  try {
+    const { user } = req;
+
+    // Validações básicas
+    const errors = [];
+    if (!Nome || Nome.trim() === "") errors.push("Nome do endereço é obrigatório");
+    if (!CEP || CEP.trim() === "") errors.push("CEP é obrigatório");
+    if (!Cidade || Cidade.trim() === "") errors.push("Cidade é obrigatória");
+    if (!UF || UF.trim() === "") errors.push("UF é obrigatória");
+    if (!Bairro || Bairro.trim() === "") errors.push("Bairro é obrigatório");
+
+    if (CEP) {
+      const cepValidation = validateCEP(CEP);
+      if (!cepValidation.isValid) errors.push(...cepValidation.errors);
+    }
+
+    if (errors.length > 0) return res.status(400).json({ success: false, errors });
+
+    // Criar endereço
+    const novoEndereco = await prisma.endereco.create({
+      data: {
+        ClienteID: user.id,
+        Nome: toUpperNoAccent(Nome),
+        Complemento: Complemento || null,
+        CEP: CEP,
+        Cidade: toUpperNoAccent(Cidade),
+        UF: toUpperNoAccent(UF),
+        TipoEndereco: TipoEndereco || 'Residencial',
+        Numero: Numero || null,
+        Bairro: toUpperNoAccent(Bairro),
+      },
+      select: {
+        EnderecoID: true,
+        Nome: true,
+        Complemento: true,
+        CEP: true,
+        Cidade: true,
+        UF: true,
+        TipoEndereco: true,
+        Numero: true,
+        Bairro: true,
+      },
+    });
+
+    logger.info('criar_endereco_ok', { clienteId: user.id, enderecoId: novoEndereco.EnderecoID });
+    res.status(201).json({ success: true, message: 'Endereço criado com sucesso', endereco: novoEndereco });
+  } catch (error) {
+    logControllerError('criar_endereco_error', error, req);
+    res.status(500).json({ success: false, errors: ["Erro interno do servidor"] });
+  }
+};
+
+export const atualizarEndereco = async (req, res) => {
+  const { id } = req.params;
+  const {
+    Nome,
+    Complemento,
+    CEP,
+    Cidade,
+    UF,
+    TipoEndereco,
+    Numero,
+    Bairro
+  } = req.body;
+
+  try {
+    const { user } = req;
+
+    // Verificar se o endereço pertence ao cliente
+    const enderecoExistente = await prisma.endereco.findFirst({
+      where: { EnderecoID: parseInt(id), ClienteID: user.id }
+    });
+
+    if (!enderecoExistente) {
+      return res.status(404).json({ success: false, errors: ["Endereço não encontrado"] });
+    }
+
+    // Validações básicas
+    const errors = [];
+    if (!Nome || Nome.trim() === "") errors.push("Nome do endereço é obrigatório");
+    if (!CEP || CEP.trim() === "") errors.push("CEP é obrigatório");
+    if (!Cidade || Cidade.trim() === "") errors.push("Cidade é obrigatória");
+    if (!UF || UF.trim() === "") errors.push("UF é obrigatória");
+    if (!Bairro || Bairro.trim() === "") errors.push("Bairro é obrigatório");
+
+    if (CEP) {
+      const cepValidation = validateCEP(CEP);
+      if (!cepValidation.isValid) errors.push(...cepValidation.errors);
+    }
+
+    if (errors.length > 0) return res.status(400).json({ success: false, errors });
+
+    // Atualizar endereço
+    const enderecoAtualizado = await prisma.endereco.update({
+      where: { EnderecoID: parseInt(id) },
+      data: {
+        Nome: toUpperNoAccent(Nome),
+        Complemento: Complemento || null,
+        CEP: CEP,
+        Cidade: toUpperNoAccent(Cidade),
+        UF: toUpperNoAccent(UF),
+        TipoEndereco: TipoEndereco || 'Residencial',
+        Numero: Numero || null,
+        Bairro: toUpperNoAccent(Bairro),
+      },
+      select: {
+        EnderecoID: true,
+        Nome: true,
+        Complemento: true,
+        CEP: true,
+        Cidade: true,
+        UF: true,
+        TipoEndereco: true,
+        Numero: true,
+        Bairro: true,
+      },
+    });
+
+    logger.info('atualizar_endereco_ok', { clienteId: user.id, enderecoId: id });
+    res.json({ success: true, message: 'Endereço atualizado com sucesso', endereco: enderecoAtualizado });
+  } catch (error) {
+    logControllerError('atualizar_endereco_error', error, req);
+    res.status(500).json({ success: false, errors: ["Erro interno do servidor"] });
+  }
+};
+
+export const excluirEndereco = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { user } = req;
+
+    // Verificar se o endereço pertence ao cliente
+    const enderecoExistente = await prisma.endereco.findFirst({
+      where: { EnderecoID: parseInt(id), ClienteID: user.id }
+    });
+
+    if (!enderecoExistente) {
+      return res.status(404).json({ success: false, errors: ["Endereço não encontrado"] });
+    }
+
+    // Excluir endereço
+    await prisma.endereco.delete({
+      where: { EnderecoID: parseInt(id) }
+    });
+
+    logger.info('excluir_endereco_ok', { clienteId: user.id, enderecoId: id });
+    res.json({ success: true, message: 'Endereço excluído com sucesso' });
+  } catch (error) {
+    logControllerError('excluir_endereco_error', error, req);
+    res.status(500).json({ success: false, errors: ["Erro interno do servidor"] });
+  }
+};
+
+export const definirEnderecoPadrao = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { user } = req;
+
+    // Verificar se o endereço pertence ao cliente
+    const enderecoExistente = await prisma.endereco.findFirst({
+      where: { EnderecoID: parseInt(id), ClienteID: user.id }
+    });
+
+    if (!enderecoExistente) {
+      return res.status(404).json({ success: false, errors: ["Endereço não encontrado"] });
+    }
+
+    // Por enquanto, apenas confirmar que o endereço existe
+    // Futuramente pode implementar lógica de endereço padrão
+    logger.info('definir_endereco_padrao_ok', { clienteId: user.id, enderecoId: id });
+    res.json({ success: true, message: 'Endereço definido como padrão' });
+  } catch (error) {
+    logControllerError('definir_endereco_padrao_error', error, req);
+    res.status(500).json({ success: false, errors: ["Erro interno do servidor"] });
+  }
+};
+
+export const solicitarResetSenha = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const errors = [];
+    if (!email || email.trim() === "") errors.push("Email é obrigatório");
+
+    if (email && !validateEmail(email).isValid) errors.push("Email inválido");
+
+    if (errors.length > 0) return res.status(400).json({ success: false, errors });
+
+    // Buscar cliente
+    const cliente = await prisma.cliente.findUnique({
+      where: { Email: email.toLowerCase() }
+    });
+
+    if (!cliente) {
+      // Não revelar se o email existe ou não por segurança
+      return res.json({ success: true, message: 'Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.' });
+    }
+
+    // Gerar token único
+    const resetToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+
+    // Salvar token na tabela dedicada
+    await prisma.passwordResetToken.create({
+      data: {
+        ClienteID: cliente.ClienteID,
+        Token: resetToken,
+        ExpiresAt: expiresAt
+      }
+    });
+
+    // Enviar email com o token
+    try {
+      await enviarEmailResetSenha(email, resetToken);
+      logger.info('solicitar_reset_senha_email_enviado', { email: email.toLowerCase() });
+    } catch (emailError) {
+      logger.error('solicitar_reset_senha_email_error', { email: email.toLowerCase(), error: emailError.message });
+      // Em produção, falhar se não conseguir enviar email
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(500).json({ success: false, errors: ["Erro ao enviar email de redefinição. Tente novamente mais tarde."] });
+      }
+      // Em desenvolvimento, apenas logar o erro mas continuar
+    }
+
+    logger.info('solicitar_reset_senha_ok', { email: email.toLowerCase() });
+    res.json({ success: true, message: 'Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.' });
+  } catch (error) {
+    logControllerError('solicitar_reset_senha_error', error, req);
+    res.status(500).json({ success: false, errors: ["Erro interno do servidor"] });
+  }
+};
+
+export const resetarSenha = async (req, res) => {
+  const { token, novaSenha } = req.body;
+
+  try {
+    const errors = [];
+    if (!token || token.trim() === "") errors.push("Token é obrigatório");
+    if (!novaSenha || novaSenha.trim() === "") errors.push("Nova senha é obrigatória");
+
+    if (novaSenha && !validatePassword(novaSenha).isValid) {
+      errors.push(...validatePassword(novaSenha).errors);
+    }
+
+    if (errors.length > 0) return res.status(400).json({ success: false, errors });
+
+    // Buscar token válido e não usado
+    const resetToken = await prisma.passwordResetToken.findFirst({
+      where: {
+        Token: token,
+        Used: false,
+        ExpiresAt: {
+          gt: new Date()
+        }
+      },
+      include: {
+        cliente: true
+      }
+    });
+
+    if (!resetToken) {
+      return res.status(400).json({ success: false, errors: ["Token inválido ou expirado"] });
+    }
+
+    // Hash da nova senha
+    const novaSenhaHash = await cryptoService.hashPassword(novaSenha);
+
+    // Atualizar senha e marcar token como usado
+    await prisma.$transaction([
+      prisma.cliente.update({
+        where: { ClienteID: resetToken.ClienteID },
+        data: { SenhaHash: novaSenhaHash },
+      }),
+      prisma.passwordResetToken.update({
+        where: { TokenID: resetToken.TokenID },
+        data: { Used: true }
+      })
+    ]);
+
+    logger.info('resetar_senha_ok', { clienteId: resetToken.ClienteID });
+    res.json({ success: true, message: 'Senha redefinida com sucesso' });
+  } catch (error) {
+    logControllerError('resetar_senha_error', error, req);
+    res.status(500).json({ success: false, errors: ["Erro interno do servidor"] });
   }
 };

@@ -13,6 +13,16 @@ router.post('/login', clienteController.login);
 router.post('/refresh', clienteController.refreshToken);
 router.post('/logout', clienteController.logout);
 router.get('/auto-login', authMiddleware, clienteController.autoLoginClient);
+router.get('/perfil', authMiddleware, clienteController.buscarPerfil);
+router.put('/perfil', authMiddleware, clienteController.atualizarPerfil);
+router.post('/validar-senha-atual', authMiddleware, clienteController.validarSenhaAtual);
+router.put('/alterar-senha', authMiddleware, clienteController.alterarSenha);
 router.get('/enderecos', authMiddleware, clienteController.listarEnderecos);
+router.post('/enderecos', authMiddleware, clienteController.criarEndereco);
+router.put('/enderecos/:id', authMiddleware, clienteController.atualizarEndereco);
+router.delete('/enderecos/:id', authMiddleware, clienteController.excluirEndereco);
+router.put('/enderecos/:id/padrao', authMiddleware, clienteController.definirEnderecoPadrao);
+router.post('/solicitar-reset-senha', clienteController.solicitarResetSenha);
+router.post('/resetar-senha', clienteController.resetarSenha);
 
 export default router;

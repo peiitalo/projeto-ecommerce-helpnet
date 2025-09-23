@@ -282,9 +282,97 @@ export const clienteService = {
     return apiRequest('/clientes/logout', { method: 'POST' });
   },
 
+  // Buscar perfil do cliente
+  buscarPerfil: async () => {
+    return apiRequest('/clientes/perfil');
+  },
+
   // Listar endereços do cliente
   listarEnderecos: async () => {
     return apiRequest('/clientes/enderecos');
+  },
+
+  // Criar endereço
+  criarEndereco: async (dadosEndereco) => {
+    return apiRequest('/clientes/enderecos', {
+      method: 'POST',
+      body: JSON.stringify(dadosEndereco),
+    });
+  },
+
+  // Atualizar endereço
+  atualizarEndereco: async (enderecoId, dadosEndereco) => {
+    return apiRequest(`/clientes/enderecos/${enderecoId}`, {
+      method: 'PUT',
+      body: JSON.stringify(dadosEndereco),
+    });
+  },
+
+  // Excluir endereço
+  excluirEndereco: async (enderecoId) => {
+    return apiRequest(`/clientes/enderecos/${enderecoId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Definir endereço padrão
+  definirEnderecoPadrao: async (enderecoId) => {
+    return apiRequest(`/clientes/enderecos/${enderecoId}/padrao`, {
+      method: 'PUT',
+    });
+  },
+
+  // Atualizar perfil do cliente
+  atualizarPerfil: async (dadosPerfil) => {
+    return apiRequest('/clientes/perfil', {
+      method: 'PUT',
+      body: JSON.stringify(dadosPerfil),
+    });
+  },
+
+  // Validar senha atual do cliente
+  validarSenhaAtual: async (senhaAtual) => {
+    return apiRequest('/clientes/validar-senha-atual', {
+      method: 'POST',
+      body: JSON.stringify({ senhaAtual }),
+    });
+  },
+
+  // Alterar senha do cliente
+  alterarSenha: async (dadosSenha) => {
+    return apiRequest('/clientes/alterar-senha', {
+      method: 'PUT',
+      body: JSON.stringify(dadosSenha),
+    });
+  },
+
+  // Listar pedidos do cliente
+  listarPedidos: async () => {
+    return apiRequest('/pedidos');
+  },
+
+  // Criar pedido
+  criarPedido: async (dadosPedido) => {
+    return apiRequest('/pedidos', {
+      method: 'POST',
+      body: JSON.stringify(dadosPedido),
+    });
+  },
+
+  // Solicitar reset de senha
+  solicitarResetSenha: async (email) => {
+    return apiRequest('/clientes/solicitar-reset-senha', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  // Resetar senha
+  resetarSenha: async (token, novaSenha) => {
+    return apiRequest('/clientes/resetar-senha', {
+      method: 'POST',
+      body: JSON.stringify({ token, novaSenha }),
+    });
   },
 };
 
@@ -326,10 +414,84 @@ export const freteService = {
   },
 };
 
+// Serviços de Notificações
+export const notificacaoService = {
+  // Listar notificações do cliente
+  listarCliente: async () => {
+    return apiRequest('/notificacoes/cliente');
+  },
+
+  // Listar notificações do vendedor
+  listarVendedor: async () => {
+    return apiRequest('/notificacoes/vendedor');
+  },
+
+  // Criar notificação para clientes específicos
+  criarParaClientes: async (titulo, mensagem, tipo, clienteIds) => {
+    return apiRequest('/notificacoes/vendedor/clientes', {
+      method: 'POST',
+      body: JSON.stringify({
+        titulo,
+        mensagem,
+        tipo: tipo || 'info',
+        clienteIds
+      }),
+    });
+  },
+
+  // Criar notificação para todos os clientes
+  criarParaTodos: async (titulo, mensagem, tipo) => {
+    return apiRequest('/notificacoes/vendedor/todos', {
+      method: 'POST',
+      body: JSON.stringify({
+        titulo,
+        mensagem,
+        tipo: tipo || 'info'
+      }),
+    });
+  },
+
+  // Marcar notificação como lida
+  marcarComoLida: async (id) => {
+    return apiRequest(`/notificacoes/${id}/lida`, {
+      method: 'PUT',
+    });
+  },
+
+  // Marcar todas as notificações como lidas
+  marcarTodasComoLidas: async () => {
+    return apiRequest('/notificacoes/cliente/lidas', {
+      method: 'PUT',
+    });
+  },
+
+  // Marcar todas as notificações do vendedor como lidas
+  marcarTodasVendedorComoLidas: async () => {
+    return apiRequest('/notificacoes/vendedor/lidas', {
+      method: 'PUT',
+    });
+  },
+
+  // Buscar clientes do vendedor
+  buscarClientesVendedor: async () => {
+    return apiRequest('/notificacoes/vendedor/clientes');
+  },
+};
+
 export default {
   produtoService,
   categoriaService,
   clienteService,
   favoritoService,
   freteService,
+  notificacaoService,
 };
+
+// Exportar função apiRequest para uso em outros módulos
+export { apiRequest };
+
+// Importar e exportar os novos serviços
+export { default as entregaApi } from './entregaApi.js';
+export { default as clienteVendedorApi } from './clienteVendedorApi.js';
+export { default as vendedorApi } from './vendedorApi.js';
+export { default as relatoriosApi } from './relatoriosApi.js';

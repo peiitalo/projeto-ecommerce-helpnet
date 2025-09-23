@@ -9,7 +9,28 @@ export const listarProdutos = async (req, res) => {
 
     const where = {};
 
-    if (categoria) where.CategoriaID = parseInt(categoria);
+    // Handle category filtering - support both ID and name
+    if (categoria) {
+      const categoriaNum = parseInt(categoria);
+      if (!isNaN(categoriaNum)) {
+        // If it's a valid number, treat as ID
+        where.CategoriaID = categoriaNum;
+      } else {
+        // If it's not a number, treat as category name and find the ID
+        const categoriaEncontrada = await prisma.categoria.findFirst({
+          where: { Nome: { equals: categoria, mode: 'insensitive' } },
+          select: { CategoriaID: true }
+        });
+        if (categoriaEncontrada) {
+          where.CategoriaID = categoriaEncontrada.CategoriaID;
+        } else {
+          // If category not found, return empty results
+          logger.warn('categoria_nao_encontrada_para_filtro', { categoria });
+          return res.json({ produtos: [], total: 0 });
+        }
+      }
+    }
+
     if (status === "ativo") where.Ativo = true;
     else if (status === "inativo") where.Ativo = false;
     else if (status === "sem-estoque") where.Estoque = 0;
