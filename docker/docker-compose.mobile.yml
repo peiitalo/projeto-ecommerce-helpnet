@@ -1,0 +1,39 @@
+services:
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ecommerce-backend-mobile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://ecommerce_user:ecommerce_secure_2024@postgres:5432/projeto_ecommerce_prod
+      PORT: 3001
+    ports:
+      - "0.0.0.0:3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+
+  # Frontend React
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ecommerce-frontend-mobile
+    restart: unless-stopped
+    environment:
+      VITE_API_BASE_URL: http://192.168.0.104:3001
+    ports:
+      - "0.0.0.0:5173:5173"
+    depends_on:
+      - backend
+    networks:
+      - ecommerce-network
+
+networks:
+  ecommerce-network:
+    driver: bridge

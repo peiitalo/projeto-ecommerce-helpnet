@@ -1,0 +1,26 @@
+# Docker Compose para Produção
+# Use: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
+
+services:
+
+  backend:
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://ecommerce_user:${POSTGRES_PASSWORD:-sua_senha_segura_aqui}@postgres:5432/projeto_ecommerce_prod
+      PORT: 3001
+    # Remover volume de desenvolvimento
+    volumes: []
+    # Build otimizado para produção
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+
+  frontend:
+    environment:
+      VITE_API_BASE_URL: ${API_URL:-http://localhost:3001}
+    # Remover volume de desenvolvimento  
+    volumes: []
+    # Build otimizado para produção
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod

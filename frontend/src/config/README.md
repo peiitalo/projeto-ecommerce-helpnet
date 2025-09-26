@@ -1,0 +1,1 @@
+Esta pasta era usada para configurações de API, mas a aplicação passou a centralizar as chamadas em src/services/api.js. O arquivo config/api.js foi mantido apenas para histórico; recomenda-se removê-lo definitivamente se não houver mais usos.
