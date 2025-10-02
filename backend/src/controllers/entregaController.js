@@ -470,8 +470,8 @@ export const atualizarStatusEntregaPorPedido = async (req, res) => {
 export const listarEntregasVendedor = async (req, res) => {
   try {
     const { user } = req;
-    const { pagina = 1, limit = 10, status } = req.query;
-    const skip = (pagina - 1) * limit;
+    const { page = 1, limit = 10, status, search } = req.query;
+    const skip = (page - 1) * limit;
 
     // Verificar se o usuário é vendedor
     if (user.role !== 'vendedor' && user.role !== 'VENDEDOR') {
@@ -489,7 +489,14 @@ export const listarEntregasVendedor = async (req, res) => {
               VendedorID: user.vendedorId
             }
           }
-        }
+        },
+        ...(search && {
+          OR: [
+            { PedidoID: { contains: search } },
+            { cliente: { NomeCompleto: { contains: search, mode: 'insensitive' } } },
+            { CodigoRastreio: { contains: search } }
+          ]
+        })
       },
       ...(status && { StatusEntrega: status })
     };

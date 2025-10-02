@@ -29,6 +29,8 @@ const VendorDashboard = lazy(() => import('./pages/vendor/VendorDashboard'));
 const VendorOrdersPage = lazy(() => import('./pages/vendor/VendorOrdersPage'));
 const VendorClientsPage = lazy(() => import('./pages/vendor/VendorClientsPage'));
 const VendorProfilePage = lazy(() => import('./pages/vendor/VendorProfilePage'));
+const VendorDeliveriesPage = lazy(() => import('./pages/vendor/VendorDeliveriesPage'));
+const VendorDeliveryDetailPage = lazy(() => import('./pages/vendor/VendorDeliveryDetailPage'));
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
 function App() {
@@ -74,6 +76,8 @@ function App() {
             <Route path="/vendedor/produtos/:id/editar" element={<ProductForm />} />
             <Route path="/vendedor/pedidos" element={<VendorOrdersPage />} />
             <Route path="/vendedor/clientes" element={<VendorClientsPage />} />
+            <Route path="/vendedor/entregas" element={<VendorDeliveriesPage />} />
+            <Route path="/vendedor/entregas/:pedidoId" element={<VendorDeliveryDetailPage />} />
           </Route>
 
           {/* Demais páginas placeholder */}
