@@ -1,4 +1,4 @@
-const API_BASE_URL = (import.meta?.env?.VITE_API_BASE_URL) || ((typeof window !== 'undefined' && window?.location) ? `${window.location.protocol}//${window.location.hostname}:${3001}/api` : 'http://localhost:3001/api');
+const API_BASE_URL = (import.meta?.env?.VITE_API_BASE_URL) || '/api';
 const withEmpresaHeader = (empresaId, options = {}) => ({
   ...options,
   headers: {
