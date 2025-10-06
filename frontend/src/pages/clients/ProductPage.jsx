@@ -38,8 +38,9 @@ function ProductPage() {
   // Helper to build full image URL
   const buildImageUrl = (imagePath) => {
     if (!imagePath) return '/placeholder-image.svg';
-    const baseUrl = (import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:3001/api').replace('/api', '');
-    return `${baseUrl}/uploads/${imagePath}`;
+    // Remove leading slash if present to avoid double slashes
+    const cleanPath = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath;
+    return `/api/${cleanPath}`;
   };
 
   // Mock do endereço do usuário (em produção, puxar do contexto do usuário logado)
