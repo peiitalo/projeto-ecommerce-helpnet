@@ -25,6 +25,7 @@ import {
 import { produtoService, favoritoService } from '../../services/api';
 import { log } from '../../utils/logger';
 import { useCart } from '../../context/CartContext.jsx';
+import LazyImage from '../../components/LazyImage';
 
 
 function ProductPage() {
@@ -33,6 +34,13 @@ function ProductPage() {
   const { addItem, removeItem, items } = useCart();
   const [buttonState, setButtonState] = useState('add'); // 'add', 'added', 'remove'
   const [addedToCartTimeout, setAddedToCartTimeout] = useState(null);
+
+  // Helper to build full image URL
+  const buildImageUrl = (imagePath) => {
+    if (!imagePath) return '/placeholder-image.svg';
+    const baseUrl = (import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:3001/api').replace('/api', '');
+    return `${baseUrl}/uploads/${imagePath}`;
+  };
 
   // Mock do endereço do usuário (em produção, puxar do contexto do usuário logado)
   const userAddress = {
@@ -156,7 +164,7 @@ function ProductPage() {
   }, []);
 
   // Mapeamento dos campos do produto para o JSX
-  const images = Array.isArray(product?.Imagens) ? product.Imagens : [];
+  const images = Array.isArray(product?.Imagens) ? product.Imagens.map(img => buildImageUrl(img)) : [];
   const name = product?.Nome || product?.nome || '';
   const price = product?.Preco || product?.preco || 0;
   const originalPrice = product?.PrecoOriginal || product?.precoOriginal || null;
@@ -346,14 +354,11 @@ function ProductPage() {
             <div className="relative aspect-[4/3] rounded-xl overflow-hidden border border-slate-200 max-w-xs sm:max-w-sm mx-auto lg:max-w-none cursor-pointer"
                  onClick={() => images.length > 0 && setShowImageModal(true)}>
               {images.length > 0 ? (
-                <img
+                <LazyImage
                   src={images[activeImageIndex]}
                   alt={name}
-                  className="w-full h-full object-contain"
-                  onError={(e) => {
-                    e.target.src = '/placeholder-image.png'; // Fallback image
-                    e.target.alt = 'Imagem não disponível';
-                  }}
+                  className="w-full h-full"
+                  fallback="/placeholder-image.svg"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-slate-100 text-slate-400">
@@ -426,14 +431,11 @@ function ProductPage() {
                         : 'border-slate-200 hover:border-slate-300'
                     }`}
                   >
-                    <img
+                    <LazyImage
                       src={image}
                       alt={`${name} ${index + 1}`}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.src = '/placeholder-image.svg';
-                        e.target.alt = 'Imagem não disponível';
-                      }}
+                      className="w-full h-full"
+                      fallback="/placeholder-image.svg"
                     />
                   </button>
                 ))
@@ -809,14 +811,11 @@ function ProductPage() {
 
             {images.length > 0 && (
               <>
-                <img
+                <LazyImage
                   src={images[activeImageIndex]}
                   alt={name}
-                  className="max-w-full max-h-full object-contain"
-                  onError={(e) => {
-                    e.target.src = '/placeholder-image.png';
-                    e.target.alt = 'Imagem não disponível';
-                  }}
+                  className="max-w-full max-h-full"
+                  fallback="/placeholder-image.svg"
                 />
                 {images.length > 1 && (
                   <>

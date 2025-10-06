@@ -12,5 +12,12 @@ export default defineConfig({
       // Ensure the client connects back on the exposed port
       clientPort: 5173,
     },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   }
 })

@@ -4,6 +4,7 @@ import { categoriaService, produtoService, favoritoService } from '../../service
 import { log } from '../../utils/logger';
 import { useCart } from '../../context/CartContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
+import LazyImage from '../../components/LazyImage';
 import {
   FaShoppingCart,
   FaUser,
@@ -46,6 +47,13 @@ function ExplorePage() {
   const { count: cartCount, addItem, removeItem, items } = useCart();
   const { logout } = useAuth();
   const navigate = useNavigate();
+
+  // Helper to build full image URL
+  const buildImageUrl = (imagePath) => {
+    if (!imagePath) return '/placeholder-image.svg';
+    const baseUrl = (import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:3001/api').replace('/api', '');
+    return `${baseUrl}/uploads/${imagePath}`;
+  };
 
   // Estados para busca e filtros na categoria
   const [categorySearchQuery, setCategorySearchQuery] = useState('');
@@ -205,7 +213,8 @@ function ExplorePage() {
         name: produto.Nome || produto.name,
         price: produto.Preco || produto.price,
         originalPrice: produto.PrecoOriginal || produto.originalPrice,
-        image: (produto.Imagens && produto.Imagens[0]) || produto.image || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?q=80&w=400&auto=format&fit=crop',
+        image: buildImageUrl(produto.Imagens && produto.Imagens[0]),
+        images: (produto.Imagens || []).map(img => buildImageUrl(img)), // Array of full URLs
         rating: 4.5,
         sales: Math.floor(Math.random() * 2000) + 100,
         category: produto.categoria?.Nome || produto.category || category.name,
@@ -722,7 +731,7 @@ function ExplorePage() {
                         {filteredProducts.map((product) => (
                           <div key={product.id} className="group bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition flex flex-col h-full">
                             <Link to={`/produto/${product.id}`} className="relative aspect-square overflow-hidden">
-                              <img src={product.image} alt={product.name} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300" />
+                              <LazyImage src={product.image} alt={product.name} className="w-full h-full group-hover:scale-105 transition-transform duration-300" fallback="/placeholder-image.svg" />
 
                               {/* Badges */}
                               <div className="absolute top-2 left-2 flex flex-col gap-1">
@@ -747,13 +756,12 @@ function ExplorePage() {
                                   e.stopPropagation();
                                   toggleFavorite(product.id);
                                 }}
-                                className={`absolute top-2 right-2 p-1.5 rounded-full shadow-sm transition-colors ${
-                                  isFavorite(product.id)
-                                    ? 'bg-red-500 text-white hover:bg-red-600'
-                                    : 'bg-white text-slate-600 hover:text-red-500'
+                                className={`absolute top-2 right-2 p-1.5 rounded-full bg-white/90 hover:bg-white shadow-sm hover:shadow-md transition-all ${
+                                  isFavorite(product.id) ? 'text-red-500' : 'text-slate-700'
                                 }`}
+                                aria-label={isFavorite(product.id) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
                               >
-                                <FaHeart className="text-xs" />
+                                <FaHeart className={`text-xs ${isFavorite(product.id) ? 'fill-current' : ''}`} />
                               </button>
                             </Link>
 

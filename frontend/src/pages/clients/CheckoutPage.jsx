@@ -45,14 +45,21 @@ function CheckoutPage() {
   const allAvailableMethods = [
     { id: 1, type: 'pix', amount: 0, label: 'PIX' },
     { id: 2, type: 'cartao', amount: 0, label: 'Cartão de Crédito' },
-    { id: 3, type: 'boleto', amount: 0, label: 'Boleto Bancário' }
+    { id: 3, type: 'debito', amount: 0, label: 'Cartão de Débito' },
+    { id: 4, type: 'boleto', amount: 0, label: 'Boleto Bancário' }
   ];
   const [orderData, setOrderData] = useState(null);
   const [processingOrder, setProcessingOrder] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
+  const [cardDetails, setCardDetails] = useState({
+    number: '',
+    expiry: '',
+    cvv: '',
+    name: ''
+  });
 
-  const { items, count, clearCart, freight, calculateFreight, freightLoading, freightError, selectedAddress, setSelectedAddress, total, subtotal } = useCart();
+  const { items, count, clearCart, freight, freightOptions, selectedFreight, setSelectedFreight, calculateFreight, freightLoading, freightError, selectedAddress, setSelectedAddress, total, subtotal } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -294,7 +301,7 @@ function CheckoutPage() {
           tipo: method.type,
           valor: method.amount
         })),
-        frete: orderData.frete,
+        frete: selectedFreight ? selectedFreight.valor : 0,
         observacoes: ''
       };
 
@@ -707,18 +714,44 @@ function CheckoutPage() {
                         </div>
                       ))}
 
-                      {/* Exibir informações do frete */}
-                      {selectedAddress && freight.valor > 0 && (
-                        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      {/* Exibir opções de frete */}
+                      {selectedAddress && freightOptions.length > 0 && (
+                        <div className="mt-4 space-y-3">
                           <div className="flex items-center gap-2 mb-2">
                             <FaTruck className="text-blue-600" />
-                            <span className="text-sm font-medium text-blue-900">Frete Calculado</span>
+                            <span className="text-sm font-medium text-blue-900">Opções de Frete</span>
                           </div>
-                          <div className="text-sm text-blue-800">
-                            <p>Distância: {freight.distanciaKm} km</p>
-                            <p>Prazo: {freight.prazo}</p>
-                            <p className="font-medium">Valor: {formatPrice(freight.valor)}</p>
-                          </div>
+                          {freightOptions.map((option) => (
+                            <div
+                              key={option.id}
+                              onClick={() => setSelectedFreight(option)}
+                              className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                                selectedFreight?.id === option.id
+                                  ? 'border-blue-500 bg-blue-50'
+                                  : 'border-slate-200 hover:border-slate-300'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <div>
+                                    <h4 className="font-medium text-slate-900">{option.nome}</h4>
+                                    <p className="text-sm text-slate-600">{option.transportadora}</p>
+                                    <p className="text-sm text-slate-600">{option.descricao}</p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-medium text-blue-600">{formatPrice(option.valor)}</p>
+                                  <p className="text-sm text-slate-600">{option.prazo}</p>
+                                </div>
+                              </div>
+                              {selectedFreight?.id === option.id && (
+                                <div className="flex items-center gap-2 mt-2">
+                                  <FaCheck className="text-blue-600" />
+                                  <span className="text-sm text-blue-600">Selecionado</span>
+                                </div>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       )}
 
@@ -799,6 +832,7 @@ function CheckoutPage() {
                             >
                               <div className="flex items-center gap-2">
                                 {method.type === 'cartao' && <FaCreditCard className="text-slate-400" />}
+                                {method.type === 'debito' && <FaCreditCard className="text-slate-400" />}
                                 {method.type === 'boleto' && <FaBarcode className="text-slate-400" />}
                                 {method.type === 'pix' && <FaMoneyBillWave className="text-slate-400" />}
                                 <div>
@@ -837,6 +871,7 @@ function CheckoutPage() {
                               <h3 className="font-medium text-slate-900">{method.label}</h3>
                               <p className="text-sm text-slate-600">
                                 {method.type === 'cartao' && 'Visa, Mastercard, Elo'}
+                                {method.type === 'debito' && 'Débito instantâneo'}
                                 {method.type === 'boleto' && 'Pagamento à vista'}
                                 {method.type === 'pix' && 'Pagamento instantâneo'}
                               </p>
@@ -860,17 +895,73 @@ function CheckoutPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-slate-600">R$</span>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={method.amount || ''}
-                            onChange={(e) => updatePaymentAmount(method.id, e.target.value)}
-                            placeholder="0,00"
-                            className="flex-1 px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
-                          />
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-slate-600">R$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={method.amount || ''}
+                              onChange={(e) => updatePaymentAmount(method.id, e.target.value)}
+                              placeholder="0,00"
+                              className="flex-1 px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
+                            />
+                          </div>
+
+                          {/* Card details for credit/debit cards */}
+                          {(method.type === 'cartao' || method.type === 'debito') && method.amount > 0 && (
+                            <div className="space-y-3 p-3 bg-slate-50 rounded-lg">
+                              <h4 className="text-sm font-medium text-slate-900">Dados do Cartão</h4>
+                              <div className="grid grid-cols-1 gap-3">
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-700 mb-1">Número do Cartão</label>
+                                  <input
+                                    type="text"
+                                    value={cardDetails.number}
+                                    onChange={(e) => setCardDetails(prev => ({ ...prev, number: e.target.value.replace(/\D/g, '').replace(/(\d{4})(?=\d)/g, '$1 ') }))}
+                                    placeholder="0000 0000 0000 0000"
+                                    maxLength="19"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="block text-xs font-medium text-slate-700 mb-1">Validade</label>
+                                    <input
+                                      type="text"
+                                      value={cardDetails.expiry}
+                                      onChange={(e) => setCardDetails(prev => ({ ...prev, expiry: e.target.value.replace(/\D/g, '').replace(/(\d{2})(?=\d)/, '$1/') }))}
+                                      placeholder="MM/AA"
+                                      maxLength="5"
+                                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium text-slate-700 mb-1">CVV</label>
+                                    <input
+                                      type="text"
+                                      value={cardDetails.cvv}
+                                      onChange={(e) => setCardDetails(prev => ({ ...prev, cvv: e.target.value.replace(/\D/g, '') }))}
+                                      placeholder="000"
+                                      maxLength="4"
+                                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
+                                    />
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-700 mb-1">Nome no Cartão</label>
+                                  <input
+                                    type="text"
+                                    value={cardDetails.name}
+                                    onChange={(e) => setCardDetails(prev => ({ ...prev, name: e.target.value.toUpperCase() }))}
+                                    placeholder="NOME COMPLETO"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -916,8 +1007,13 @@ function CheckoutPage() {
                             <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-slate-600"></div>
                             <span>Calculando...</span>
                           </div>
+                        ) : selectedFreight ? (
+                          <div className="text-right">
+                            <div>{formatPrice(selectedFreight.valor)}</div>
+                            <div className="text-xs text-slate-500">{selectedFreight.nome}</div>
+                          </div>
                         ) : (
-                          formatPrice(freight.valor)
+                          formatPrice(0)
                         )}
                       </span>
                     </div>

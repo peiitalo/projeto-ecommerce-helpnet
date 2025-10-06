@@ -6,6 +6,7 @@ import { useCart } from '../../context/CartContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import useDebounce from '../../hooks/useDebounce';
 import apiCache from '../../utils/cache';
+import LazyImage from '../../components/LazyImage';
 import {
   FaShoppingCart,
   FaUser,
@@ -18,7 +19,8 @@ import {
   FaPercent,
   FaFilter,
   FaCheck,
-  FaSignOutAlt
+  FaSignOutAlt,
+  FaRegHeart
 } from 'react-icons/fa';
 import {
   FiSearch,
@@ -41,6 +43,13 @@ function Home() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchResultsOpen, setSearchResultsOpen] = useState(false);
 
+  // Helper to build full image URL
+  const buildImageUrl = (imagePath) => {
+    if (!imagePath) return '/placeholder-image.svg';
+    const baseUrl = (import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:3001/api').replace('/api', '');
+    return `${baseUrl}/uploads/${imagePath}`;
+  };
+
   // Estados para pesquisa e filtros
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounce(query, 300); // 300ms debounce
@@ -62,6 +71,7 @@ function Home() {
   const [notifCount] = useState(3);
   const [favorites, setFavorites] = useState([]);
   const [favoritesLoading, setFavoritesLoading] = useState(true);
+  const [favoriteLoading, setFavoriteLoading] = useState(null); // productId being toggled
 
   // Logo configuration - you can change this to use an image
   const logoConfig = {
@@ -174,7 +184,8 @@ function Home() {
         name: produto.Nome || produto.name,
         price: produto.Preco || produto.price,
         originalPrice: produto.PrecoOriginal || produto.originalPrice,
-        image: (produto.Imagens && produto.Imagens[0]) || produto.image || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?q=80&w=1200&auto=format&fit=crop',
+        image: buildImageUrl(produto.Imagens && produto.Imagens[0]),
+        images: (produto.Imagens || []).map(img => buildImageUrl(img)), // Array of full URLs
         rating: 4.5, // Mock rating - pode ser implementado depois
         sales: Math.floor(Math.random() * 2000) + 100, // Mock sales - pode ser implementado depois
         category: produto.categoria?.Nome || produto.category || 'Geral',
@@ -373,6 +384,9 @@ function Home() {
 
   // Toggle favorito
   const handleToggleFavorite = async (productId) => {
+    if (favoriteLoading) return; // Prevent multiple clicks
+
+    setFavoriteLoading(productId);
     try {
       if (isFavorited(productId)) {
         await favoritoService.remover(productId);
@@ -388,6 +402,8 @@ function Home() {
     } catch (error) {
       log.error('home_toggle_favorite_error', { productId, error: error.message });
       // Could show a toast or alert here
+    } finally {
+      setFavoriteLoading(null);
     }
   };
 
@@ -566,14 +582,11 @@ function Home() {
                           className="flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors"
                           onClick={() => setSearchResultsOpen(false)}
                         >
-                          <img
+                          <LazyImage
                             src={product.image}
                             alt={product.name}
-                            className="w-12 h-12 object-cover rounded-lg"
-                            onError={(e) => {
-                              e.target.src = '/placeholder-image.svg';
-                              e.target.alt = 'Imagem não disponível';
-                            }}
+                            className="w-12 h-12 rounded-lg"
+                            fallback="/placeholder-image.svg"
                           />
                           <div className="flex-1 min-w-0">
                             <h4 className="text-sm font-medium text-slate-900 truncate">{product.name}</h4>
@@ -708,10 +721,11 @@ function Home() {
                           className="flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors"
                           onClick={() => setSearchResultsOpen(false)}
                         >
-                          <img 
-                            src={product.image} 
+                          <LazyImage
+                            src={product.image}
                             alt={product.name}
-                            className="w-12 h-12 object-cover rounded-lg"
+                            className="w-12 h-12 rounded-lg"
+                            fallback="/placeholder-image.svg"
                           />
                           <div className="flex-1 min-w-0">
                             <h4 className="text-sm font-medium text-slate-900 truncate">{product.name}</h4>
@@ -1027,14 +1041,11 @@ function Home() {
               {paginatedProducts.map((p) => (
             <div key={p.id} className="group bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition flex flex-col h-full">
             <Link to={`/produto/${p.id}`} className="relative aspect-square overflow-hidden">
-            <img
+            <LazyImage
               src={p.image}
               alt={p.name}
-              className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
-              onError={(e) => {
-                e.target.src = '/placeholder-image.svg';
-                e.target.alt = 'Imagem não disponível';
-              }}
+              className="w-full h-full group-hover:scale-105 transition-transform duration-300"
+              fallback="/placeholder-image.svg"
             />
             
             {/* Badges */}
@@ -1059,12 +1070,19 @@ function Home() {
             e.stopPropagation();
             handleToggleFavorite(p.id);
             }}
+            disabled={favoriteLoading === p.id}
             className={`absolute top-2 right-2 p-1.5 rounded-full bg-white/90 hover:bg-white shadow-sm hover:shadow-md transition-all ${
               isFavorited(p.id) ? 'text-red-500' : 'text-slate-700'
-            }`}
+            } ${favoriteLoading === p.id ? 'opacity-50 cursor-not-allowed' : ''}`}
             aria-label={isFavorited(p.id) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
             >
-            <FaHeart className={`text-xs ${isFavorited(p.id) ? 'fill-current' : ''}`} />
+            {favoriteLoading === p.id ? (
+              <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin"></div>
+            ) : isFavorited(p.id) ? (
+              <FaHeart className="text-xs fill-current" />
+            ) : (
+              <FaRegHeart className="text-xs" />
+            )}
             </button>
             </Link>
             

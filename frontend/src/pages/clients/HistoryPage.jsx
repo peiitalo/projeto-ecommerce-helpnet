@@ -13,7 +13,9 @@ import {
   FaTruck,
   FaCheck,
   FaClock,
-  FaArrowLeft
+  FaArrowLeft,
+  FaPrint,
+  FaDownload
 } from 'react-icons/fa';
 import {
   FiSearch,
@@ -141,6 +143,88 @@ function HistoryPage() {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const handlePrintReceipt = () => {
+    const printWindow = window.open('', '_blank');
+    const receiptHTML = `
+      <html>
+        <head>
+          <title>Comprovante - Pedido ${selectedOrder.id}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+            .info { margin-bottom: 20px; }
+            .info div { margin-bottom: 10px; }
+            .items { margin-bottom: 20px; }
+            .items table { width: 100%; border-collapse: collapse; }
+            .items th, .items td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            .total { font-weight: bold; text-align: right; }
+            .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #666; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>HelpNet - Comprovante de Compra</h1>
+            <h2>Pedido ${selectedOrder.id}</h2>
+          </div>
+
+          <div class="info">
+            <div><strong>Data da Compra:</strong> ${formatDate(selectedOrder.date)}</div>
+            <div><strong>Status do Pedido:</strong> ${selectedOrder.status}</div>
+            <div><strong>Método de Pagamento:</strong> ${
+              selectedOrder.paymentMethod === 'cartao' ? 'Cartão de Crédito' :
+              selectedOrder.paymentMethod === 'boleto' ? 'Boleto Bancário' : 'PIX'
+            }</div>
+          </div>
+
+          <div class="items">
+            <h3>Produtos Comprados</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Produto</th>
+                  <th>Quantidade</th>
+                  <th>Preço Unitário</th>
+                  <th>Total</th>
+                  <th>Vendedor</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${selectedOrder.items.map(item => `
+                  <tr>
+                    <td>${item.name}</td>
+                    <td>${item.quantity}</td>
+                    <td>${formatPrice(item.price)}</td>
+                    <td>${formatPrice(item.price * item.quantity)}</td>
+                    <td>${item.seller}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+            <div class="total">
+              <strong>Valor Total: ${formatPrice(selectedOrder.total)}</strong>
+            </div>
+          </div>
+
+          <div class="info">
+            <h3>Endereço de Entrega</h3>
+            <div>${selectedOrder.address.name}</div>
+            <div>${selectedOrder.address.street}</div>
+            <div>${selectedOrder.address.city}</div>
+            <div>CEP: ${selectedOrder.address.cep}</div>
+          </div>
+
+          <div class="footer">
+            <p>Este é um comprovante oficial da HelpNet. Data de emissão: ${new Date().toLocaleDateString('pt-BR')}</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(receiptHTML);
+    printWindow.document.close();
+    printWindow.print();
   };
 
   if (loading) {
@@ -430,62 +514,104 @@ function HistoryPage() {
             <div className="p-6 border-b border-slate-200">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-slate-900">Comprovante - Pedido {selectedOrder.id}</h2>
-                <button
-                  onClick={() => setSelectedOrder(null)}
-                  className="p-2 rounded-lg text-slate-600 hover:bg-slate-50"
-                >
-                  <FiX />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handlePrintReceipt}
+                    className="flex items-center gap-2 px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200"
+                    title="Imprimir comprovante"
+                  >
+                    <FaPrint />
+                    <span className="hidden sm:inline">Imprimir</span>
+                  </button>
+                  <button
+                    onClick={() => setSelectedOrder(null)}
+                    className="p-2 rounded-lg text-slate-600 hover:bg-slate-50"
+                  >
+                    <FiX />
+                  </button>
+                </div>
               </div>
             </div>
             <div className="p-6 space-y-6">
+              {/* Cabeçalho do comprovante */}
+              <div className="text-center border-b border-slate-200 pb-4">
+                <h3 className="text-lg font-bold text-slate-900">HelpNet</h3>
+                <p className="text-sm text-slate-600">Comprovante de Compra</p>
+                <p className="text-sm font-medium text-slate-900">Pedido {selectedOrder.id}</p>
+              </div>
+
               {/* Informações do pedido */}
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="font-medium text-slate-900">Data do pedido</p>
+                  <p className="font-medium text-slate-900">Data da Compra</p>
                   <p className="text-slate-600">{formatDate(selectedOrder.date)}</p>
                 </div>
                 <div>
-                  <p className="font-medium text-slate-900">Status</p>
+                  <p className="font-medium text-slate-900">Status do Pedido</p>
                   <p className="text-slate-600">{selectedOrder.status}</p>
                 </div>
               </div>
 
               {/* Itens */}
               <div>
-                <h3 className="font-medium text-slate-900 mb-3">Itens do pedido</h3>
-                <div className="space-y-2">
-                  {selectedOrder.items.map((item, index) => (
-                    <div key={index} className="flex justify-between text-sm">
-                      <span className="text-slate-600">{item.name} (x{item.quantity})</span>
-                      <span className="font-medium">{formatPrice(item.price * item.quantity)}</span>
-                    </div>
-                  ))}
+                <h3 className="font-medium text-slate-900 mb-3">Produtos Comprados</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border border-slate-200">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="border border-slate-200 px-3 py-2 text-left">Produto</th>
+                        <th className="border border-slate-200 px-3 py-2 text-center">Qtd</th>
+                        <th className="border border-slate-200 px-3 py-2 text-right">Preço Unit.</th>
+                        <th className="border border-slate-200 px-3 py-2 text-right">Total</th>
+                        <th className="border border-slate-200 px-3 py-2 text-left">Vendedor</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedOrder.items.map((item, index) => (
+                        <tr key={index} className="border-b border-slate-200">
+                          <td className="border border-slate-200 px-3 py-2">{item.name}</td>
+                          <td className="border border-slate-200 px-3 py-2 text-center">{item.quantity}</td>
+                          <td className="border border-slate-200 px-3 py-2 text-right">{formatPrice(item.price)}</td>
+                          <td className="border border-slate-200 px-3 py-2 text-right">{formatPrice(item.price * item.quantity)}</td>
+                          <td className="border border-slate-200 px-3 py-2">{item.seller}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
                 <div className="border-t border-slate-200 pt-2 mt-3">
-                  <div className="flex justify-between font-semibold">
-                    <span>Total</span>
+                  <div className="flex justify-between font-bold text-slate-900">
+                    <span>Valor Total</span>
                     <span>{formatPrice(selectedOrder.total)}</span>
                   </div>
                 </div>
               </div>
 
               {/* Endereço e pagamento */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
                 <div>
-                  <h3 className="font-medium text-slate-900 mb-2">Endereço de entrega</h3>
-                  <p className="text-slate-600">{selectedOrder.address.name}</p>
-                  <p className="text-slate-600">{selectedOrder.address.street}</p>
-                  <p className="text-slate-600">{selectedOrder.address.city}</p>
-                  <p className="text-slate-600">CEP: {selectedOrder.address.cep}</p>
+                  <h3 className="font-medium text-slate-900 mb-2">Endereço de Entrega</h3>
+                  <div className="text-slate-600 space-y-1">
+                    <p>{selectedOrder.address.name}</p>
+                    <p>{selectedOrder.address.street}</p>
+                    <p>{selectedOrder.address.city}</p>
+                    <p>CEP: {selectedOrder.address.cep}</p>
+                  </div>
                 </div>
                 <div>
-                  <h3 className="font-medium text-slate-900 mb-2">Método de pagamento</h3>
+                  <h3 className="font-medium text-slate-900 mb-2">Método de Pagamento</h3>
                   <p className="text-slate-600">
                     {selectedOrder.paymentMethod === 'cartao' ? 'Cartão de Crédito' :
+                     selectedOrder.paymentMethod === 'debito' ? 'Cartão de Débito' :
                      selectedOrder.paymentMethod === 'boleto' ? 'Boleto Bancário' : 'PIX'}
                   </p>
                 </div>
+              </div>
+
+              {/* Rodapé */}
+              <div className="text-center text-xs text-slate-500 border-t border-slate-200 pt-4">
+                <p>Este é um comprovante oficial da HelpNet</p>
+                <p>Data de emissão: {new Date().toLocaleDateString('pt-BR')}</p>
               </div>
             </div>
             <div className="p-6 border-t border-slate-200">

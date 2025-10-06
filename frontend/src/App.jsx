@@ -8,6 +8,7 @@ const LandingPage = lazy(() => import('./pages/landingPage'));
 const Login = lazy(() => import('./pages/login'));
 const Cadastro = lazy(() => import('./pages/cadastro'));
 const Dashboard = lazy(() => import('./pages/admin/dashboard'));
+const AdminOrdersPage = lazy(() => import('./pages/admin/orders'));
 const NotFound = lazy(() => import('./pages/errors/notFound'));
 const Home = lazy(() => import('./pages/clients/home'));
 const ProductPage = lazy(() => import('./pages/clients/ProductPage'));
@@ -65,6 +66,7 @@ function App() {
           {/* Admin */}
           <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
             <Route path="/admin" element={<Dashboard />} />
+            <Route path="/admin/pedidos" element={<AdminOrdersPage />} />
           </Route>
 
           {/* Vendedor */}

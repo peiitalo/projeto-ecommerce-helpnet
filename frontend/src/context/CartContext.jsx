@@ -34,7 +34,8 @@ export function CartProvider({ children }) {
   const STORAGE_KEY = user ? `helpnet_cart_${user.id}` : 'helpnet_cart_guest';
 
   const [items, setItems] = useState(() => safeStorageGet(STORAGE_KEY, []));
-  const [freight, setFreight] = useState({ valor: 0, distanciaKm: 0, prazo: '', tipo: '', detalhes: '' });
+  const [freightOptions, setFreightOptions] = useState([]);
+  const [selectedFreight, setSelectedFreight] = useState(null);
   const [selectedAddress, setSelectedAddress] = useState(null);
   const [freightLoading, setFreightLoading] = useState(false);
   const [freightError, setFreightError] = useState(null);
@@ -190,7 +191,8 @@ export function CartProvider({ children }) {
   // Calcular frete baseado no endereço selecionado e produtos específicos
   const calculateFreight = async (enderecoId, produtoIds = null) => {
     if (!user || !enderecoId) {
-      setFreight({ valor: 0, distanciaKm: 0, prazo: '', tipo: '', detalhes: '' });
+      setFreightOptions([]);
+      setSelectedFreight(null);
       return;
     }
 
@@ -198,7 +200,8 @@ export function CartProvider({ children }) {
     const idsParaCalculo = produtoIds || items.map(item => item.id);
 
     if (idsParaCalculo.length === 0) {
-      setFreight({ valor: 0, distanciaKm: 0, prazo: '', tipo: '', detalhes: '' });
+      setFreightOptions([]);
+      setSelectedFreight(null);
       return;
     }
 
@@ -208,17 +211,20 @@ export function CartProvider({ children }) {
     try {
       const freteResult = await freteService.calcular(user.id, enderecoId, idsParaCalculo);
 
-      setFreight({
-        valor: freteResult.frete || 0,
-        distanciaKm: freteResult.distanciaKm || 0,
-        prazo: freteResult.prazo || '',
-        tipo: freteResult.tipo || '',
-        detalhes: freteResult.detalhes || ''
-      });
+      const options = freteResult.opcoes || [];
+      setFreightOptions(options);
+
+      // Selecionar primeira opção como padrão se disponível
+      if (options.length > 0) {
+        setSelectedFreight(options[0]);
+      } else {
+        setSelectedFreight(null);
+      }
     } catch (error) {
       console.error('Erro ao calcular frete:', error);
       setFreightError(error.message || 'Erro ao calcular frete');
-      setFreight({ valor: 0, distanciaKm: 0, prazo: '', tipo: '', detalhes: '' });
+      setFreightOptions([]);
+      setSelectedFreight(null);
     } finally {
       setFreightLoading(false);
     }
@@ -226,6 +232,7 @@ export function CartProvider({ children }) {
 
   const count = useMemo(() => items.length, [items]); // Conta itens únicos
   const subtotal = useMemo(() => items.reduce((sum, i) => sum + (i.price * (i.quantity || 0)), 0), [items]);
+  const freight = useMemo(() => selectedFreight || { valor: 0, prazo: '', nome: '' }, [selectedFreight]);
   const total = useMemo(() => subtotal + freight.valor, [subtotal, freight.valor]);
 
   const value = {
@@ -238,6 +245,9 @@ export function CartProvider({ children }) {
     subtotal,
     total,
     freight,
+    freightOptions,
+    selectedFreight,
+    setSelectedFreight,
     selectedAddress,
     setSelectedAddress,
     calculateFreight,

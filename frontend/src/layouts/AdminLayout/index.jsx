@@ -66,6 +66,7 @@ function AdminLayout({ children }) {
   // Admin agora foca em controles macro (empresas, usuários, faturamento)
   const adminMenu = [
     { label: 'Visão Geral', to: `${basePath}`, icon: <FiHome className="text-slate-500" /> },
+    { label: 'Pedidos', to: `${basePath}/pedidos`, icon: <FiPackage className="text-slate-500" /> },
     { label: 'Empresas', to: `${basePath}/empresas`, icon: <FiBriefcase className="text-slate-500" /> },
     { label: 'Usuários', to: `${basePath}/usuarios`, icon: <FiUsers className="text-slate-500" /> },
     { label: 'Relatórios', to: `${basePath}/relatorios`, icon: <FiBarChart2 className="text-slate-500" /> },

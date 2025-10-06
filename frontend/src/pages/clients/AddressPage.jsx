@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { clienteService } from '../../services/api';
+import { useBuscarCep } from '../../hooks/useBuscarCep';
 import {
   FaMapMarkerAlt,
   FaPlus,
@@ -11,7 +12,7 @@ import {
   FaTimes,
   FaUser,
   FaShoppingCart,
-  FaHeart,
+  FaHeart, 
   FaBell,
   FaSignOutAlt,
   FaArrowLeft
@@ -49,6 +50,7 @@ function AddressPage() {
   });
   const [saving, setSaving] = useState(false);
   const [formErrors, setFormErrors] = useState([]);
+  const { buscarCep, loading: cepLoading } = useBuscarCep();
   const { logout } = useAuth();
 
   // Logo configuration
@@ -189,6 +191,27 @@ function AddressPage() {
       await carregarEnderecos();
     } catch (error) {
       console.error('Erro ao definir endereço padrão:', error);
+    }
+  };
+
+  const handleCepChange = async (cep) => {
+    setAddressForm(prev => ({ ...prev, CEP: cep }));
+
+    if (cep.length === 9) { // Formato 00000-000
+      try {
+        const cepData = await buscarCep(cep);
+        if (cepData) {
+          setAddressForm(prev => ({
+            ...prev,
+            Cidade: cepData.localidade || prev.Cidade,
+            UF: cepData.uf || prev.UF,
+            Bairro: cepData.bairro || prev.Bairro
+          }));
+        }
+      } catch (error) {
+        console.error('Erro ao buscar CEP:', error);
+        // Não mostra erro para o usuário, apenas log
+      }
     }
   };
 
@@ -493,13 +516,21 @@ function AddressPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">CEP</label>
-                  <input
-                    type="text"
-                    value={addressForm.CEP}
-                    onChange={(e) => setAddressForm(prev => ({ ...prev, CEP: e.target.value }))}
-                    placeholder="00000-000"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={addressForm.CEP}
+                      onChange={(e) => handleCepChange(e.target.value)}
+                      placeholder="00000-000"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      maxLength="9"
+                    />
+                    {cepLoading && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <div className="animate-spin rounded-full h-4 w-4 border border-slate-400 border-t-transparent"></div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Cidade</label>

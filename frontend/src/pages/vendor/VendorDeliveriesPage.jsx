@@ -37,7 +37,42 @@ function VendorDeliveriesPage() {
         status: statusFilter !== 'all' ? statusFilter : undefined,
         search: searchQuery
       });
-      setDeliveries(response.entregas || []);
+
+      // Transform API data to match component expectations
+      const transformedDeliveries = (response.entregas || []).map(delivery => {
+        // Map database status to frontend status
+        let status = 'pendente';
+        switch (delivery.StatusEntrega) {
+          case 'AguardandoEnvio':
+            status = 'pendente';
+            break;
+          case 'EmTransito':
+            status = 'em_transito';
+            break;
+          case 'Entregue':
+            status = 'entregue';
+            break;
+          case 'Cancelado':
+            status = 'cancelada';
+            break;
+          default:
+            status = 'pendente';
+        }
+
+        return {
+          id: delivery.EntregaID,
+          pedidoId: delivery.PedidoID,
+          orderId: `#${delivery.PedidoID}`,
+          customerName: delivery.pedido?.cliente?.NomeCompleto || 'Cliente não informado',
+          customerPhone: 'Não informado', // API doesn't provide phone
+          address: `${delivery.pedido?.Endereco?.Cidade || ''}, ${delivery.pedido?.Endereco?.UF || ''}`.trim() || 'Endereço não informado',
+          status: status,
+          estimatedDelivery: delivery.PrevisaoEntrega,
+          trackingCode: delivery.CodigoRastreio || 'Não informado'
+        };
+      });
+
+      setDeliveries(transformedDeliveries);
       setLoading(false);
     } catch (error) {
       console.error('Erro ao carregar entregas:', error);
@@ -91,7 +126,7 @@ function VendorDeliveriesPage() {
 
   return (
     <VendorLayout>
-      <div className="space-y-6">
+      <div className="space-y-6 m-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -224,7 +259,7 @@ function VendorDeliveriesPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center gap-2">
                           <Link
-                            to={`/vendedor/entregas/${delivery.id}`}
+                            to={`/vendedor/entregas/${delivery.pedidoId}`}
                             className="text-blue-600 hover:text-blue-900 p-1"
                             title="Ver Detalhes"
                           >
