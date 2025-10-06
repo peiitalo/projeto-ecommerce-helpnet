@@ -65,6 +65,16 @@ const sendEmail = async (to, subject, htmlContent) => {
   };
 
   try {
+    // Sempre logar detalhes do email em desenvolvimento
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('=== DETALHES DO EMAIL ===');
+      console.log('Para:', to);
+      console.log('De:', mailOptions.from);
+      console.log('Assunto:', subject);
+      console.log('Conteúdo HTML length:', htmlContent.length);
+      console.log('========================');
+    }
+
     // Tentar SendGrid primeiro
     if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_API_KEY !== 'your-sendgrid-api-key') {
       const result = await sgMail.send(mailOptions);

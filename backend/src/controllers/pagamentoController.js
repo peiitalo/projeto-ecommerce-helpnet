@@ -279,13 +279,13 @@ async function montarResumoPagamento(pedidoId) {
     }
   });
   if (!pedido) return null;
-  const totalRestante = Math.max(0, pedido.Total - pedido.TotalPago);
+  const totalRestante = Math.max(0, Math.round((pedido.Total - pedido.TotalPago) * 100) / 100);
   const metodos = pedido.distribuicoes.map(d => ({
     metodoId: d.MetodoID,
     metodo: d.MetodoPagamento?.Nome,
     alocado: d.ValorAlocado,
     pago: d.ValorPagoAcumulado,
-    restante: Math.max(0, d.ValorAlocado - d.ValorPagoAcumulado)
+    restante: Math.max(0, Math.round((d.ValorAlocado - d.ValorPagoAcumulado) * 100) / 100)
   }));
   return {
     pedidoId: pedido.PedidoID,
@@ -345,7 +345,7 @@ export const registrarPagamentoParcial = async (req, res) => {
     const { metodoId, valor } = req.body || {};
     const { user } = req;
 
-    const valorPago = parseFloat(valor);
+    const valorPago = Math.round(parseFloat(valor) * 100) / 100; // Round to 2 decimal places
     if (!metodoId || !valorPago || valorPago <= 0) {
       return res.status(400).json({ success: false, errors: ['Parâmetros inválidos: metodoId e valor > 0 são obrigatórios'] });
     }
@@ -368,13 +368,13 @@ export const registrarPagamentoParcial = async (req, res) => {
     });
     if (!dist) return res.status(400).json({ success: false, errors: ['Método de pagamento não alocado neste pedido'] });
 
-    const restanteMetodo = Math.max(0, dist.ValorAlocado - dist.ValorPagoAcumulado);
-    const restantePedido = Math.max(0, pedido.Total - pedido.TotalPago);
+    const restanteMetodo = Math.max(0, Math.round((dist.ValorAlocado - dist.ValorPagoAcumulado) * 100) / 100);
+    const restantePedido = Math.max(0, Math.round((pedido.Total - pedido.TotalPago) * 100) / 100);
 
-    if (valorPago - restanteMetodo > 1e-6) {
+    if (valorPago > restanteMetodo + 1e-6) {
       return res.status(400).json({ success: false, errors: [`Pagamento excede o restante do método (${formatCurrencyBRL(restanteMetodo)})`] });
     }
-    if (valorPago - restantePedido > 1e-6) {
+    if (valorPago > restantePedido + 1e-6) {
       return res.status(400).json({ success: false, errors: [`Pagamento excede o restante do pedido (${formatCurrencyBRL(restantePedido)})`] });
     }
 
