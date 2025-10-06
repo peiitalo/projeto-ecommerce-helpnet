@@ -1,7 +1,7 @@
 // backend/src/controllers/clienteController.js
 import prisma from "../config/prisma.js";
 import cryptoService from "../services/cryptoService.js";
-import { enviarEmailResetSenha } from "../services/emailService.js";
+import { enviarEmailResetSenha, sendWelcomeEmail } from "../services/emailService.js";
 import removerAcentos from "remove-accents";
 import {
   validatePassword,
@@ -237,6 +237,18 @@ export const criarCliente = async (req, res) => {
           Complemento: ComplementoCobranca || null,
         },
       });
+    }
+
+    // Enviar email de boas-vindas
+    try {
+      await sendWelcomeEmail({
+        nome: novoCliente.NomeCompleto,
+        email: novoCliente.Email
+      });
+      logger.info('email_boas_vindas_enviado', { clienteId: novoCliente.ClienteID });
+    } catch (emailError) {
+      logger.warn('erro_email_boas_vindas', { clienteId: novoCliente.ClienteID, error: emailError.message });
+      // Não falhar o cadastro por erro no email
     }
 
     logger.info('criar_cliente_ok', { email: Email?.toLowerCase() });

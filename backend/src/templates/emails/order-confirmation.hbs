@@ -1,0 +1,55 @@
+<p>Olá, {{clienteNome}}!</p>
+
+<p>Obrigado por sua compra no HelpNet! Seu pedido foi confirmado e estamos processando-o.</p>
+
+<div class="order-details">
+  <p><strong>Pedido #{{pedidoId}}</strong></p>
+  <p><strong>Data:</strong> {{dataPedido}}</p>
+  <p><strong>Método de Pagamento:</strong> {{metodoPagamento}}</p>
+  <p><strong>Endereço de Entrega:</strong> {{enderecoEntrega}}</p>
+</div>
+
+<h3>Produtos</h3>
+<table class="product-table">
+  <thead>
+    <tr>
+      <th>Produto</th>
+      <th>Quantidade</th>
+      <th>Preço Unitário</th>
+      <th>Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each produtos}}
+    <tr>
+      <td>{{nome}}</td>
+      <td>{{quantidade}}</td>
+      <td>R$ {{precoUnitario}}</td>
+      <td>R$ {{subtotal}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+  <tfoot>
+    <tr class="total-row">
+      <td colspan="3"><strong>Subtotal</strong></td>
+      <td><strong>R$ {{subtotal}}</strong></td>
+    </tr>
+    <tr class="total-row">
+      <td colspan="3"><strong>Frete</strong></td>
+      <td><strong>R$ {{frete}}</strong></td>
+    </tr>
+    <tr class="total-row">
+      <td colspan="3"><strong>Total</strong></td>
+      <td><strong>R$ {{total}}</strong></td>
+    </tr>
+  </tfoot>
+</table>
+
+<div style="text-align: center; margin: 30px 0;">
+  <a href="{{frontendUrl}}/entregas/{{pedidoId}}" class="button">Acompanhar Pedido</a>
+</div>
+
+<p>Você receberá atualizações sobre o status do seu pedido por email.</p>
+
+<p>Atenciosamente,<br>
+Equipe HelpNet</p>

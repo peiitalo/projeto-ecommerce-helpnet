@@ -1,0 +1,31 @@
+<p>Olá, {{clienteNome}}!</p>
+
+<p>Atualização sobre seu pedido #{{pedidoId}}:</p>
+
+<div class="order-details">
+  <p><strong>Status:</strong> {{status}}</p>
+  {{#if codigoRastreio}}
+  <p><strong>Código de Rastreio:</strong> {{codigoRastreio}}</p>
+  {{/if}}
+  {{#if previsaoEntrega}}
+  <p><strong>Previsão de Entrega:</strong> {{previsaoEntrega}}</p>
+  {{/if}}
+  {{#if local}}
+  <p><strong>Localização:</strong> {{local}}</p>
+  {{/if}}
+  <p><strong>Data da Atualização:</strong> {{dataAtualizacao}}</p>
+</div>
+
+{{#if showTrackingButton}}
+<div style="text-align: center; margin: 30px 0;">
+  <a href="{{frontendUrl}}/entregas/{{pedidoId}}" class="button">Acompanhar Entrega</a>
+</div>
+{{/if}}
+
+{{#if isDelivered}}
+<p>Seu pedido foi entregue com sucesso! Esperamos que tenha gostado dos produtos.</p>
+<p>Conte-nos sua experiência avaliando os produtos em seu pedido.</p>
+{{/if}}
+
+<p>Atenciosamente,<br>
+Equipe HelpNet</p>

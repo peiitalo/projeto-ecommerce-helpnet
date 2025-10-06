@@ -79,25 +79,20 @@ const calcularFrete = async (req, res) => {
     // Em produção, seria necessário campo de endereço na empresa/vendedor
     const cepEmpresa = getCepEmpresaPadrao(empresa.EmpresaID);
 
-    // Calcular frete usando o serviço de frete baseado em distância
-    const resultadoFrete = calcularFreteService(cepEmpresa, endereco.CEP);
+    // Calcular opções de frete usando o serviço de frete baseado em distância
+    const opcoesFrete = calcularFreteService(cepEmpresa, endereco.CEP);
 
-    logger.info('frete_calculado_distancia', {
+    logger.info('frete_calculado_opcoes', {
       clienteId,
       enderecoId,
       produtoIds,
       cepEmpresa,
       cepCliente: endereco.CEP,
-      distanciaKm: resultadoFrete.distanciaKm,
-      valorFrete: resultadoFrete.valorFrete
+      opcoes: opcoesFrete.length
     });
 
     res.json({
-      frete: resultadoFrete.valorFrete,
-      distanciaKm: resultadoFrete.distanciaKm,
-      prazo: calcularPrazoPorDistancia(resultadoFrete.distanciaKm),
-      tipo: "Frete por Distância",
-      detalhes: `Distância: ${resultadoFrete.distanciaKm}km`,
+      opcoes: opcoesFrete,
       endereco: {
         cep: endereco.CEP,
         cidade: endereco.Cidade,

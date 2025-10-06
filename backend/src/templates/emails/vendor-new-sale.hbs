@@ -1,0 +1,40 @@
+<p>Olá, {{vendedorNome}}!</p>
+
+<p>Você recebeu uma nova venda no HelpNet!</p>
+
+<div class="order-details">
+  <p><strong>Pedido #{{pedidoId}}</strong></p>
+  <p><strong>Data:</strong> {{dataPedido}}</p>
+  <p><strong>Valor Total Recebido:</strong> R$ {{valorTotal}}</p>
+</div>
+
+<h3>Produtos Vendidos</h3>
+<table class="product-table">
+  <thead>
+    <tr>
+      <th>Produto</th>
+      <th>Quantidade</th>
+      <th>Preço Unitário</th>
+      <th>Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each produtos}}
+    <tr>
+      <td>{{nome}}</td>
+      <td>{{quantidade}}</td>
+      <td>R$ {{precoUnitario}}</td>
+      <td>R$ {{subtotal}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+
+<div style="text-align: center; margin: 30px 0;">
+  <a href="{{frontendUrl}}/vendedor/pedidos" class="button">Ver Pedidos</a>
+</div>
+
+<p>Prepare os produtos para envio o mais breve possível.</p>
+
+<p>Atenciosamente,<br>
+Equipe HelpNet</p>

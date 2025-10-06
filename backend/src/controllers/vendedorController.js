@@ -376,6 +376,141 @@ export const atualizarVendedor = async (req, res) => {
   }
 };
 
+// Buscar perfil do vendedor atual
+export const buscarPerfilVendedor = async (req, res) => {
+  try {
+    const { user } = req;
+
+    if (!user?.vendedorId) {
+      return res.status(403).json({
+        success: false,
+        errors: ["Acesso negado. Vendedor não identificado."]
+      });
+    }
+
+    const vendedor = await prisma.vendedor.findUnique({
+      where: {
+        VendedorID: user.vendedorId
+      },
+      include: {
+        empresa: {
+          select: {
+            Nome: true,
+            Documento: true,
+            Telefone: true,
+            Email: true
+          }
+        },
+        _count: {
+          select: {
+            produtos: true,
+            clientesVendedor: true
+          }
+        }
+      }
+    });
+
+    // Buscar informações do cliente associado ao vendedor
+    const cliente = await prisma.cliente.findUnique({
+      where: {
+        Email: vendedor.Email
+      },
+      select: {
+        CPF_CNPJ: true,
+        TelefoneFixo: true,
+        TelefoneCelular: true,
+        Whatsapp: true,
+        RazaoSocial: true,
+        InscricaoEstadual: true,
+        InscricaoMunicipal: true,
+        enderecos: {
+          select: {
+            EnderecoID: true,
+            Nome: true,
+            CEP: true,
+            Cidade: true,
+            UF: true,
+            Numero: true,
+            Bairro: true,
+            Complemento: true
+          }
+        }
+      }
+    });
+
+    if (!vendedor) {
+      return res.status(404).json({
+        success: false,
+        errors: ["Vendedor não encontrado"]
+      });
+    }
+
+    // Calcular estatísticas
+    const clientesComPedidos = await prisma.clienteVendedor.findMany({
+      where: {
+        VendedorID: user.vendedorId
+      },
+      include: {
+        cliente: {
+          include: {
+            pedidos: {
+              where: {
+                Status: 'Entregue'
+              },
+              select: {
+                Total: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    const totalPedidos = clientesComPedidos.reduce((acc, cv) => {
+      return acc + cv.cliente.pedidos.length;
+    }, 0);
+
+    const totalVendas = clientesComPedidos.reduce((acc, cv) => {
+      return acc + cv.cliente.pedidos.reduce((pedidoAcc, pedido) => pedidoAcc + pedido.Total, 0);
+    }, 0);
+
+    res.json({
+      success: true,
+      vendedor: {
+        VendedorID: vendedor.VendedorID,
+        Nome: vendedor.Nome,
+        Email: vendedor.Email,
+        CriadoEm: vendedor.CriadoEm,
+        Ativo: vendedor.Ativo,
+        empresa: vendedor.empresa,
+        cliente: cliente ? {
+          CPF_CNPJ: cliente.CPF_CNPJ,
+          TelefoneFixo: cliente.TelefoneFixo,
+          TelefoneCelular: cliente.TelefoneCelular,
+          Whatsapp: cliente.Whatsapp,
+          RazaoSocial: cliente.RazaoSocial,
+          InscricaoEstadual: cliente.InscricaoEstadual,
+          InscricaoMunicipal: cliente.InscricaoMunicipal,
+          enderecos: cliente.enderecos
+        } : null,
+        estatisticas: {
+          totalProdutos: vendedor._count.produtos,
+          totalClientes: vendedor._count.clientesVendedor,
+          totalPedidos,
+          totalVendas
+        }
+      }
+    });
+
+  } catch (error) {
+    logControllerError('buscar_perfil_vendedor', error, req);
+    res.status(500).json({
+      success: false,
+      errors: ["Erro interno do servidor"]
+    });
+  }
+};
+
 // Excluir vendedor (soft delete)
 export const excluirVendedor = async (req, res) => {
   try {

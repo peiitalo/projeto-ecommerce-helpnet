@@ -1,6 +1,7 @@
 // backend/src/controllers/produtoController.js
 import prisma from "../config/prisma.js";
 import { logControllerError, logger } from "../utils/logger.js";
+import { sendVendorLowStockEmail } from "../services/emailService.js";
 
 /**
  * Lista produtos com filtros opcionais de categoria, status e busca.
@@ -334,8 +335,49 @@ export const atualizarProduto = async (req, res) => {
         ...(data.imagens !== undefined && { Imagens: data.imagens }),
         ...(data.ativo !== undefined && { Ativo: data.ativo }),
       },
-      include: { categoria: true, vendedor: { select: { VendedorID: true, Nome: true } } },
+      include: {
+        categoria: true,
+        vendedor: {
+          select: {
+            VendedorID: true,
+            Nome: true,
+            Email: true
+          }
+        }
+      },
     });
+
+    // Verificar se estoque ficou baixo e enviar alerta para vendedor
+    if (data.estoque !== undefined && produto.vendedor && produto.Estoque <= 5) {
+      try {
+        // Calcular vendas recentes (últimos 30 dias)
+        const trintaDiasAtras = new Date();
+        trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
+
+        const vendasRecentes = await prisma.itensPedido.count({
+          where: {
+            ProdutoID: produto.ProdutoID,
+            pedido: {
+              DataPedido: {
+                gte: trintaDiasAtras
+              }
+            }
+          }
+        });
+
+        await sendVendorLowStockEmail({
+          vendedorNome: produto.vendedor.Nome,
+          email: produto.vendedor.Email,
+          produtoNome: produto.Nome,
+          estoqueAtual: produto.Estoque,
+          vendasRecentes
+        });
+        logger.info('email_estoque_baixo_enviado', { produtoId: produto.ProdutoID, vendedorId: produto.vendedor.VendedorID });
+      } catch (emailError) {
+        logger.warn('erro_email_estoque_baixo', { produtoId: produto.ProdutoID, error: emailError.message });
+        // Não falhar a atualização por erro no email
+      }
+    }
 
     logger.info('atualizar_produto_ok', { id: produto.ProdutoID });
     res.json(produto);

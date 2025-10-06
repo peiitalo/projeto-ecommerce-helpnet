@@ -3,6 +3,7 @@ import prisma from "../config/prisma.js";
 import { logControllerError, logger } from "../utils/logger.js";
 import paymentService from "../services/paymentService.js";
 import { calcularFrete } from "../services/freightService.js";
+import { sendOrderConfirmationEmail, sendDeliveryStatusEmail, sendVendorNewSaleEmail } from "../services/emailService.js";
 
 export const criarPedido = async (req, res) => {
   try {
@@ -157,6 +158,35 @@ export const criarPedido = async (req, res) => {
       }
     });
 
+    // Validar métodos de pagamento antes da transação (evita timeout do pool de conexões)
+    const metodosValidados = [];
+    for (const metodo of metodosPagamento) {
+      // Mapear tipos do frontend para nomes do banco
+      const tipoMapeado = {
+        'pix': 'PIX',
+        'cartao': 'Cartão de Crédito',
+        'debito': 'Cartão de Débito',
+        'boleto': 'Boleto Bancário'
+      }[metodo.tipo] || metodo.tipo;
+
+      // Verificar se método de pagamento existe
+      const metodoPagamento = await prisma.metodoPagamento.findFirst({
+        where: { Nome: tipoMapeado, Ativo: true }
+      });
+
+      if (!metodoPagamento) {
+        return res.status(400).json({
+          success: false,
+          errors: [`Método de pagamento ${metodo.tipo} não encontrado`]
+        });
+      }
+
+      metodosValidados.push({
+        metodoPagamento,
+        valor: parseFloat(metodo.valor)
+      });
+    }
+
     // Criar pedido em transação
     const resultado = await prisma.$transaction(async (tx) => {
       // Criar pedido com expiração e status de pagamento inicial
@@ -195,36 +225,20 @@ export const criarPedido = async (req, res) => {
         });
       }
 
-      // Salvar distribuição de pagamento (não cria pagamento ainda)
-      for (const metodo of metodosPagamento) {
-        // Mapear tipos do frontend para nomes do banco
-        const tipoMapeado = {
-          'pix': 'PIX',
-          'cartao': 'Cartão de Crédito',
-          'boleto': 'Boleto Bancário'
-        }[metodo.tipo] || metodo.tipo;
-
-        // Verificar se método de pagamento existe (usar prisma global pois métodos são dados estáticos)
-        const metodoPagamento = await prisma.metodoPagamento.findFirst({
-          where: { Nome: tipoMapeado, Ativo: true }
-        });
-
-        if (!metodoPagamento) {
-          throw new Error(`Método de pagamento ${metodo.tipo} não encontrado`);
-        }
-
+      // Salvar distribuição de pagamento (usando métodos já validados)
+      for (const metodoValidado of metodosValidados) {
         await tx.distribuicaoPagamentoPedido.create({
           data: {
             PedidoID: pedido.PedidoID,
-            MetodoID: metodoPagamento.MetodoID,
-            ValorAlocado: parseFloat(metodo.valor),
+            MetodoID: metodoValidado.metodoPagamento.MetodoID,
+            ValorAlocado: metodoValidado.valor,
             ValorPagoAcumulado: 0
           }
         });
       }
 
       return pedido;
-    });
+    }, { timeout: 15000 }); // Increase timeout to 15 seconds
 
     // Não cria preferências externas aqui. Fluxo será a tela de pagamento interna por método.
     let paymentPreference = null;
@@ -252,6 +266,31 @@ export const criarPedido = async (req, res) => {
       // Não falhar o pedido por erro de roteamento
     }
 
+    // Enviar email de confirmação de pedido
+    try {
+      await sendOrderConfirmationEmail({
+        clienteNome: clienteData.NomeCompleto,
+        email: clienteData.Email,
+        pedidoId: resultado.PedidoID,
+        dataPedido: new Date().toLocaleDateString('pt-BR'),
+        metodoPagamento: metodosPagamento.map(m => m.tipo).join(', '),
+        enderecoEntrega: `${enderecoData.Cidade}, ${enderecoData.UF}`,
+        produtos: itensComPreco.map(item => ({
+          nome: item.nome,
+          quantidade: item.quantidade,
+          precoUnitario: item.precoUnitario.toFixed(2),
+          subtotal: item.subtotal.toFixed(2)
+        })),
+        subtotal: totalItens.toFixed(2),
+        frete: valorFrete.toFixed(2),
+        total: totalPedido.toFixed(2)
+      });
+      logger.info('email_confirmacao_pedido_enviado', { pedidoId: resultado.PedidoID });
+    } catch (emailError) {
+      logger.warn('erro_email_confirmacao_pedido', { pedidoId: resultado.PedidoID, error: emailError.message });
+      // Não falhar o pedido por erro no email
+    }
+
     logger.info('criar_pedido_ok', {
       pedidoId: resultado.PedidoID,
       clienteId: user.id,
@@ -275,6 +314,7 @@ export const criarPedido = async (req, res) => {
 
   } catch (error) {
     logControllerError('criar_pedido_error', error, req);
+    console.error('Erro ao criar pedido:', error.message);
     res.status(500).json({
       success: false,
       errors: ["Erro interno do servidor"]
@@ -362,6 +402,27 @@ async function rotearPedidoParaVendedores(pedidoId, clienteId, itensComPreco) {
           VendedorID: vendedorId
         }
       });
+
+      // Enviar email para o vendedor sobre nova venda
+      try {
+        await sendVendorNewSaleEmail({
+          vendedorNome: dados.vendedor.Nome,
+          email: dados.vendedor.Email,
+          pedidoId,
+          dataPedido: new Date().toLocaleDateString('pt-BR'),
+          produtos: dados.produtos.map(p => ({
+            nome: p.produto.Nome,
+            quantidade: p.quantidade,
+            precoUnitario: p.precoUnitario.toFixed(2),
+            subtotal: p.subtotal.toFixed(2)
+          })),
+          valorTotal: dados.valorTotal.toFixed(2)
+        });
+        logger.info('email_nova_venda_enviado', { pedidoId, vendedorId });
+      } catch (emailError) {
+        logger.warn('erro_email_nova_venda', { pedidoId, vendedorId, error: emailError.message });
+        // Não falhar o pedido por erro no email
+      }
 
       logger.info('pedido_roteado_vendedor', {
         pedidoId,
@@ -781,3 +842,337 @@ export const listarPedidosVendedor = async (req, res) => {
     res.status(500).json({ error: "Erro ao listar pedidos do vendedor" });
   }
 };
+
+// Funções para administradores
+export const listarPedidosAdmin = async (req, res) => {
+  try {
+    const { user } = req;
+    const { pagina = 1, limit = 10, status, cliente, dataInicio, dataFim } = req.query;
+    const skip = (pagina - 1) * limit;
+
+    // Verificar se o usuário é administrador
+    if (user.role !== 'admin' && user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        errors: ["Acesso negado. Apenas administradores podem acessar esta funcionalidade."]
+      });
+    }
+
+    // Construir filtros
+    const whereClause = {};
+
+    if (status) {
+      whereClause.Status = status;
+    }
+
+    if (cliente) {
+      whereClause.ClienteID = parseInt(cliente);
+    }
+
+    if (dataInicio || dataFim) {
+      whereClause.DataPedido = {};
+      if (dataInicio) {
+        whereClause.DataPedido.gte = new Date(dataInicio);
+      }
+      if (dataFim) {
+        whereClause.DataPedido.lte = new Date(dataFim);
+      }
+    }
+
+    const [pedidos, total] = await prisma.$transaction([
+      prisma.pedido.findMany({
+        where: whereClause,
+        select: {
+          PedidoID: true,
+          DataPedido: true,
+          Status: true,
+          Total: true,
+          Frete: true,
+          TotalPago: true,
+          StatusPagamento: true,
+          ExpiraEm: true,
+          cliente: {
+            select: {
+              NomeCompleto: true,
+              Email: true
+            }
+          },
+          itensPedido: {
+            select: {
+              Quantidade: true,
+              PrecoUnitario: true,
+              produto: {
+                select: {
+                  Nome: true,
+                  SKU: true,
+                  vendedor: {
+                    select: {
+                      Nome: true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          pagamentosPedido: {
+            select: {
+              ValorPago: true,
+              StatusPagamento: true,
+              DataPagamento: true,
+              MetodoPagamento: {
+                select: { Nome: true }
+              }
+            }
+          }
+        },
+        orderBy: { DataPedido: 'desc' },
+        skip,
+        take: parseInt(limit)
+      }),
+      prisma.pedido.count({ where: whereClause })
+    ]);
+
+    logger.info('listar_pedidos_admin_ok', { adminId: user.id, total });
+    res.json({
+      success: true,
+      pedidos,
+      total,
+      pagina: parseInt(pagina),
+      limit: parseInt(limit)
+    });
+
+  } catch (error) {
+    logControllerError('listar_pedidos_admin_error', error, req);
+    res.status(500).json({
+      success: false,
+      errors: ["Erro ao listar pedidos"]
+    });
+  }
+};
+
+export const atualizarStatusPedidoAdmin = async (req, res) => {
+  try {
+    const { user } = req;
+    const { id } = req.params;
+    const { status, observacoes } = req.body;
+
+    // Verificar se o usuário é administrador
+    if (user.role !== 'admin' && user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        errors: ["Acesso negado. Apenas administradores podem alterar status de pedidos."]
+      });
+    }
+
+    // Validar status
+    const statusValidos = [
+      'AguardandoPagamento', 'PagamentoIniciado', 'Pago', 'EmProcessamento',
+      'Enviado', 'Entregue', 'Cancelado', 'Reembolsado'
+    ];
+
+    if (!statusValidos.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        errors: [`Status inválido. Valores permitidos: ${statusValidos.join(', ')}`]
+      });
+    }
+
+    // Buscar pedido
+    const pedido = await prisma.pedido.findUnique({
+      where: { PedidoID: parseInt(id) },
+      include: {
+        cliente: {
+          select: {
+            NomeCompleto: true,
+            Email: true
+          }
+        }
+      }
+    });
+
+    if (!pedido) {
+      return res.status(404).json({
+        success: false,
+        errors: ["Pedido não encontrado"]
+      });
+    }
+
+    // Atualizar status do pedido
+    const pedidoAtualizado = await prisma.pedido.update({
+      where: { PedidoID: parseInt(id) },
+      data: { Status: status }
+    });
+
+    // Criar notificação para o cliente sobre a mudança de status
+    await prisma.notificacao.create({
+      data: {
+        Titulo: 'Status do Pedido Atualizado',
+        Mensagem: `O status do seu pedido #${id} foi alterado para: ${getStatusDescription(status)}${observacoes ? `. Observações: ${observacoes}` : ''}`,
+        Tipo: 'info',
+        ClienteID: pedido.ClienteID
+      }
+    });
+
+    // Enviar email de atualização de status para o cliente
+    try {
+      await sendDeliveryStatusEmail({
+        clienteNome: pedido.cliente.NomeCompleto,
+        email: pedido.cliente.Email,
+        pedidoId: id,
+        status: getStatusDescription(status),
+        dataAtualizacao: new Date().toLocaleDateString('pt-BR'),
+        showTrackingButton: ['Enviado', 'EmProcessamento', 'Entregue'].includes(status),
+        isDelivered: status === 'Entregue'
+      });
+      logger.info('email_status_pedido_admin_enviado', { pedidoId: id, status });
+    } catch (emailError) {
+      logger.warn('erro_email_status_pedido_admin', { pedidoId: id, status, error: emailError.message });
+      // Não falhar a atualização por erro no email
+    }
+
+    // Se o pedido foi cancelado, devolver itens ao estoque
+    if (status === 'Cancelado' && pedido.Status !== 'Cancelado') {
+      const itensPedido = await prisma.itensPedido.findMany({
+        where: { PedidoID: parseInt(id) }
+      });
+
+      for (const item of itensPedido) {
+        await prisma.produto.update({
+          where: { ProdutoID: item.ProdutoID },
+          data: { Estoque: { increment: item.Quantidade } }
+        });
+      }
+    }
+
+    logger.info('atualizar_status_pedido_admin_ok', {
+      adminId: user.id,
+      pedidoId: id,
+      statusAnterior: pedido.Status,
+      statusNovo: status
+    });
+
+    res.json({
+      success: true,
+      message: 'Status do pedido atualizado com sucesso',
+      pedido: pedidoAtualizado
+    });
+
+  } catch (error) {
+    logControllerError('atualizar_status_pedido_admin_error', error, req);
+    res.status(500).json({
+      success: false,
+      errors: ["Erro interno do servidor"]
+    });
+  }
+};
+
+export const buscarPedidoAdmin = async (req, res) => {
+  try {
+    const { user } = req;
+    const { id } = req.params;
+
+    // Verificar se o usuário é administrador
+    if (user.role !== 'admin' && user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        errors: ["Acesso negado. Apenas administradores podem acessar esta funcionalidade."]
+      });
+    }
+
+    const pedido = await prisma.pedido.findUnique({
+      where: { PedidoID: parseInt(id) },
+      select: {
+        PedidoID: true,
+        DataPedido: true,
+        Status: true,
+        Total: true,
+        Frete: true,
+        TotalPago: true,
+        StatusPagamento: true,
+        ExpiraEm: true,
+        cliente: {
+          select: {
+            ClienteID: true,
+            NomeCompleto: true,
+            Email: true,
+            CPF_CNPJ: true
+          }
+        },
+        itensPedido: {
+          select: {
+            Quantidade: true,
+            PrecoUnitario: true,
+            produto: {
+              select: {
+                ProdutoID: true,
+                Nome: true,
+                SKU: true,
+                vendedor: {
+                  select: {
+                    Nome: true
+                  }
+                }
+              }
+            }
+          }
+        },
+        pagamentosPedido: {
+          select: {
+            ValorPago: true,
+            StatusPagamento: true,
+            DataPagamento: true,
+            MetodoPagamento: {
+              select: { Nome: true }
+            }
+          }
+        },
+        Endereco: {
+          select: {
+            Nome: true,
+            Complemento: true,
+            CEP: true,
+            Cidade: true,
+            UF: true,
+            Bairro: true,
+            Numero: true
+          }
+        }
+      }
+    });
+
+    if (!pedido) {
+      return res.status(404).json({
+        success: false,
+        errors: ["Pedido não encontrado"]
+      });
+    }
+
+    logger.info('buscar_pedido_admin_ok', { adminId: user.id, pedidoId: id });
+    res.json({
+      success: true,
+      pedido
+    });
+
+  } catch (error) {
+    logControllerError('buscar_pedido_admin_error', error, req);
+    res.status(500).json({
+      success: false,
+      errors: ["Erro interno do servidor"]
+    });
+  }
+};
+
+// Função auxiliar para descrições de status
+function getStatusDescription(status) {
+  const descriptions = {
+    'AguardandoPagamento': 'Aguardando pagamento',
+    'PagamentoIniciado': 'Pagamento iniciado',
+    'Pago': 'Pago',
+    'EmProcessamento': 'Em processamento',
+    'Enviado': 'Enviado',
+    'Entregue': 'Entregue',
+    'Cancelado': 'Cancelado',
+    'Reembolsado': 'Reembolsado'
+  };
+  return descriptions[status] || status;
+}

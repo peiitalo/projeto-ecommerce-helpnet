@@ -1,6 +1,7 @@
 // backend/src/controllers/entregaController.js
 import prisma from "../config/prisma.js";
 import { logControllerError, logger } from "../utils/logger.js";
+import { sendDeliveryStatusEmail } from "../services/emailService.js";
 
 export const criarEntrega = async (req, res) => {
   try {
@@ -185,6 +186,26 @@ export const atualizarStatusEntrega = async (req, res) => {
       }
     });
 
+    // Enviar email de atualização de entrega para o cliente
+    try {
+      await sendDeliveryStatusEmail({
+        clienteNome: entrega.pedido.cliente.NomeCompleto,
+        email: entrega.pedido.cliente.Email,
+        pedidoId: entrega.PedidoID,
+        status: getStatusDescription(status),
+        codigoRastreio: entrega.CodigoRastreio,
+        previsaoEntrega: entrega.PrevisaoEntrega ? new Date(entrega.PrevisaoEntrega).toLocaleDateString('pt-BR') : null,
+        local: local || 'Centro de distribuição',
+        dataAtualizacao: new Date().toLocaleDateString('pt-BR'),
+        showTrackingButton: ['Enviado', 'EmTransito', 'Entregue'].includes(status),
+        isDelivered: status === 'Entregue'
+      });
+      logger.info('email_status_entrega_enviado', { entregaId, status });
+    } catch (emailError) {
+      logger.warn('erro_email_status_entrega', { entregaId, status, error: emailError.message });
+      // Não falhar a atualização por erro no email
+    }
+
     logger.info('status_entrega_atualizado', {
       entregaId,
       novoStatus: status,
@@ -305,6 +326,14 @@ export const buscarEntregaVendedor = async (req, res) => {
             }
           }
         }
+      },
+      include: {
+        cliente: {
+          select: {
+            NomeCompleto: true,
+            Email: true
+          }
+        }
       }
     });
 
@@ -315,12 +344,43 @@ export const buscarEntregaVendedor = async (req, res) => {
       });
     }
 
-    // Buscar entrega do pedido
+    // Buscar entrega do pedido com informações completas
     const entrega = await prisma.entrega.findFirst({
       where: {
         PedidoID: parseInt(pedidoId)
       },
       include: {
+        pedido: {
+          include: {
+            cliente: {
+              select: {
+                NomeCompleto: true,
+                Email: true,
+                TelefoneCelular: true
+              }
+            },
+            Endereco: {
+              select: {
+                Cidade: true,
+                UF: true,
+                Bairro: true,
+                Numero: true,
+                Complemento: true
+              }
+            },
+            itensPedido: {
+              include: {
+                produto: {
+                  select: {
+                    Nome: true,
+                    Preco: true,
+                    Imagens: true
+                  }
+                }
+              }
+            }
+          }
+        },
         rastreamentos: {
           orderBy: { DataHora: 'desc' }
         }
@@ -372,7 +432,7 @@ export const atualizarStatusEntregaPorPedido = async (req, res) => {
     }
 
     // Validar status
-    const statusValidos = ['AguardandoEnvio', 'EmTransito', 'SaiuParaEntrega', 'Entregue', 'Cancelado'];
+    const statusValidos = ['AguardandoEnvio', 'Enviado', 'EmTransito', 'SaiuParaEntrega', 'Entregue', 'Cancelado'];
     if (!statusValidos.includes(status)) {
       return res.status(400).json({
         success: false,
@@ -389,6 +449,14 @@ export const atualizarStatusEntregaPorPedido = async (req, res) => {
             produto: {
               VendedorID: user.vendedorId
             }
+          }
+        }
+      },
+      include: {
+        cliente: {
+          select: {
+            NomeCompleto: true,
+            Email: true
           }
         }
       }
@@ -446,6 +514,26 @@ export const atualizarStatusEntregaPorPedido = async (req, res) => {
       }
     });
 
+    // Enviar email de atualização de entrega para o cliente
+    try {
+      await sendDeliveryStatusEmail({
+        clienteNome: pedido.cliente?.NomeCompleto || 'Cliente',
+        email: pedido.cliente?.Email,
+        pedidoId: pedidoId,
+        status: getStatusDescription(status),
+        codigoRastreio: entrega.CodigoRastreio,
+        previsaoEntrega: entrega.PrevisaoEntrega ? new Date(entrega.PrevisaoEntrega).toLocaleDateString('pt-BR') : null,
+        local: 'Atualizado pelo vendedor',
+        dataAtualizacao: new Date().toLocaleDateString('pt-BR'),
+        showTrackingButton: ['Enviado', 'EmTransito', 'Entregue'].includes(status),
+        isDelivered: status === 'Entregue'
+      });
+      logger.info('email_status_entrega_por_pedido_enviado', { pedidoId, status });
+    } catch (emailError) {
+      logger.warn('erro_email_status_entrega_por_pedido', { pedidoId, status, error: emailError.message });
+      // Não falhar a atualização por erro no email
+    }
+
     logger.info('status_entrega_atualizado_por_pedido', {
       pedidoId,
       novoStatus: status,
@@ -498,7 +586,7 @@ export const listarEntregasVendedor = async (req, res) => {
           ]
         })
       },
-      ...(status && { StatusEntrega: status })
+      ...(status && status !== 'undefined' && { StatusEntrega: status })
     };
 
     const [entregas, total] = await prisma.$transaction([
@@ -537,7 +625,7 @@ export const listarEntregasVendedor = async (req, res) => {
       success: true,
       entregas,
       total,
-      pagina: parseInt(pagina),
+      pagina: parseInt(page),
       limit: parseInt(limit)
     });
 

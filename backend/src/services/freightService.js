@@ -178,10 +178,43 @@ function calcularValorFrete(distanciaKm) {
 }
 
 /**
- * Calcula o frete entre vendedor e cliente
+ * Calcula o prazo de entrega baseado na distância e tipo de frete
+ * @param {number} distanciaKm - Distância em quilômetros
+ * @param {string} tipo - Tipo de frete (pac, sedex, transportadora)
+ * @returns {string} Prazo de entrega
+ */
+function calcularPrazoEntrega(distanciaKm, tipo) {
+  let diasBase;
+
+  switch (tipo) {
+    case 'sedex':
+      diasBase = 1;
+      break;
+    case 'transportadora':
+      diasBase = 2;
+      break;
+    case 'pac':
+    default:
+      diasBase = 3;
+      break;
+  }
+
+  // Adiciona dias baseado na distância
+  const diasAdicionais = Math.floor(distanciaKm / 100); // 1 dia a cada 100km
+  const diasTotais = diasBase + diasAdicionais;
+
+  if (diasTotais === 1) {
+    return '1 dia útil';
+  }
+
+  return `${diasTotais} dias úteis`;
+}
+
+/**
+ * Calcula opções de frete entre vendedor e cliente
  * @param {string} cepVendedor - CEP do vendedor
  * @param {string} cepCliente - CEP do cliente
- * @returns {Object} Objeto com valor do frete e detalhes do cálculo
+ * @returns {Array} Array com opções de frete disponíveis
  */
 export function calcularFrete(cepVendedor, cepCliente) {
   try {
@@ -190,28 +223,46 @@ export function calcularFrete(cepVendedor, cepCliente) {
     }
 
     const distanciaKm = calcularDistanciaPorCEP(cepVendedor, cepCliente);
-    const valorFrete = calcularValorFrete(distanciaKm);
 
-    const resultado = {
-      valorFrete,
-      distanciaKm,
-      detalhes: {
-        freteBase: FREIGHT_CONFIG.FRETE_BASE,
-        taxaPorKm: FREIGHT_CONFIG.TAXA_POR_KM,
-        distanciaMinima: FREIGHT_CONFIG.DISTANCIA_MINIMA,
-        cepOrigem: cepVendedor,
-        cepDestino: cepCliente
+    // Opções de frete disponíveis
+    const opcoesFrete = [
+      {
+        id: 'correios-pac',
+        nome: 'PAC',
+        transportadora: 'Correios',
+        valor: calcularValorFrete(distanciaKm),
+        prazo: calcularPrazoEntrega(distanciaKm, 'pac'),
+        descricao: 'Entrega econômica',
+        ativo: true
+      },
+      {
+        id: 'correios-sedex',
+        nome: 'SEDEX',
+        transportadora: 'Correios',
+        valor: calcularValorFrete(distanciaKm) * 1.5, // 50% mais caro
+        prazo: calcularPrazoEntrega(distanciaKm, 'sedex'),
+        descricao: 'Entrega expressa',
+        ativo: true
+      },
+      {
+        id: 'transportadora',
+        nome: 'Transportadora',
+        transportadora: 'Transportadora Parceira',
+        valor: calcularValorFrete(distanciaKm) * 1.2, // 20% mais caro
+        prazo: calcularPrazoEntrega(distanciaKm, 'transportadora'),
+        descricao: 'Entrega por transportadora',
+        ativo: true
       }
-    };
+    ];
 
     logger.info('frete_calculado_sucesso', {
       cepVendedor,
       cepCliente,
       distanciaKm,
-      valorFrete
+      opcoes: opcoesFrete.length
     });
 
-    return resultado;
+    return opcoesFrete;
   } catch (error) {
     logger.error('erro_calculo_frete', {
       cepVendedor,
@@ -219,19 +270,17 @@ export function calcularFrete(cepVendedor, cepCliente) {
       error: error.message
     });
 
-    // Retorna frete padrão em caso de erro
-    return {
-      valorFrete: FREIGHT_CONFIG.FRETE_BASE,
-      distanciaKm: FREIGHT_CONFIG.DISTANCIA_MINIMA,
-      detalhes: {
-        freteBase: FREIGHT_CONFIG.FRETE_BASE,
-        taxaPorKm: FREIGHT_CONFIG.TAXA_POR_KM,
-        distanciaMinima: FREIGHT_CONFIG.DISTANCIA_MINIMA,
-        cepOrigem: cepVendedor,
-        cepDestino: cepCliente,
-        erro: error.message
-      }
-    };
+    // Retorna opção padrão em caso de erro
+    return [{
+      id: 'padrao',
+      nome: 'Frete Padrão',
+      transportadora: 'Correios',
+      valor: FREIGHT_CONFIG.FRETE_BASE,
+      prazo: '3-5 dias úteis',
+      descricao: 'Entrega padrão',
+      ativo: true,
+      erro: error.message
+    }];
   }
 }
 

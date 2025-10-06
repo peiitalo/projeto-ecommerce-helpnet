@@ -1,4 +1,5 @@
 // backend/src/index.js
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import clienteRoutes from './routes/clienteRoutes.js';
@@ -19,6 +20,7 @@ import vendedorRoutes from './routes/vendedorRoutes.js';
 import relatoriosRoutes from './routes/relatoriosRoutes.js';
 import vendorRoutes from './routes/vendorRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 import { logger, requestLogger } from './utils/logger.js';
 // Middlewares de erro centralizados
 import { notFound, errorHandler } from './middleware/errorHandler.js';
@@ -104,6 +106,7 @@ app.use('/api/vendedor/vendedores', vendedorRoutes);
 app.use('/api/vendedor/relatorios', relatoriosRoutes);
 app.use('/api/vendedor', vendorRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Helper: healthcheck simples
 app.get('/api/health', (req, res) => res.json({ ok: true }));

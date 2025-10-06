@@ -1,0 +1,20 @@
+<p>Olá, {{vendedorNome}}!</p>
+
+<p><strong>Alerta de Estoque Baixo</strong></p>
+
+<p>O produto abaixo está com estoque baixo e precisa ser reabastecido:</p>
+
+<div class="order-details">
+  <p><strong>Produto:</strong> {{produtoNome}}</p>
+  <p><strong>Estoque Atual:</strong> {{estoqueAtual}} unidades</p>
+  <p><strong>Vendas Recentes:</strong> {{vendasRecentes}} unidades</p>
+</div>
+
+<p>Recomendamos reabastecer o estoque o mais breve possível para evitar interrupções nas vendas.</p>
+
+<div style="text-align: center; margin: 30px 0;">
+  <a href="{{frontendUrl}}/vendedor/produtos" class="button">Gerenciar Produtos</a>
+</div>
+
+<p>Atenciosamente,<br>
+Equipe HelpNet</p>

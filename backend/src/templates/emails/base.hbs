@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}}</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #f4f4f4;
+      padding: 20px;
+    }
+    .email-container {
+      background-color: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .header {
+      background-color: #2563eb;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: bold;
+    }
+    .body {
+      padding: 30px;
+    }
+    .footer {
+      background-color: #f8f9fa;
+      padding: 20px;
+      text-align: center;
+      font-size: 14px;
+      color: #666;
+      border-top: 1px solid #e9ecef;
+    }
+    .button {
+      display: inline-block;
+      background-color: #2563eb;
+      color: white;
+      padding: 12px 24px;
+      text-decoration: none;
+      border-radius: 6px;
+      margin: 10px 0;
+      font-weight: bold;
+    }
+    .button:hover {
+      background-color: #1d4ed8;
+    }
+    .product-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+    }
+    .product-table th,
+    .product-table td {
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid #e9ecef;
+    }
+    .product-table th {
+      background-color: #f8f9fa;
+      font-weight: bold;
+    }
+    .total-row {
+      font-weight: bold;
+      background-color: #f8f9fa;
+    }
+    .order-details {
+      background-color: #f8f9fa;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 20px 0;
+    }
+    .order-details p {
+      margin: 5px 0;
+    }
+    @media (max-width: 600px) {
+      body {
+        padding: 10px;
+      }
+      .header, .body, .footer {
+        padding: 15px;
+      }
+      .header h1 {
+        font-size: 20px;
+      }
+      .product-table {
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="header">
+      <h1>{{title}}</h1>
+    </div>
+    <div class="body">
+      {{{body}}}
+    </div>
+    <div class="footer">
+      <p>Se precisar de ajuda, contate-nos em <a href="mailto:suporte@helpnet.com">suporte@helpnet.com</a></p>
+      {{#if showUnsubscribe}}
+      <p><a href="{{unsubscribeLink}}">Cancelar inscrição</a></p>
+      {{/if}}
+      <p>&copy; 2024 HelpNet. Todos os direitos reservados.</p>
+    </div>
+  </div>
+</body>
+</html>
