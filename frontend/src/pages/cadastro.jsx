@@ -17,7 +17,7 @@ import {
   FiCheckCircle,
   FiLoader,
 } from "react-icons/fi";
-import { InputMask } from "@react-input/mask";
+import InputMask from "react-input-mask";
 import InputSenha from "../components/cadastro/InputSenha";
 import InputConfirmarSenha from "../components/cadastro/InputConfirmarSenha";
 import {
@@ -625,8 +625,7 @@ function Cadastro() {
             <div className={classeGrupoInput}>
               <FaMapMarkerAlt className={classeIconeInput} />
               <InputMask
-                mask="_____-___"
-                replacement={{ _: /\d/ }}
+                mask="99999-999"
                 value={dadosFormulario.cep}
                 onChange={lidarComAlteracao}
                 name="cep"
@@ -739,8 +738,7 @@ function Cadastro() {
                 <div className={classeGrupoInput}>
                   <FaMapMarkerAlt className={classeIconeInput} />
                   <InputMask
-                    mask="_____-___"
-                    replacement={{ _: /\d/ }}
+                    mask="99999-999"
                     value={dadosFormulario.cepCobranca}
                     onChange={lidarComAlteracao}
                     name="cepCobranca"
