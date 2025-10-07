@@ -1,6 +1,7 @@
 // backend/src/controllers/avaliacaoController.js
 import prisma from '../config/prisma.js';
 import { logControllerError } from '../utils/logger.js';
+import { enviarNotificacaoAvaliacao } from '../services/emailService.js';
 
 export const listarPorProduto = async (req, res) => {
   try {
@@ -47,7 +48,17 @@ export const avaliar = async (req, res) => {
       return res.status(400).json({ erro: 'nota deve ser um inteiro de 1 a 5' });
     }
 
-    const produto = await prisma.produto.findUnique({ where: { ProdutoID: parseInt(produtoId) } });
+    const produto = await prisma.produto.findUnique({ 
+      where: { ProdutoID: parseInt(produtoId) },
+      include: {
+        vendedor: {
+          select: {
+            Nome: true,
+            Email: true
+          }
+        }
+      }
+    });
     if (!produto) return res.status(404).json({ erro: 'Produto não encontrado' });
 
     const avaliacao = await prisma.avaliacao.upsert({
@@ -55,6 +66,28 @@ export const avaliar = async (req, res) => {
       update: { Nota: notaInt, Comentario: comentario ?? null },
       create: { ClienteID: userId, ProdutoID: parseInt(produtoId), Nota: notaInt, Comentario: comentario ?? null },
     });
+
+    // Enviar notificação por email para o vendedor
+    try {
+      const cliente = await prisma.cliente.findUnique({ 
+        where: { ClienteID: userId },
+        select: { Nome: true }
+      });
+      
+      if (produto.vendedor && produto.vendedor.Email) {
+        await enviarNotificacaoAvaliacao(
+          produto.vendedor.Email,
+          produto.vendedor.Nome,
+          produto.Nome,
+          cliente?.Nome || 'Cliente',
+          notaInt,
+          comentario
+        );
+      }
+    } catch (emailError) {
+      console.error('Erro ao enviar notificação de avaliação:', emailError);
+      // Não falhar a operação por causa do email
+    }
 
     res.status(201).json({ avaliacao });
   } catch (error) {

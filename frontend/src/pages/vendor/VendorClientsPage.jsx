@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import VendorLayout from '../../layouts/VendorLayout';
 import { useAuth } from '../../context/AuthContext';
 import clienteVendedorApi from '../../services/clienteVendedorApi';
+import ClientDetailsModal from '../../components/ClientDetailsModal';
 import { FiUsers, FiMail, FiPhone, FiShoppingBag, FiSearch, FiEye } from 'react-icons/fi';
 
 function VendorClientsPage() {
@@ -10,6 +11,8 @@ function VendorClientsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [totalClients, setTotalClients] = useState(0);
+  const [selectedClientId, setSelectedClientId] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     loadClients();
@@ -54,6 +57,16 @@ function VendorClientsPage() {
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('pt-BR');
+  };
+
+  const handleViewDetails = (clienteId) => {
+    setSelectedClientId(clienteId);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedClientId(null);
   };
 
   const filteredClients = clients.filter(client =>
@@ -173,7 +186,10 @@ function VendorClientsPage() {
                           )}
                         </div>
 
-                        <button className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <button
+                          onClick={() => handleViewDetails(clientRelation.ClienteID)}
+                          className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        >
                           <FiEye className="w-4 h-4 mr-2" />
                           Ver Detalhes
                         </button>
@@ -197,6 +213,13 @@ function VendorClientsPage() {
             )}
           </>
         )}
+
+        {/* Client Details Modal */}
+        <ClientDetailsModal
+          clienteId={selectedClientId}
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+        />
       </div>
     </VendorLayout>
   );

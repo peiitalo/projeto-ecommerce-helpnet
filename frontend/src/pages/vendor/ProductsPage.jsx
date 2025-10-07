@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { produtoService } from '../../services/api';
 import VendorLayout from '../../components/VendorLayout.jsx';
+import { useNotifications } from '../../hooks/useNotifications';
 import {
   FaSearch,
   FaPlus,
@@ -11,16 +12,20 @@ import {
   FaTrash,
   FaBox,
   FaShoppingCart,
-  FaExclamationTriangle
+  FaExclamationTriangle,
+  FaTimes
 } from 'react-icons/fa';
 
 function VendorProductsPage() {
   const { user } = useAuth();
+  const { showSuccess, showError } = useNotifications();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const productsPerPage = 10;
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [showProductModal, setShowProductModal] = useState(false);
 
   // Statistics
   const stats = useMemo(() => {
@@ -84,9 +89,14 @@ function VendorProductsPage() {
         setProducts(prev => prev.filter(p => p.ProdutoID !== productId));
       } catch (error) {
         console.error('Erro ao excluir produto:', error);
-        alert('Erro ao excluir produto');
+        showError('Erro ao excluir produto');
       }
     }
+  };
+
+  const handleViewProduct = (product) => {
+    setSelectedProduct(product);
+    setShowProductModal(true);
   };
 
   return (
@@ -274,13 +284,13 @@ function VendorProductsPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex items-center gap-2">
-                            <Link
-                              to={`/vendedor/produtos/${product.ProdutoID}`}
+                            <button
+                              onClick={() => handleViewProduct(product)}
                               className="text-blue-600 hover:text-blue-900 p-1"
                               title="Ver"
                             >
                               <FaEye />
-                            </Link>
+                            </button>
                             <Link
                               to={`/vendedor/produtos/${product.ProdutoID}/editar`}
                               className="text-green-600 hover:text-green-900 p-1"
@@ -352,13 +362,13 @@ function VendorProductsPage() {
 
                         <div className="mt-3 flex items-center justify-between">
                           <div className="flex items-center gap-1">
-                            <Link
-                              to={`/vendedor/produtos/${product.ProdutoID}`}
+                            <button
+                              onClick={() => handleViewProduct(product)}
                               className="text-blue-600 hover:text-blue-900 p-2"
                               title="Ver"
                             >
                               <FaEye className="text-sm" />
-                            </Link>
+                            </button>
                             <Link
                               to={`/vendedor/produtos/${product.ProdutoID}/editar`}
                               className="text-green-600 hover:text-green-900 p-2"
@@ -416,6 +426,79 @@ function VendorProductsPage() {
           )}
         </div>
       </div>
+
+      {/* Product Details Modal */}
+      {showProductModal && selectedProduct && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Detalhes do Produto</h2>
+                <button
+                  onClick={() => setShowProductModal(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <FaTimes className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Image */}
+                <div className="space-y-4">
+                  <img
+                    src={selectedProduct.Imagens?.[0] || '/placeholder-image.svg'}
+                    alt={selectedProduct.Nome}
+                    className="w-full h-64 object-cover rounded-lg"
+                  />
+                </div>
+
+                {/* Details */}
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900">{selectedProduct.Nome}</h3>
+                    <p className="text-sm text-gray-600">SKU: {selectedProduct.SKU || 'N/A'}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {formatPrice(selectedProduct.Preco)}
+                    </p>
+                    <p className="text-sm text-gray-600">Estoque: {selectedProduct.Estoque} unidades</p>
+                    <p className="text-sm text-gray-600">Categoria: {selectedProduct.categoria?.Nome || 'Sem categoria'}</p>
+                    <p className="text-sm text-gray-600">Status: {selectedProduct.status === 'ativo' ? 'Ativo' : 'Inativo'}</p>
+                  </div>
+
+                  {selectedProduct.BreveDescricao && (
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-2">Descrição</h4>
+                      <p className="text-sm text-gray-600">{selectedProduct.BreveDescricao}</p>
+                    </div>
+                  )}
+
+                  <div className="pt-4 border-t border-gray-200">
+                    <h4 className="font-semibold text-gray-900 mb-2">Ações</h4>
+                    <div className="flex gap-2">
+                      <Link
+                        to={`/vendedor/produtos/${selectedProduct.ProdutoID}/editar`}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        onClick={() => setShowProductModal(false)}
+                      >
+                        Editar Produto
+                      </Link>
+                      <button
+                        onClick={() => setShowProductModal(false)}
+                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        Fechar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </VendorLayout>
   );
 }

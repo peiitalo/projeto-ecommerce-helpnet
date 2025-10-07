@@ -16,8 +16,17 @@ export const criarPedido = async (req, res) => {
       observacoes
     } = req.body;
 
+    logger.info('criar_pedido_iniciado', {
+      clienteId: user.id,
+      enderecoId,
+      itensCount: itens?.length,
+      metodosPagamento: metodosPagamento?.map(m => ({ tipo: m.tipo, valor: m.valor })),
+      frete
+    });
+
     // Validações
     if (!enderecoId || !itens || !Array.isArray(itens) || itens.length === 0) {
+      logger.warn('criar_pedido_validacao_falhou_endereco_itens', { clienteId: user.id });
       return res.status(400).json({
         success: false,
         errors: ["Endereço e itens são obrigatórios"]
@@ -25,6 +34,7 @@ export const criarPedido = async (req, res) => {
     }
 
     if (!metodosPagamento || !Array.isArray(metodosPagamento) || metodosPagamento.length === 0) {
+      logger.warn('criar_pedido_validacao_falhou_metodos', { clienteId: user.id });
       return res.status(400).json({
         success: false,
         errors: ["Métodos de pagamento são obrigatórios"]
@@ -129,7 +139,21 @@ export const criarPedido = async (req, res) => {
     const totalPagamentos = metodosPagamento.reduce((total, metodo) => total + parseFloat(metodo.valor), 0);
     const totalPedido = totalItens + valorFrete;
 
+    logger.info('criar_pedido_calculos', {
+      clienteId: user.id,
+      totalItens,
+      valorFrete,
+      totalPedido,
+      totalPagamentos,
+      diferenca: Math.abs(totalPagamentos - totalPedido)
+    });
+
     if (Math.abs(totalPagamentos - totalPedido) > 0.01) {
+      logger.warn('criar_pedido_total_divergente', {
+        clienteId: user.id,
+        totalPagamentos,
+        totalPedido
+      });
       return res.status(400).json({
         success: false,
         errors: [`Total dos pagamentos (R$ ${totalPagamentos.toFixed(2)}) deve ser igual ao total do pedido (R$ ${totalPedido.toFixed(2)})`]
@@ -181,9 +205,24 @@ export const criarPedido = async (req, res) => {
         });
       }
 
+      const valorMetodo = parseFloat(metodo.valor);
+
+      // Validação específica para débito: deve ser pagamento total imediato
+      if (metodo.tipo === 'debito' && Math.abs(valorMetodo - totalPedido) > 0.01) {
+        logger.warn('debito_valor_invalido', {
+          clienteId: user.id,
+          valorEnviado: valorMetodo,
+          valorEsperado: totalPedido
+        });
+        return res.status(400).json({
+          success: false,
+          errors: [`Cartão de débito deve ter o valor total do pedido (R$ ${totalPedido.toFixed(2)})`]
+        });
+      }
+
       metodosValidados.push({
         metodoPagamento,
-        valor: parseFloat(metodo.valor)
+        valor: valorMetodo
       });
     }
 
@@ -240,18 +279,73 @@ export const criarPedido = async (req, res) => {
       return pedido;
     }, { timeout: 15000 }); // Increase timeout to 15 seconds
 
-    // Não cria preferências externas aqui. Fluxo será a tela de pagamento interna por método.
-    let paymentPreference = null;
+    // Simular processamento de pagamento (mock) - marcar como pago imediatamente
+    logger.info('simulando_processamento_pagamento_mock', {
+      pedidoId: resultado.PedidoID,
+      metodos: metodosValidados.map(m => ({ tipo: m.metodoPagamento.Nome, valor: m.valor }))
+    });
+
     try {
-      // Opcionalmente, poderíamos criar preferências individuais por método no futuro.
+      // Simular aprovação de pagamento para todos os métodos
+      const dadosPagamentoFicticios = {
+        status: 'pago',
+        transactionId: `MOCK_${Date.now()}_${resultado.PedidoID}`,
+        authorizationCode: `AUTH_${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+        paymentDate: new Date().toISOString(),
+        gatewayResponse: {
+          message: 'Pagamento processado com sucesso via simulação',
+          fictitiousData: {
+            banco: 'Banco Simulado S.A.',
+            agencia: '1234',
+            conta: '56789-0',
+            comprovante: `COMP_${resultado.PedidoID}`
+          }
+        }
+      };
+
+      // Registrar pagamentos simulados no banco
+      for (const metodoValidado of metodosValidados) {
+        await prisma.pagamentosPedido.create({
+          data: {
+            PedidoID: resultado.PedidoID,
+            MetodoID: metodoValidado.metodoPagamento.MetodoID,
+            ValorPago: metodoValidado.valor,
+            StatusPagamento: 'Aprovado',
+            DataPagamento: new Date(),
+            DadosPagamento: JSON.stringify(dadosPagamentoFicticios)
+          }
+        });
+      }
+
+      // Atualizar pedido como pago
       await prisma.pedido.update({
         where: { PedidoID: resultado.PedidoID },
-        data: { Status: 'PagamentoIniciado' }
+        data: {
+          Status: 'Pago',
+          StatusPagamento: 'PAGO',
+          TotalPago: totalPedido
+        }
       });
+
+      // Notificar vendedor e criar entregas
+      await notificarVendedorPedidoPago(resultado.PedidoID);
+      await criarEntregasAutomaticas(resultado.PedidoID);
+
+      logger.info('pagamento_mock_aprovado', {
+        pedidoId: resultado.PedidoID,
+        transactionId: dadosPagamentoFicticios.transactionId,
+        totalPago: totalPedido
+      });
+
     } catch (paymentError) {
-      logger.error('erro_configurar_pagamento', {
+      logger.error('erro_processamento_pagamento_mock', {
         pedidoId: resultado.PedidoID,
         error: paymentError.message
+      });
+      // Em caso de erro no processamento mock, manter pedido como aguardando pagamento
+      await prisma.pedido.update({
+        where: { PedidoID: resultado.PedidoID },
+        data: { Status: 'AguardandoPagamento' }
       });
     }
 
@@ -299,16 +393,20 @@ export const criarPedido = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Pedido criado com sucesso',
+      message: 'Pedido criado e pago com sucesso',
       data: {
         pedidoId: resultado.PedidoID,
         total: totalPedido,
         frete: valorFrete,
         subtotal: totalItens,
-        status: 'PagamentoIniciado',
-        // Direcionar o cliente para a tela interna de pagamento do pedido
-        paymentUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/checkout/pagamento/${resultado.PedidoID}`,
-        sandboxPaymentUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/checkout/pagamento/${resultado.PedidoID}`
+        status: 'Pago',
+        // Pagamento simulado aprovado - redirecionar para página de sucesso
+        paymentUrl: null, // Não há URL de pagamento externa
+        paymentStatus: 'pago',
+        paymentData: {
+          status: 'pago',
+          message: 'Pagamento processado com sucesso via simulação'
+        }
       }
     });
 
@@ -461,6 +559,11 @@ export const listarPedidosCliente = async (req, res) => {
           TotalPago: true,
           StatusPagamento: true,
           ExpiraEm: true,
+          cliente: {
+            select: {
+              NomeCompleto: true
+            }
+          },
           itensPedido: {
             select: {
               Quantidade: true,
@@ -470,7 +573,12 @@ export const listarPedidosCliente = async (req, res) => {
                   ProdutoID: true,
                   Nome: true,
                   Imagens: true,
-                  SKU: true
+                  SKU: true,
+                  vendedor: {
+                    select: {
+                      Nome: true
+                    }
+                  }
                 }
               }
             }
@@ -488,6 +596,7 @@ export const listarPedidosCliente = async (req, res) => {
           Endereco: {
             select: {
               Nome: true,
+              Logradouro: true,
               CEP: true,
               Cidade: true,
               UF: true,
@@ -813,7 +922,8 @@ export const listarPedidosVendedor = async (req, res) => {
           cliente: {
             select: {
               NomeCompleto: true,
-              Email: true
+              Email: true,
+              TelefoneCelular: true
             }
           }
         },

@@ -590,6 +590,7 @@ export const listarEnderecos = async (req, res) => {
         UF: true,
         Numero: true,
         Bairro: true,
+        TipoEndereco: true,
       },
     });
 

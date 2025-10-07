@@ -289,11 +289,47 @@ export const enviarEmailResetSenha = async (email, resetToken) => {
   return await sendEmail(email, 'Redefinição de Senha - HelpNet', htmlContent);
 };
 
+// Função para enviar notificação de nova avaliação
+export const enviarNotificacaoAvaliacao = async (vendedorEmail, vendedorNome, produtoNome, clienteNome, nota, comentario) => {
+  try {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #2563eb;">Nova Avaliação Recebida</h2>
+        <p>Olá ${vendedorNome},</p>
+        <p>Você recebeu uma nova avaliação para o produto <strong>${produtoNome}</strong>.</p>
+        
+        <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #1e293b; margin-top: 0;">Detalhes da Avaliação</h3>
+          <p><strong>Cliente:</strong> ${clienteNome}</p>
+          <p><strong>Nota:</strong> ${nota}/5 ⭐</p>
+          ${comentario ? `<p><strong>Comentário:</strong> ${comentario}</p>` : ''}
+        </div>
+        
+        <p>Acesse sua área de vendedor para ver todas as avaliações dos seus produtos.</p>
+        
+        <div style="text-align: center; margin: 20px 0;">
+          <a href="${frontendUrl}/vendedor" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block;">Acessar Painel do Vendedor</a>
+        </div>
+        
+        <p>Atenciosamente,<br>Equipe HelpNet</p>
+      </div>
+    `;
+
+    return await sendEmail(vendedorEmail, `Nova avaliação: ${produtoNome}`, htmlContent);
+  } catch (error) {
+    console.error('Erro ao enviar notificação de avaliação:', error);
+    throw error;
+  }
+};
+
 export default {
   sendWelcomeEmail,
   sendOrderConfirmationEmail,
   sendDeliveryStatusEmail,
   sendVendorNewSaleEmail,
   sendVendorLowStockEmail,
-  enviarEmailResetSenha
+  enviarEmailResetSenha,
+  enviarNotificacaoAvaliacao
 };

@@ -5,8 +5,11 @@ import { useAuth } from '../../context/AuthContext';
 import { useNotification } from '../../context/NotificationContext';
 import LoadingSkeleton from '../../components/LoadingSkeleton';
 import LazyImage from '../../components/LazyImage';
-import { FiPlus, FiEdit, FiTrash2, FiEye, FiPackage, FiArchive, FiSearch, FiFilter, FiGrid, FiList } from 'react-icons/fi';
+import ProductDetailsModal from '../../components/ProductDetailsModal';
+import { FiPlus, FiEdit, FiTrash2, FiPackage, FiArchive, FiSearch, FiFilter, FiGrid, FiList } from 'react-icons/fi';
+import { FaEye } from 'react-icons/fa';
 import { produtoService } from '../../services/api';
+import { buildImageUrl } from '../../utils/imageUtils';
 
 function ProductsManagement() {
   const { user } = useAuth();
@@ -17,15 +20,9 @@ function ProductsManagement() {
   const [products, setProducts] = useState([]);
   const [totalProducts, setTotalProducts] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [productModalId, setProductModalId] = useState(null);
   const [showProductModal, setShowProductModal] = useState(false);
 
-  // Helper to build full image URL
-  const buildImageUrl = (imagePath) => {
-    if (!imagePath) return '/placeholder-image.svg';
-    const baseUrl = (import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:3001/api').replace('/api', '');
-    return `${baseUrl}/uploads/${imagePath}`;
-  };
 
   const [tabs, setTabs] = useState([
     { id: 'todos', label: 'Todos os Produtos', count: 0 },
@@ -42,8 +39,8 @@ function ProductsManagement() {
     { id: 'esportes', label: 'Esportes' },
   ];
 
-  const handleViewProduct = (product) => {
-    setSelectedProduct(product);
+  const handleViewProduct = (productId) => {
+    setProductModalId(productId);
     setShowProductModal(true);
   };
 
@@ -183,11 +180,11 @@ function ProductsManagement() {
             Editar
           </Link>
           <button
-            onClick={() => handleViewProduct(product)}
-            className="p-2 text-gray-600 hover:text-gray-800 border border-gray-200 rounded hover:bg-gray-50 transition-colors"
+            onClick={() => handleViewProduct(product.id)}
+            className="p-2 text-gray-600 hover:text-blue-600 border border-gray-200 rounded hover:bg-gray-50 transition-colors"
             title="Ver detalhes"
           >
-            <FiEye className="w-4 h-4" />
+            <FaEye className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -224,11 +221,11 @@ function ProductsManagement() {
             Editar
           </Link>
           <button
-            onClick={() => handleViewProduct(product)}
-            className="p-2 text-gray-600 hover:text-gray-800 border border-gray-200 rounded hover:bg-gray-50 transition-colors"
+            onClick={() => handleViewProduct(product.id)}
+            className="p-2 text-gray-600 hover:text-blue-600 border border-gray-200 rounded hover:bg-gray-50 transition-colors"
             title="Ver detalhes"
           >
-            <FiEye className="w-4 h-4" />
+            <FaEye className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -374,74 +371,14 @@ function ProductsManagement() {
       </div>
 
       {/* Product Details Modal */}
-      {showProductModal && selectedProduct && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Detalhes do Produto</h2>
-                <button
-                  onClick={() => setShowProductModal(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <FiX className="w-6 h-6" />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Image */}
-                <div className="space-y-4">
-                  <LazyImage
-                    src={selectedProduct.image}
-                    alt={selectedProduct.name}
-                    className="w-full h-64 object-cover rounded-lg"
-                    fallback="/placeholder-image.svg"
-                  />
-                </div>
-
-                {/* Details */}
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900">{selectedProduct.name}</h3>
-                    <p className="text-sm text-gray-600">SKU: {selectedProduct.sku}</p>
-                  </div>
-
-                  <div>
-                    <p className="text-2xl font-bold text-blue-600">
-                      R$ {selectedProduct.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
-                    <p className="text-sm text-gray-600">Estoque: {selectedProduct.stock} unidades</p>
-                    <p className="text-sm text-gray-600">Categoria: {selectedProduct.category}</p>
-                    <p className="text-sm text-gray-600">Status: {selectedProduct.status === 'ativo' ? 'Ativo' : 'Inativo'}</p>
-                  </div>
-
-                  <div className="pt-4 border-t border-gray-200">
-                    <h4 className="font-semibold text-gray-900 mb-2">Ações</h4>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setShowProductModal(false);
-                          // Navigate to edit page
-                          window.location.href = `/vendedor/produtos/${selectedProduct.id}/editar`;
-                        }}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        Editar Produto
-                      </button>
-                      <button
-                        onClick={() => setShowProductModal(false)}
-                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        Fechar
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <ProductDetailsModal
+        productId={productModalId}
+        isOpen={showProductModal}
+        onClose={() => {
+          setShowProductModal(false);
+          setProductModalId(null);
+        }}
+      />
     </VendorLayout>
   );
 }

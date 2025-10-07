@@ -55,6 +55,11 @@ model Cliente {
   RazaoSocial        String?
   SenhaHash          String
   DataCadastro       DateTime       @default(now())
+  // Banking data
+  Banco              String?
+  Agencia            String?
+  ContaCorrente      String?
+  TipoConta          String?        // 'corrente', 'poupanca'
   enderecos          Endereco[]
   pedidos            Pedido[]
   role               Role           @default(CLIENTE)
@@ -88,6 +93,23 @@ model Endereco {
   Pedido       Pedido[]
 
   @@map("Endereco")
+}
+
+model EnderecoVendedor {
+  EnderecoVendedorID Int      @id @default(autoincrement())
+  VendedorID         Int
+  Nome               String
+  Complemento        String?
+  CEP                String
+  CodigoIBGE         String?
+  Cidade             String
+  UF                 String
+  TipoEndereco       String   @default("Comercial")
+  Numero             String?
+  Bairro             String
+  vendedor           Vendedor @relation(fields: [VendedorID], references: [VendedorID])
+
+  @@map("EnderecoVendedor")
 }
 
 model Produto {
@@ -239,6 +261,7 @@ model Vendedor {
   produtos     Produto[]
   notificacoes Notificacao[]
   clientesVendedor ClienteVendedor[]
+  enderecosVendedor EnderecoVendedor[]
 
   @@index([EmpresaID])
   @@index([Ativo])

@@ -1,5 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import LoadingSkeleton from './components/LoadingSkeleton';
 import { NotificationProvider } from './context/NotificationContext';
 import NotificationContainer from './components/NotificationContainer';
@@ -9,6 +11,9 @@ const Login = lazy(() => import('./pages/login'));
 const Cadastro = lazy(() => import('./pages/cadastro'));
 const Dashboard = lazy(() => import('./pages/admin/dashboard'));
 const AdminOrdersPage = lazy(() => import('./pages/admin/orders'));
+const VendedoresPage = lazy(() => import('./pages/admin/VendedoresPage'));
+const FinanceiroPage = lazy(() => import('./pages/admin/FinanceiroPage'));
+const ConfiguracoesPage = lazy(() => import('./pages/admin/ConfiguracoesPage'));
 const NotFound = lazy(() => import('./pages/errors/notFound'));
 const Home = lazy(() => import('./pages/clients/home'));
 const ProductPage = lazy(() => import('./pages/clients/ProductPage'));
@@ -24,6 +29,8 @@ const HistoryPage = lazy(() => import('./pages/clients/HistoryPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const PaymentSimulator = lazy(() => import('./pages/clients/PaymentSimulator'));
 const PaymentCheckout = lazy(() => import('./pages/clients/PaymentCheckout'));
+const SuportePage = lazy(() => import('./pages/clients/SuportePage'));
+const MeusCuponsPage = lazy(() => import('./pages/clients/MeusCuponsPage'));
 const ProductsManagement = lazy(() => import('./pages/vendor/ProductsManagement'));
 const ProductForm = lazy(() => import('./pages/vendor/ProductForm'));
 const VendorDashboard = lazy(() => import('./pages/vendor/VendorDashboard'));
@@ -32,6 +39,8 @@ const VendorClientsPage = lazy(() => import('./pages/vendor/VendorClientsPage'))
 const VendorProfilePage = lazy(() => import('./pages/vendor/VendorProfilePage'));
 const VendorDeliveriesPage = lazy(() => import('./pages/vendor/VendorDeliveriesPage'));
 const VendorDeliveryDetailPage = lazy(() => import('./pages/vendor/VendorDeliveryDetailPage'));
+const RelatorioPage = lazy(() => import('./pages/vendor/RelatorioPage'));
+const VendorCuponsPage = lazy(() => import('./pages/vendor/VendorCuponsPage'));
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
 function App() {
@@ -43,6 +52,7 @@ function App() {
           {/* Público */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/home" element={<Home />} />
+          <Route path="/suporte" element={<SuportePage />} />
           <Route path="/carrinho" element={<CartPage />} />
           <Route path="/produto/:id" element={<ProductPage />} />
           <Route path="/login" element={<Login />} />
@@ -59,6 +69,7 @@ function App() {
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/meus-pedidos" element={<OrdersPage />} />
             <Route path="/historico" element={<HistoryPage />} />
+            <Route path="/cupons" element={<MeusCuponsPage />} />
             <Route path="/dashboard" element={<Dashboard />} />
             {/* demais rotas do cliente */}
           </Route>
@@ -67,6 +78,9 @@ function App() {
           <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
             <Route path="/admin" element={<Dashboard />} />
             <Route path="/admin/pedidos" element={<AdminOrdersPage />} />
+            <Route path="/vendedores" element={<VendedoresPage />} />
+            <Route path="/financeiro" element={<FinanceiroPage />} />
+            <Route path="/configuracoes" element={<ConfiguracoesPage />} />
           </Route>
 
           {/* Vendedor */}
@@ -80,6 +94,8 @@ function App() {
             <Route path="/vendedor/clientes" element={<VendorClientsPage />} />
             <Route path="/vendedor/entregas" element={<VendorDeliveriesPage />} />
             <Route path="/vendedor/entregas/:pedidoId" element={<VendorDeliveryDetailPage />} />
+            <Route path="/vendedor/cupons" element={<VendorCuponsPage />} />
+            <Route path="/relatorio" element={<RelatorioPage />} />
           </Route>
 
           {/* Demais páginas placeholder */}
@@ -99,6 +115,18 @@ function App() {
         </Routes>
         </Suspense>
         <NotificationContainer />
+        <ToastContainer
+          position="top-right"
+          autoClose={3000}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="light"
+        />
       </Router>
     </NotificationProvider>
   );
