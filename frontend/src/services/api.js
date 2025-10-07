@@ -563,6 +563,19 @@ export const vendedorService = {
   },
 };
 
+// Serviços Públicos (Landing Page)
+export const publicService = {
+  // Obter estatísticas públicas
+  obterStats: async () => {
+    return apiRequest('/public/stats');
+  },
+
+  // Obter depoimentos
+  obterDepoimentos: async () => {
+    return apiRequest('/public/testimonials');
+  },
+};
+
 export default {
   produtoService,
   categoriaService,
