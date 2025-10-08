@@ -380,6 +380,7 @@ export const atualizarVendedor = async (req, res) => {
 export const buscarPerfilVendedor = async (req, res) => {
   try {
     const { user } = req;
+    logger.info('buscarPerfilVendedor called', { userId: user?.id, vendedorId: user?.vendedorId });
 
     if (!user?.vendedorId) {
       return res.status(403).json({

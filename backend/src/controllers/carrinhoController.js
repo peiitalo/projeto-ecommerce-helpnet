@@ -5,6 +5,7 @@ import { logControllerError } from '../utils/logger.js';
 export const listar = async (req, res) => {
   try {
     const userId = req.user?.id;
+    logger.info('listar carrinho called', { userId });
     if (!userId) {
       return res.status(401).json({ erro: 'Usuário não autenticado' });
     }

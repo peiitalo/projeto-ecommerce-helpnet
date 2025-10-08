@@ -82,6 +82,7 @@ export const dashboard = async (req, res) => {
 export const listarEnderecos = async (req, res) => {
   try {
     const { user } = req;
+    logger.info('listarEnderecos called', { userId: user?.id, vendedorId: user?.vendedorId });
 
     if (!user?.vendedorId) {
       return res.status(403).json({ error: "Acesso negado. Vendedor não identificado." });
