@@ -567,6 +567,11 @@ export const vendedorService = {
   dashboard: async () => {
     return apiRequest('/vendedor/dashboard');
   },
+
+  // Dados financeiros do vendedor
+  financeiro: async (periodo = '30d') => {
+    return apiRequest(`/vendedor/financeiro?periodo=${periodo}`);
+  },
 };
 
 // Serviços Públicos (Landing Page)

@@ -12,7 +12,7 @@ const Cadastro = lazy(() => import('./pages/cadastro'));
 const Dashboard = lazy(() => import('./pages/admin/dashboard'));
 const AdminOrdersPage = lazy(() => import('./pages/admin/orders'));
 const VendedoresPage = lazy(() => import('./pages/admin/VendedoresPage'));
-const FinanceiroPage = lazy(() => import('./pages/admin/FinanceiroPage'));
+const FinanceiroPage = lazy(() => import('./pages/vendor/FinanceiroPage'));
 const ConfiguracoesPage = lazy(() => import('./pages/admin/ConfiguracoesPage'));
 const NotFound = lazy(() => import('./pages/errors/notFound'));
 const Home = lazy(() => import('./pages/clients/home'));
@@ -79,7 +79,6 @@ function App() {
             <Route path="/admin" element={<Dashboard />} />
             <Route path="/admin/pedidos" element={<AdminOrdersPage />} />
             <Route path="/vendedores" element={<VendedoresPage />} />
-            <Route path="/financeiro" element={<FinanceiroPage />} />
             <Route path="/configuracoes" element={<ConfiguracoesPage />} />
           </Route>
 
@@ -95,7 +94,8 @@ function App() {
             <Route path="/vendedor/entregas" element={<VendorDeliveriesPage />} />
             <Route path="/vendedor/entregas/:pedidoId" element={<VendorDeliveryDetailPage />} />
             <Route path="/vendedor/cupons" element={<VendorCuponsPage />} />
-            <Route path="/relatorio" element={<RelatorioPage />} />
+            <Route path="/vendedor/relatorios" element={<RelatorioPage />} />
+            <Route path="/vendedor/financeiro" element={<FinanceiroPage />} />
           </Route>
 
           {/* Demais páginas placeholder */}

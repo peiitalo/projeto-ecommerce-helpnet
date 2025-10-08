@@ -261,8 +261,8 @@ const OrderDetailsModal = ({ orderId, isOpen, onClose, isAdmin = false }) => {
                       <div className="space-y-1">
                         <p className="font-medium text-gray-900">{order.Endereco.Nome}</p>
                         <p className="text-gray-700">
-                          {order.Endereco.Logradouro && order.Endereco.Numero
-                            ? `${order.Endereco.Logradouro}, ${order.Endereco.Numero}`
+                          {order.Endereco.Nome && order.Endereco.Numero
+                            ? `${order.Endereco.Nome}, ${order.Endereco.Numero}`
                             : 'Endereço não informado'}
                         </p>
                         <p className="text-gray-700">

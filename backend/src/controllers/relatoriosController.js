@@ -18,7 +18,7 @@ const logControllerError = (operation, error, req) => {
 export const obterEstatisticasGerais = async (req, res) => {
   try {
     const { user } = req;
-    const { dateRange = '30d' } = req.query;
+    const { dateRange = '30d', category = 'all' } = req.query;
 
     if (!user?.empresaId) {
       return res.status(403).json({
@@ -57,12 +57,14 @@ export const obterEstatisticasGerais = async (req, res) => {
     });
 
     // Estatísticas de pedidos
+    const categoryFilter = category !== 'all' ? { categoria: { Nome: category } } : {};
     const pedidosStats = await prisma.pedido.findMany({
       where: {
         itensPedido: {
           some: {
             produto: {
-              EmpresaID: user.empresaId
+              EmpresaID: user.empresaId,
+              ...categoryFilter
             }
           }
         },
@@ -111,7 +113,8 @@ export const obterEstatisticasGerais = async (req, res) => {
         itensPedido: {
           some: {
             produto: {
-              EmpresaID: user.empresaId
+              EmpresaID: user.empresaId,
+              ...categoryFilter
             }
           }
         },
@@ -121,13 +124,23 @@ export const obterEstatisticasGerais = async (req, res) => {
         }
       },
       select: {
-        Total: true
+        PedidoID: true,
+        Total: true,
+        itensPedido: {
+          select: {
+            Quantidade: true,
+            produto: {
+              select: {
+                EmpresaID: true
+              }
+            }
+          }
+        }
       }
     });
 
     const pedidosAnterioresFiltrados = pedidosAnteriores.filter(pedido =>
-      // Verificar se o pedido tem itens da empresa (simplificado)
-      true // Em produção, seria necessário verificar os itens
+      pedido.itensPedido.some(item => item.produto.EmpresaID === user.empresaId)
     );
 
     const previousRevenue = pedidosAnterioresFiltrados.reduce((acc, pedido) => acc + pedido.Total, 0);
@@ -167,7 +180,7 @@ export const obterEstatisticasGerais = async (req, res) => {
 export const obterDadosVendas = async (req, res) => {
   try {
     const { user } = req;
-    const { dateRange = '30d' } = req.query;
+    const { dateRange = '30d', category = 'all' } = req.query;
 
     if (!user?.empresaId) {
       return res.status(403).json({
@@ -198,6 +211,7 @@ export const obterDadosVendas = async (req, res) => {
     }
 
     // Dados diários de vendas
+    const categoryFilter = category !== 'all' ? { categoria: { Nome: category } } : {};
     const dailySales = [];
     for (let i = 4; i >= 0; i--) {
       const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
@@ -209,7 +223,8 @@ export const obterDadosVendas = async (req, res) => {
           itensPedido: {
             some: {
               produto: {
-                EmpresaID: user.empresaId
+                EmpresaID: user.empresaId,
+                ...categoryFilter
               }
             }
           },
@@ -219,17 +234,23 @@ export const obterDadosVendas = async (req, res) => {
           }
         },
         select: {
+          PedidoID: true,
           Total: true,
           itensPedido: {
             select: {
-              Quantidade: true
+              Quantidade: true,
+              produto: {
+                select: {
+                  EmpresaID: true
+                }
+              }
             }
           }
         }
       });
 
       const pedidosFiltrados = pedidosDoDia.filter(pedido =>
-        pedido.itensPedido.some(item => true) // Simplificado
+        pedido.itensPedido.some(item => item.produto.EmpresaID === user.empresaId)
       );
 
       const revenue = pedidosFiltrados.reduce((acc, pedido) => acc + pedido.Total, 0);
@@ -246,7 +267,8 @@ export const obterDadosVendas = async (req, res) => {
     const topProducts = await prisma.produto.findMany({
       where: {
         EmpresaID: user.empresaId,
-        Ativo: true
+        Ativo: true,
+        ...(category !== 'all' && { categoria: { Nome: category } })
       },
       select: {
         ProdutoID: true,
@@ -313,7 +335,7 @@ export const obterDadosVendas = async (req, res) => {
 export const obterDadosClientes = async (req, res) => {
   try {
     const { user } = req;
-    const { dateRange = '30d' } = req.query;
+    const { dateRange = '30d', category = 'all' } = req.query;
 
     if (!user?.empresaId) {
       return res.status(403).json({
@@ -343,13 +365,15 @@ export const obterDadosClientes = async (req, res) => {
         startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     }
 
-    // Estatísticas de clientes
-    const clientesComPedidos = await prisma.pedido.findMany({
+    // Get ClienteIDs who have orders in the period with vendor products
+    const categoryFilter = category !== 'all' ? { categoria: { Nome: category } } : {};
+    const clientesIds = await prisma.pedido.findMany({
       where: {
         itensPedido: {
           some: {
             produto: {
-              EmpresaID: user.empresaId
+              EmpresaID: user.empresaId,
+              ...categoryFilter
             }
           }
         },
@@ -359,35 +383,86 @@ export const obterDadosClientes = async (req, res) => {
       },
       select: {
         ClienteID: true,
-        cliente: {
+        itensPedido: {
           select: {
-            NomeCompleto: true
-          }
-        },
-        Total: true,
-        _count: {
-          select: {
-            itensPedido: true
+            produto: {
+              select: {
+                EmpresaID: true
+              }
+            }
           }
         }
       },
       distinct: ['ClienteID']
     });
 
-    const clientesFiltrados = clientesComPedidos.filter(pedido =>
-      // Verificar se tem itens da empresa (simplificado)
-      true
-    );
+    const clientesFiltradosIds = clientesIds
+      .filter(pedido => pedido.itensPedido.some(item => item.produto.EmpresaID === user.empresaId))
+      .map(p => p.ClienteID);
 
-    const newCustomers = clientesFiltrados.length;
-    const returningCustomers = Math.max(0, newCustomers - Math.floor(newCustomers * 0.3)); // Estimativa
+    // Get first order date for these customers
+    const firstOrderDates = await prisma.pedido.groupBy({
+      by: ['ClienteID'],
+      where: {
+        ClienteID: {
+          in: clientesFiltradosIds
+        }
+      },
+      _min: {
+        DataPedido: true
+      }
+    });
 
-    // Top clientes
-    const topCustomers = clientesFiltrados
-      .map(pedido => ({
-        name: pedido.cliente?.NomeCompleto || 'Cliente',
-        orders: 1, // Simplificado
-        totalSpent: pedido.Total
+    const newCustomers = firstOrderDates.filter(c => c._min.DataPedido >= startDate).length;
+    const returningCustomers = firstOrderDates.filter(c => c._min.DataPedido < startDate).length;
+
+    // Get top customers: sum total and count orders for these customers in the period
+    const topCustomersData = await prisma.pedido.groupBy({
+      by: ['ClienteID'],
+      where: {
+        ClienteID: {
+          in: clientesFiltradosIds
+        },
+        DataPedido: {
+          gte: startDate
+        },
+        itensPedido: {
+          some: {
+            produto: {
+              EmpresaID: user.empresaId,
+              ...categoryFilter
+            }
+          }
+        }
+      },
+      _sum: {
+        Total: true
+      },
+      _count: {
+        PedidoID: true
+      }
+    });
+
+    // Get customer names
+    const customerNames = await prisma.cliente.findMany({
+      where: {
+        ClienteID: {
+          in: topCustomersData.map(c => c.ClienteID)
+        }
+      },
+      select: {
+        ClienteID: true,
+        NomeCompleto: true
+      }
+    });
+
+    const nameMap = new Map(customerNames.map(c => [c.ClienteID, c.NomeCompleto]));
+
+    const topCustomers = topCustomersData
+      .map(c => ({
+        name: nameMap.get(c.ClienteID) || 'Cliente',
+        orders: c._count.PedidoID,
+        totalSpent: c._sum.Total
       }))
       .sort((a, b) => b.totalSpent - a.totalSpent)
       .slice(0, 3);
@@ -403,6 +478,135 @@ export const obterDadosClientes = async (req, res) => {
 
   } catch (error) {
     logControllerError('obter_dados_clientes', error, req);
+    res.status(500).json({
+      success: false,
+      errors: ["Erro interno do servidor"]
+    });
+  }
+};
+
+// Exportar relatório CSV
+export const exportarRelatorio = async (req, res) => {
+  try {
+    const { user } = req;
+    const { dateRange = '30d', category = 'all' } = req.query;
+
+    if (!user?.empresaId) {
+      return res.status(403).json({
+        success: false,
+        errors: ["Acesso negado. Empresa não identificada."]
+      });
+    }
+
+    // Calcular data de início
+    const now = new Date();
+    let startDate;
+
+    switch (dateRange) {
+      case '7d':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '30d':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case '90d':
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        break;
+      case '1y':
+        startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    }
+
+    // Get orders data for CSV export
+    const categoryFilter = category !== 'all' ? { categoria: { Nome: category } } : {};
+    const pedidos = await prisma.pedido.findMany({
+      where: {
+        itensPedido: {
+          some: {
+            produto: {
+              EmpresaID: user.empresaId,
+              ...categoryFilter
+            }
+          }
+        },
+        DataPedido: {
+          gte: startDate
+        }
+      },
+      include: {
+        cliente: {
+          select: {
+            NomeCompleto: true,
+            Email: true
+          }
+        },
+        itensPedido: {
+          include: {
+            produto: {
+              select: {
+                Nome: true,
+                SKU: true,
+                categoria: {
+                  select: {
+                    Nome: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        DataPedido: 'desc'
+      }
+    });
+
+    // Filter orders that actually contain vendor products
+    const pedidosFiltrados = pedidos.filter(pedido =>
+      pedido.itensPedido.some(item => item.produto.EmpresaID === user.empresaId)
+    );
+
+    // Generate CSV content
+    let csvContent = 'Data Pedido,Cliente,Email,Produto,SKU,Categoria,Quantidade,Preço Unitário,Total Item,Total Pedido\n';
+
+    pedidosFiltrados.forEach(pedido => {
+      const dataPedido = new Date(pedido.DataPedido).toLocaleDateString('pt-BR');
+      const clienteNome = pedido.cliente?.NomeCompleto || 'Cliente';
+      const clienteEmail = pedido.cliente?.Email || '';
+
+      pedido.itensPedido.forEach(item => {
+        if (item.produto.EmpresaID === user.empresaId) {
+          const linha = [
+            dataPedido,
+            `"${clienteNome}"`,
+            clienteEmail,
+            `"${item.produto.Nome}"`,
+            item.produto.SKU,
+            `"${item.produto.categoria?.Nome || 'N/A'}"`,
+            item.Quantidade,
+            item.PrecoUnitario.toFixed(2),
+            (item.Quantidade * item.PrecoUnitario).toFixed(2),
+            pedido.Total.toFixed(2)
+          ].join(',');
+          csvContent += linha + '\n';
+        }
+      });
+    });
+
+    // Set headers for CSV download
+    const fileName = `relatorio_vendas_${dateRange}_${category}_${new Date().toISOString().split('T')[0]}.csv`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+
+    // Add BOM for proper UTF-8 encoding in Excel
+    res.write('\uFEFF');
+    res.end(csvContent);
+
+  } catch (error) {
+    logControllerError('exportar_relatorio', error, req);
     res.status(500).json({
       success: false,
       errors: ["Erro interno do servidor"]

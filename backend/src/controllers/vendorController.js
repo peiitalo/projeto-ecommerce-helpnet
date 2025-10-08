@@ -244,3 +244,121 @@ export const excluirEndereco = async (req, res) => {
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 };
+
+// Obter dados financeiros do vendedor
+export const getFinanceiro = async (req, res) => {
+  try {
+    const { user } = req;
+    const { periodo = '30d' } = req.query;
+
+    if (!user?.vendedorId) {
+      return res.status(403).json({ error: "Acesso negado. Vendedor não identificado." });
+    }
+
+    // Calcular data de início baseada no período
+    const now = new Date();
+    let startDate;
+
+    switch (periodo) {
+      case '7d':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '30d':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case '90d':
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        break;
+      case '1y':
+        startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    }
+
+    // Calcular receita bruta: soma dos totais dos pedidos pagos que contenham produtos do vendedor
+    const revenueResult = await prisma.pedido.aggregate({
+      _sum: { Total: true },
+      _count: { PedidoID: true },
+      where: {
+        StatusPagamento: 'PAGO',
+        DataPedido: {
+          gte: startDate
+        },
+        itensPedido: {
+          some: {
+            produto: { VendedorID: user.vendedorId }
+          }
+        }
+      }
+    });
+
+    const receitaBruta = revenueResult._sum.Total || 0;
+    const totalOrders = revenueResult._count.PedidoID || 0;
+
+    // Calcular comissões (10% da receita bruta)
+    const comissoes = receitaBruta * 0.10;
+
+    // Lucro líquido = receita bruta - comissões (despesas serão adicionadas posteriormente)
+    const lucroLiquido = receitaBruta - comissoes;
+
+    // Gerar dados históricos para gráficos (últimos 6 períodos)
+    const historicalData = [];
+    const periodDays = periodo === '7d' ? 7 : periodo === '30d' ? 30 : periodo === '90d' ? 90 : 365;
+    const intervals = 6; // 6 pontos no gráfico
+
+    for (let i = intervals - 1; i >= 0; i--) {
+      const periodStart = new Date(now.getTime() - (i + 1) * periodDays * 24 * 60 * 60 * 1000);
+      const periodEnd = new Date(now.getTime() - i * periodDays * 24 * 60 * 60 * 1000);
+
+      const periodRevenue = await prisma.pedido.aggregate({
+        _sum: { Total: true },
+        where: {
+          StatusPagamento: 'PAGO',
+          DataPedido: {
+            gte: periodStart,
+            lt: periodEnd
+          },
+          itensPedido: {
+            some: {
+              produto: { VendedorID: user.vendedorId }
+            }
+          }
+        }
+      });
+
+      const revenue = periodRevenue._sum.Total || 0;
+      const expenses = revenue * 0.15; // Mock expenses for now (15% of revenue)
+
+      historicalData.push({
+        period: periodStart.toISOString().split('T')[0],
+        revenue,
+        expenses
+      });
+    }
+
+    // Dados para gráficos de despesas por categoria (mock para MVP)
+    const expensesByCategory = [
+      { category: 'Marketing', amount: receitaBruta * 0.05 },
+      { category: 'Operações', amount: receitaBruta * 0.04 },
+      { category: 'Tecnologia', amount: receitaBruta * 0.03 },
+      { category: 'Administrativo', amount: receitaBruta * 0.02 },
+      { category: 'Outros', amount: receitaBruta * 0.01 }
+    ];
+
+    const financeiro = {
+      receitaBruta,
+      comissoes,
+      lucroLiquido,
+      periodo,
+      totalOrders,
+      historicalData,
+      expensesByCategory
+    };
+
+    res.json({ financeiro });
+  } catch (error) {
+    logControllerError('vendor_get_financeiro_error', error, req);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+};

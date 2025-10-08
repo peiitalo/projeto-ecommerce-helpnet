@@ -3,7 +3,8 @@ import express from 'express';
 import {
   obterEstatisticasGerais,
   obterDadosVendas,
-  obterDadosClientes
+  obterDadosClientes,
+  exportarRelatorio
 } from '../controllers/relatoriosController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 
@@ -16,5 +17,6 @@ router.use(authMiddleware);
 router.get('/gerais', obterEstatisticasGerais);
 router.get('/vendas', obterDadosVendas);
 router.get('/clientes', obterDadosClientes);
+router.get('/export', exportarRelatorio);
 
 export default router;

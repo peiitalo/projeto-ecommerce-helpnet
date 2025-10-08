@@ -90,7 +90,7 @@ function OrdersPage() {
         sellers: [...new Set(pedido.itensPedido.map(item => item.produto.vendedor?.Nome).filter(Boolean))],
         address: pedido.Endereco ? {
           name: pedido.Endereco.Nome || 'Endereço não informado',
-          street: `${pedido.Endereco.Logradouro || ''}, ${pedido.Endereco.Numero || ''}`.trim(),
+          street: `${pedido.Endereco.Nome || ''}, ${pedido.Endereco.Numero || ''}`.trim(),
           city: `${pedido.Endereco.Cidade || ''} - ${pedido.Endereco.UF || ''}`.trim(),
           cep: pedido.Endereco.CEP || 'Não informado'
         } : {

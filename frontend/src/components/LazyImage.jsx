@@ -79,7 +79,7 @@ const LazyImage = ({
           setHasError(true);
           // Set fallback image directly on error
           e.target.src = fallback;
-          onError?.();
+          onError?.(e);
         }}
         loading="lazy"
         decoding="async"

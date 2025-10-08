@@ -596,7 +596,6 @@ export const listarPedidosCliente = async (req, res) => {
           Endereco: {
             select: {
               Nome: true,
-              Logradouro: true,
               CEP: true,
               Cidade: true,
               UF: true,

@@ -1,7 +1,13 @@
 // backend/src/index.js
 import 'dotenv/config';
 import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import cors from 'cors';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 import clienteRoutes from './routes/clienteRoutes.js';
 import produtoRoutes from './routes/produtoRoutes.js';
 import categoriaRoutes from './routes/categoriaRoutes.js';
@@ -83,7 +89,7 @@ try {
 } catch {}
 
 // Servir arquivos estáticos (imagens, uploads, etc.)
-app.use('/uploads', express.static('uploads', {
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads'), {
   maxAge: '1d', // Cache de 1 dia para imagens
   etag: true
 }));

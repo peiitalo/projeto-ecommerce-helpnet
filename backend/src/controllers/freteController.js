@@ -50,11 +50,20 @@ const calcularFrete = async (req, res) => {
     if (todosFreteGratis) {
       logger.info('frete_calculado_gratis', { clienteId, enderecoId, produtoIds });
       return res.json({
-        frete: 0,
-        distanciaKm: 0,
-        prazo: "3-5 dias úteis",
-        tipo: "Frete Grátis",
-        detalhes: "Todos os produtos selecionados têm frete grátis"
+        opcoes: [{
+          id: 'frete-gratis',
+          nome: 'Frete Grátis',
+          transportadora: 'HelpNet',
+          valor: 0,
+          prazo: '3-5 dias úteis',
+          descricao: 'Todos os produtos selecionados têm frete grátis',
+          ativo: true
+        }],
+        endereco: {
+          cep: endereco.CEP,
+          cidade: endereco.Cidade,
+          uf: endereco.UF
+        }
       });
     }
 
@@ -62,6 +71,10 @@ const calcularFrete = async (req, res) => {
     const primeiroProduto = produtos[0];
     if (!primeiroProduto.VendedorID) {
       return res.status(400).json({ erro: "Produto não possui vendedor associado" });
+    }
+
+    if (!primeiroProduto.EmpresaID) {
+      return res.status(400).json({ erro: "Produto não possui empresa associada" });
     }
 
     // Buscar empresa do vendedor para obter CEP de origem

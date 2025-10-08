@@ -21,4 +21,7 @@ router.post('/enderecos', vendorController.criarEndereco);
 router.put('/enderecos/:enderecoId', vendorController.atualizarEndereco);
 router.delete('/enderecos/:enderecoId', vendorController.excluirEndereco);
 
+// Vendor financial data
+router.get('/financeiro', vendorController.getFinanceiro);
+
 export default router;
