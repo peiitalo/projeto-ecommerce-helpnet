@@ -4,6 +4,7 @@ import { useCart } from '../../context/CartContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { clienteService, freteService } from '../../services/api';
 import { useNotifications } from '../../hooks/useNotifications';
+import MaskedInput from '../../components/cadastro/MaskedInput.jsx';
 import {
   FaShoppingCart,
   FaUser,
@@ -1058,6 +1059,57 @@ function CheckoutPage() {
                               <span className="text-xs text-blue-600 font-medium ml-2">Pagamento total imediato</span>
                             )}
                           </div>
+
+                          {/* Detalhes do cartão para cartão de crédito */}
+                          {method.type === 'cartao' && method.amount > 0 && (
+                            <div className="space-y-3 p-3 bg-slate-50 rounded-lg">
+                              <h4 className="text-sm font-medium text-slate-900">Dados do Cartão</h4>
+                              <div className="grid grid-cols-1 gap-3">
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-700 mb-1">Número do Cartão</label>
+                                  <MaskedInput
+                                    mask="9999 9999 9999 9999"
+                                    replacement={{9: /\d/}}
+                                    value={getCardDetails(method.id).number}
+                                    onChange={(e) => updateCardDetails(method.id, 'number', e.target.value)}
+                                    placeholder="1234 5678 9012 3456"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-700 mb-1">Nome no Cartão</label>
+                                  <input
+                                    type="text"
+                                    value={getCardDetails(method.id).name}
+                                    onChange={(e) => updateCardDetails(method.id, 'name', e.target.value.toUpperCase())}
+                                    placeholder="NOME COMPLETO"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="block text-xs font-medium text-slate-700 mb-1">Validade</label>
+                                    <MaskedInput
+                                      mask="99/99"
+                                      replacement={{9: /\d/}}
+                                      value={getCardDetails(method.id).expiry}
+                                      onChange={(e) => updateCardDetails(method.id, 'expiry', e.target.value)}
+                                      placeholder="MM/YY"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium text-slate-700 mb-1">CVV</label>
+                                    <MaskedInput
+                                      mask="999"
+                                      replacement={{9: /\d/}}
+                                      value={getCardDetails(method.id).cvv}
+                                      onChange={(e) => updateCardDetails(method.id, 'cvv', e.target.value)}
+                                      placeholder="123"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
 
                           {/* Opções de parcelas e preço à vista */}
                           {method.amount > 0 && (
