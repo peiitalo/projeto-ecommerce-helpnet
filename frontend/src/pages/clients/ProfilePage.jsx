@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { clienteService } from '../../services/api';
 import apiCache from '../../utils/cache';
+import { useNotifications } from '../../hooks/useNotifications';
 import {
   FaUser,
   FaShoppingCart,
@@ -38,6 +39,7 @@ import {
 } from 'react-icons/fi';
 
 function ProfilePage() {
+  const { showSuccess, showError, showWarning } = useNotifications();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -159,16 +161,16 @@ function ProfilePage() {
       setProfileData(response.cliente || response);
       setIsEditing(false);
       setEditForm({});
-      alert('Perfil atualizado com sucesso!');
+      showSuccess('Perfil atualizado com sucesso!');
     } catch (error) {
       console.error('Erro ao salvar perfil:', error);
       // Show more specific error messages
       if (error.errors && Array.isArray(error.errors)) {
-        alert('Erro ao salvar perfil:\n' + error.errors.join('\n'));
+        showError('Erro ao salvar perfil:\n' + error.errors.join('\n'));
       } else if (error.message) {
-        alert('Erro ao salvar perfil: ' + error.message);
+        showError('Erro ao salvar perfil: ' + error.message);
       } else {
-        alert('Erro ao salvar perfil. Tente novamente.');
+        showError('Erro ao salvar perfil. Tente novamente.');
       }
     } finally {
       setSaving(false);
@@ -222,17 +224,17 @@ function ProfilePage() {
 
   const handleSavePassword = async () => {
     if (!currentPasswordValid) {
-      alert('A senha atual está incorreta');
+      showError('A senha atual está incorreta');
       return;
     }
 
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      alert('As senhas não coincidem');
+      showError('As senhas não coincidem');
       return;
     }
 
     if (passwordForm.newPassword.length < 8) {
-      alert('A nova senha deve ter pelo menos 8 caracteres');
+      showError('A nova senha deve ter pelo menos 8 caracteres');
       return;
     }
 
@@ -242,7 +244,7 @@ function ProfilePage() {
         senhaAtual: passwordForm.currentPassword,
         novaSenha: passwordForm.newPassword
       });
-      alert('Senha alterada com sucesso!');
+      showSuccess('Senha alterada com sucesso!');
       setIsChangingPassword(false);
       setPasswordForm({
         currentPassword: '',
@@ -253,9 +255,9 @@ function ProfilePage() {
     } catch (error) {
       console.error('Erro ao alterar senha:', error);
       if (error.errors && Array.isArray(error.errors)) {
-        alert('Erro ao alterar senha:\n' + error.errors.join('\n'));
+        showError('Erro ao alterar senha:\n' + error.errors.join('\n'));
       } else {
-        alert('Erro ao alterar senha: ' + (error.message || 'Erro desconhecido'));
+        showError('Erro ao alterar senha: ' + (error.message || 'Erro desconhecido'));
       }
     } finally {
       setSaving(false);

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import VendorLayout from '../../components/VendorLayout.jsx';
 import { relatoriosApi } from '../../services/api.js';
+import { useNotifications } from '../../hooks/useNotifications';
 import {
   FaChartLine,
   FaChartBar,
@@ -20,6 +21,7 @@ import {
 
 function VendorReportsPage() {
   const { user } = useAuth();
+  const { showSuccess } = useNotifications();
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState('30d');
   const [reportType, setReportType] = useState('overview');
@@ -102,7 +104,7 @@ function VendorReportsPage() {
 
   const exportReport = () => {
     // In a real app, this would trigger a download
-    alert('Relatório exportado com sucesso!');
+    showSuccess('Relatório exportado com sucesso!');
   };
 
   return (

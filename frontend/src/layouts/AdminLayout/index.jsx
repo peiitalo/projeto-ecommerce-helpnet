@@ -51,7 +51,6 @@ function AdminLayout({ children }) {
     { label: 'Visão Geral', to: `${basePath}`, icon: <FiHome className="text-slate-500" /> },
     { label: 'Pedidos', to: `${basePath}/pedidos`, icon: <FiPackage className="text-slate-500" /> },
     { label: 'Produtos', to: `${basePath}/produtos`, icon: <FiBox className="text-slate-500" /> },
-    { label: 'Categorias', to: `${basePath}/categorias`, icon: <FiTag className="text-slate-500" /> },
     { label: 'Clientes', to: `${basePath}/clientes`, icon: <FiUsers className="text-slate-500" /> },
     { label: 'Vendedores', to: `${basePath}/vendedores`, icon: <FiBriefcase className="text-slate-500" /> },
     { label: 'Estoque', to: `${basePath}/estoque`, icon: <FiBox className="text-slate-500" /> },

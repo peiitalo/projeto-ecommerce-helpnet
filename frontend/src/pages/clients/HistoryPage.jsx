@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { clienteService } from '../../services/api';
+import OrderDetailsModal from '../../components/OrderDetailsModal';
 import {
   FaUser,
   FaShoppingCart,
@@ -15,7 +16,8 @@ import {
   FaClock,
   FaArrowLeft,
   FaPrint,
-  FaDownload
+  FaDownload,
+  FaEye
 } from 'react-icons/fa';
 import {
   FiSearch,
@@ -37,6 +39,9 @@ function HistoryPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedSeller, setSelectedSeller] = useState(null);
+  const [orderModalId, setOrderModalId] = useState(null);
+  const [showOrderModal, setShowOrderModal] = useState(false);
   const { logout } = useAuth();
 
   // Logo configuration
@@ -76,19 +81,31 @@ function HistoryPage() {
         date: pedido.DataPedido,
         status: pedido.Status,
         total: parseFloat(pedido.Total),
+        clientName: pedido.cliente?.Nome || pedido.Cliente?.Nome || 'Cliente',
         items: pedido.itensPedido.map(item => ({
           name: item.produto.Nome,
           quantity: item.Quantidade,
           price: parseFloat(item.PrecoUnitario),
-          seller: item.produto.vendedor ? item.produto.vendedor.Nome : 'N/A'
+          seller: item.produto.vendedor ? item.produto.vendedor.Nome : 'N/A',
+          sellerId: item.produto.vendedor?.VendedorID || null
         })),
+        sellers: [...new Set(pedido.itensPedido.map(item => item.produto.vendedor?.Nome).filter(Boolean))],
         address: {
-          name: pedido.Endereco.Nome,
-          street: `${pedido.Endereco.Logradouro}, ${pedido.Endereco.Numero}`,
-          city: `${pedido.Endereco.Cidade} - ${pedido.Endereco.UF}`,
-          cep: pedido.Endereco.CEP
+          name: pedido.Endereco?.Nome || 'Endereço não informado',
+          street: pedido.Endereco?.Logradouro && pedido.Endereco?.Numero 
+            ? `${pedido.Endereco.Logradouro}, ${pedido.Endereco.Numero}` 
+            : 'Endereço não informado',
+          city: pedido.Endereco?.Cidade && pedido.Endereco?.UF 
+            ? `${pedido.Endereco.Cidade} - ${pedido.Endereco.UF}` 
+            : 'Cidade não informada',
+          cep: pedido.Endereco?.CEP || 'CEP não informado'
         },
-        paymentMethod: pedido.pagamentosPedido[0]?.MetodoPagamento?.Nome || 'N/A'
+        paymentMethod: pedido.pagamentosPedido?.[0]?.MetodoPagamento?.Nome || 'Método não informado',
+        paymentDetails: pedido.pagamentosPedido?.map(pagamento => ({
+          method: pagamento.MetodoPagamento?.Nome || 'N/A',
+          amount: parseFloat(pagamento.Valor || 0),
+          installments: pagamento.Parcelas || 1
+        })) || []
       }));
 
       setOrders(pedidosFormatados);
@@ -172,10 +189,8 @@ function HistoryPage() {
           <div class="info">
             <div><strong>Data da Compra:</strong> ${formatDate(selectedOrder.date)}</div>
             <div><strong>Status do Pedido:</strong> ${selectedOrder.status}</div>
-            <div><strong>Método de Pagamento:</strong> ${
-              selectedOrder.paymentMethod === 'cartao' ? 'Cartão de Crédito' :
-              selectedOrder.paymentMethod === 'boleto' ? 'Boleto Bancário' : 'PIX'
-            }</div>
+            <div><strong>Cliente:</strong> ${selectedOrder.clientName}</div>
+            <div><strong>Método de Pagamento:</strong> ${selectedOrder.paymentMethod}</div>
           </div>
 
           <div class="items">
@@ -422,6 +437,27 @@ function HistoryPage() {
                       </div>
                     </div>
 
+                    {/* Vendedores */}
+                    {order.sellers && order.sellers.length > 0 && (
+                      <div className="bg-slate-50 rounded-lg p-4 mb-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <FaUser className="text-blue-600" />
+                          <span className="text-sm font-medium text-slate-900">Vendedor{order.sellers.length > 1 ? 'es' : ''}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {order.sellers.map((seller, index) => (
+                            <button
+                              key={index}
+                              onClick={() => setSelectedSeller({ name: seller, id: order.items.find(item => item.seller === seller)?.sellerId })}
+                              className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-sm text-blue-600 hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                            >
+                              {seller}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Itens do pedido */}
                     <div className="border-t border-slate-200 pt-4">
                       <div className="space-y-2">
@@ -446,10 +482,7 @@ function HistoryPage() {
                         </div>
                         <div>
                           <p className="font-medium text-slate-900 mb-1">Método de pagamento</p>
-                          <p className="text-slate-600">
-                            {order.paymentMethod === 'cartao' ? 'Cartão de Crédito' :
-                             order.paymentMethod === 'boleto' ? 'Boleto Bancário' : 'PIX'}
-                          </p>
+                          <p className="text-slate-600">{order.paymentMethod}</p>
                         </div>
                       </div>
                     </div>
@@ -457,6 +490,17 @@ function HistoryPage() {
                     {/* Ações */}
                     <div className="border-t border-slate-200 pt-4 mt-4">
                       <div className="flex gap-3">
+                        <button
+                          onClick={() => {
+                            setOrderModalId(order.id);
+                            setShowOrderModal(true);
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200"
+                          title="Ver detalhes do pedido"
+                        >
+                          <FaEye />
+                          <span>Ver Detalhes</span>
+                        </button>
                         <button
                           onClick={() => setSelectedOrder(order)}
                           className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200"
@@ -550,6 +594,14 @@ function HistoryPage() {
                   <p className="font-medium text-slate-900">Status do Pedido</p>
                   <p className="text-slate-600">{selectedOrder.status}</p>
                 </div>
+                <div>
+                  <p className="font-medium text-slate-900">Cliente</p>
+                  <p className="text-slate-600">{selectedOrder.clientName}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-slate-900">Método de Pagamento</p>
+                  <p className="text-slate-600">{selectedOrder.paymentMethod}</p>
+                </div>
               </div>
 
               {/* Itens */}
@@ -600,11 +652,19 @@ function HistoryPage() {
                 </div>
                 <div>
                   <h3 className="font-medium text-slate-900 mb-2">Método de Pagamento</h3>
-                  <p className="text-slate-600">
-                    {selectedOrder.paymentMethod === 'cartao' ? 'Cartão de Crédito' :
-                     selectedOrder.paymentMethod === 'debito' ? 'Cartão de Débito' :
-                     selectedOrder.paymentMethod === 'boleto' ? 'Boleto Bancário' : 'PIX'}
-                  </p>
+                  <div className="text-slate-600 space-y-1">
+                    <p>{selectedOrder.paymentMethod}</p>
+                    {selectedOrder.paymentDetails.length > 0 && (
+                      <div className="mt-2">
+                        {selectedOrder.paymentDetails.map((payment, index) => (
+                          <p key={index} className="text-xs">
+                            {payment.method}: {formatPrice(payment.amount)}
+                            {payment.installments > 1 && ` (${payment.installments}x)`}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -625,6 +685,60 @@ function HistoryPage() {
           </div>
         </div>
       )}
+
+      {/* Modal de Informações do Vendedor */}
+      {selectedSeller && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-slate-900">Informações do Vendedor</h3>
+                <button
+                  onClick={() => setSelectedSeller(null)}
+                  className="text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <FiX className="text-xl" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <span className="text-sm font-medium text-slate-600">Nome:</span>
+                  <p className="text-slate-900">{selectedSeller.name || 'Não informado'}</p>
+                </div>
+
+                <div>
+                  <span className="text-sm font-medium text-slate-600">ID do Vendedor:</span>
+                  <p className="text-slate-900">{selectedSeller.id || 'Não informado'}</p>
+                </div>
+
+                {/* Adicionar mais informações se disponíveis */}
+                <div className="text-sm text-slate-500 mt-4">
+                  <p>Para mais informações ou suporte, entre em contato conosco.</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-200">
+              <button
+                onClick={() => setSelectedSeller(null)}
+                className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Order Details Modal */}
+      <OrderDetailsModal
+        orderId={orderModalId}
+        isOpen={showOrderModal}
+        onClose={() => {
+          setShowOrderModal(false);
+          setOrderModalId(null);
+        }}
+      />
     </div>
   );
 }

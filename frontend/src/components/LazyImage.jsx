@@ -2,7 +2,6 @@
 // Optimized image component with lazy loading and performance features
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useLazyImage } from '../hooks/usePerformance';
 
 /**
  * Optimized image component with lazy loading, error handling, and performance features
@@ -53,11 +52,6 @@ const LazyImage = ({
     onLoad?.();
   };
 
-  // Handle image error
-  const handleError = () => {
-    setHasError(true);
-    onError?.();
-  };
 
   // Determine which image source to use
   const imageSrc = hasError ? fallback : (isInView ? src : placeholder);
@@ -80,7 +74,13 @@ const LazyImage = ({
           isLoaded ? 'opacity-100' : 'opacity-0'
         }`}
         onLoad={handleLoad}
-        onError={handleError}
+        onError={(e) => {
+          console.warn('LazyImage: Failed to load image:', src);
+          setHasError(true);
+          // Set fallback image directly on error
+          e.target.src = fallback;
+          onError?.(e);
+        }}
         loading="lazy"
         decoding="async"
         {...props}

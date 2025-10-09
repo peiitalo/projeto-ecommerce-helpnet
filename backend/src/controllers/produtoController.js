@@ -13,7 +13,7 @@ import { sendVendorLowStockEmail } from "../services/emailService.js";
  */
 export const listarProdutos = async (req, res) => {
   try {
-    const { categoria, status, busca, pagina = 1, limit = 10 } = req.query;
+    const { categoria, status, busca, pagina = 1, limit = 10, precoMin, precoMax, estoqueMin, estoqueMax } = req.query;
     const skip = (pagina - 1) * limit;
 
     const where = {};
@@ -52,6 +52,22 @@ export const listarProdutos = async (req, res) => {
       ];
     }
 
+    // Price filters
+    if (precoMin !== undefined) {
+      where.Preco = { ...where.Preco, gte: parseFloat(precoMin) };
+    }
+    if (precoMax !== undefined) {
+      where.Preco = { ...where.Preco, lte: parseFloat(precoMax) };
+    }
+
+    // Stock filters
+    if (estoqueMin !== undefined) {
+      where.Estoque = { ...where.Estoque, gte: parseInt(estoqueMin) };
+    }
+    if (estoqueMax !== undefined) {
+      where.Estoque = { ...where.Estoque, lte: parseInt(estoqueMax) };
+    }
+
     const [produtos, total] = await prisma.$transaction([
       prisma.produto.findMany({
         where,
@@ -62,6 +78,7 @@ export const listarProdutos = async (req, res) => {
           Descricao: true,
           Preco: true,
           PrecoOriginal: true,
+          Estoque: true,
           Imagens: true,
           FreteGratis: true,
           Desconto: true,
@@ -211,6 +228,7 @@ export const criarProduto = async (req, res) => {
         return res.status(400).json({ erro: "Vendedor não encontrado" });
     }
 
+    const estoqueValue = parseInt(estoque) || 0;
     const produto = await prisma.produto.create({
       data: {
         Nome: nome,
@@ -218,7 +236,7 @@ export const criarProduto = async (req, res) => {
         BreveDescricao: breveDescricao,
         Preco: parseFloat(preco),
         PrecoOriginal: precoOriginal ? parseFloat(precoOriginal) : null,
-        Estoque: parseInt(estoque) || 0,
+        Estoque: estoqueValue,
         CategoriaID: parseInt(categoriaId),
         VendedorID: vendedorId ? parseInt(vendedorId) : null,
         CodBarras:
@@ -236,7 +254,7 @@ export const criarProduto = async (req, res) => {
         Desconto: parseInt(desconto) || 0,
         PrazoEntrega: prazoEntrega,
         Imagens: imagens || [],
-        Ativo: ativo !== undefined ? ativo : true,
+        Ativo: ativo !== undefined ? ativo : (estoqueValue > 0), // Set to false if out of stock
       },
       include: { categoria: true, vendedor: { select: { VendedorID: true, Nome: true } } },
     });
@@ -347,37 +365,31 @@ export const atualizarProduto = async (req, res) => {
       },
     });
 
-    // Verificar se estoque ficou baixo e enviar alerta para vendedor
-    if (data.estoque !== undefined && produto.vendedor && produto.Estoque <= 5) {
-      try {
-        // Calcular vendas recentes (últimos 30 dias)
-        const trintaDiasAtras = new Date();
-        trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
+    // Handle out of stock logic: if estoque <= 0, set status to inativo and notify vendor
+    if (produto.Estoque <= 0 && produto.Ativo) {
+      await prisma.produto.update({
+        where: { ProdutoID: parseInt(id) },
+        data: { Ativo: false },
+      });
+      produto.Ativo = false; // Update local object for consistency
 
-        const vendasRecentes = await prisma.itensPedido.count({
-          where: {
-            ProdutoID: produto.ProdutoID,
-            pedido: {
-              DataPedido: {
-                gte: trintaDiasAtras
-              }
-            }
-          }
-        });
-
-        await sendVendorLowStockEmail({
-          vendedorNome: produto.vendedor.Nome,
-          email: produto.vendedor.Email,
-          produtoNome: produto.Nome,
-          estoqueAtual: produto.Estoque,
-          vendasRecentes
-        });
-        logger.info('email_estoque_baixo_enviado', { produtoId: produto.ProdutoID, vendedorId: produto.vendedor.VendedorID });
-      } catch (emailError) {
-        logger.warn('erro_email_estoque_baixo', { produtoId: produto.ProdutoID, error: emailError.message });
-        // Não falhar a atualização por erro no email
+      // Send email notification to vendor
+      if (produto.vendedor) {
+        try {
+          await sendVendorLowStockEmail({
+            vendedorNome: produto.vendedor.Nome,
+            email: produto.vendedor.Email,
+            produtoNome: produto.Nome,
+            estoqueAtual: produto.Estoque,
+            vendasRecentes: 0 // For out of stock, we can set to 0 or calculate if needed
+          });
+          logger.info('email_estoque_esgotado_enviado', { produtoId: produto.ProdutoID, vendedorId: produto.vendedor.VendedorID });
+        } catch (emailError) {
+          logger.warn('erro_email_estoque_esgotado', { produtoId: produto.ProdutoID, error: emailError.message });
+        }
       }
     }
+
 
     logger.info('atualizar_produto_ok', { id: produto.ProdutoID });
     res.json(produto);

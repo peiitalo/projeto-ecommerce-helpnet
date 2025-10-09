@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { clienteService, freteService } from '../../services/api';
+import { useNotifications } from '../../hooks/useNotifications';
 import {
   FaShoppingCart,
   FaUser,
@@ -52,16 +53,14 @@ function CheckoutPage() {
   const [processingOrder, setProcessingOrder] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
-  const [cardDetails, setCardDetails] = useState({
-    number: '',
-    expiry: '',
-    cvv: '',
-    name: ''
-  });
+  const [cardDetails, setCardDetails] = useState({});
+  const [installments, setInstallments] = useState({});
+  const [cashDiscount, setCashDiscount] = useState(0.05); // 5% de desconto à vista
 
   const { items, count, clearCart, freight, freightOptions, selectedFreight, setSelectedFreight, calculateFreight, freightLoading, freightError, selectedAddress, setSelectedAddress, total, subtotal } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { showSuccess, showError, showWarning, showInfo } = useNotifications();
 
   // Logo configuration
   const logoConfig = {
@@ -117,10 +116,18 @@ function CheckoutPage() {
       };
       setOrderData(dadosAtualizados);
 
-      // Atualizar valor do PIX se for o único método de pagamento
-      if (paymentMethods.length === 1 && paymentMethods[0].type === 'pix') {
-        setPaymentMethods(prev => prev.map(method => ({ ...method, amount: dadosAtualizados.total })));
-      }
+      console.log(`[DEBUG] Order total updated: R$ ${dadosAtualizados.total.toFixed(2)} (subtotal: R$ ${dadosAtualizados.subtotal.toFixed(2)}, freight: R$ ${dadosAtualizados.frete.toFixed(2)})`);
+
+      // Atualizar valores dos métodos de pagamento baseado no novo total
+      setPaymentMethods(prev => prev.map(method => {
+        if (method.type === 'pix' || method.type === 'debito') {
+          // PIX e Débito: pagamento total imediato
+          console.log(`[DEBUG] Updating ${method.type} method ${method.id} to full amount: R$ ${dadosAtualizados.total.toFixed(2)}`);
+          return { ...method, amount: dadosAtualizados.total };
+        }
+        // Outros métodos mantêm o valor atual, mas podem ser ajustados se necessário
+        return method;
+      }));
     }
   }, [freight.valor, items]);
 
@@ -176,20 +183,108 @@ function CheckoutPage() {
   // Atualizar valor do método de pagamento
   const updatePaymentAmount = (id, amount) => {
     const numericAmount = parseFloat(amount) || 0;
-    setPaymentMethods(prev => prev.map(method =>
-      method.id === id ? { ...method, amount: numericAmount } : method
-    ));
+    setPaymentMethods(prev => prev.map(method => {
+      // Para débito, forçar pagamento total imediato
+      if (method.type === 'debito') {
+        const totalPedido = orderData?.total || 0;
+        console.log(`[DEBUG] Débito method ${id}: Forçando pagamento total imediato de R$ ${totalPedido.toFixed(2)}`);
+        return { ...method, amount: totalPedido };
+      }
+      return method.id === id ? { ...method, amount: numericAmount } : method;
+    }));
+  };
+
+  // Atualizar dados do cartão para um método específico
+  const updateCardDetails = (methodId, field, value) => {
+    setCardDetails(prev => ({
+      ...prev,
+      [methodId]: {
+        ...prev[methodId],
+        [field]: value
+      }
+    }));
+  };
+
+  // Obter dados do cartão para um método específico
+  const getCardDetails = (methodId) => {
+    return cardDetails[methodId] || {
+      number: '',
+      expiry: '',
+      cvv: '',
+      name: ''
+    };
+  };
+
+  // Calcular parcelas para cartão de crédito
+  const calculateInstallments = (amount) => {
+    const installments = [];
+    for (let i = 2; i <= 12; i++) {
+      const installmentValue = amount / i;
+      installments.push({
+        installments: i,
+        value: installmentValue,
+        total: amount,
+        label: `${i}x de R$ ${installmentValue.toFixed(2)}`
+      });
+    }
+    return installments;
+  };
+
+  // Calcular preço à vista com desconto
+  const calculateCashPrice = (amount) => {
+    const discount = amount * cashDiscount;
+    return {
+      original: amount,
+      discount: discount,
+      final: amount - discount,
+      discountPercent: (cashDiscount * 100).toFixed(0)
+    };
+  };
+
+  // Atualizar parcelas para um método de pagamento
+  const updateInstallments = (methodId, installments) => {
+    setInstallments(prev => ({
+      ...prev,
+      [methodId]: installments
+    }));
+  };
+
+  // Aplicar desconto à vista
+  const applyCashDiscount = (methodId) => {
+    const method = paymentMethods.find(m => m.id === methodId);
+    if (!method) return;
+
+    const cashPrice = calculateCashPrice(method.amount);
+    updatePaymentAmount(methodId, cashPrice.final);
+    showSuccess(`Desconto de ${cashPrice.discountPercent}% aplicado! Preço à vista: R$ ${cashPrice.final.toFixed(2)}`);
   };
 
   // Adicionar método de pagamento
   const addPaymentMethod = (type) => {
+    console.log(`[DEBUG] Adicionando método de pagamento: ${type}`);
+
     const methodExists = paymentMethods.find(m => m.type === type);
-    if (methodExists) return;
+    if (methodExists) {
+      console.log(`[DEBUG] Método ${type} já existe`);
+      return;
+    }
 
     const methodTemplate = allAvailableMethods.find(m => m.type === type);
-    if (!methodTemplate) return;
+    if (!methodTemplate) {
+      console.log(`[DEBUG] Template para método ${type} não encontrado`);
+      return;
+    }
 
-    setPaymentMethods(prev => [...prev, { ...methodTemplate, active: true }]);
+    const newMethod = { ...methodTemplate, active: true };
+
+    // Para débito, definir valor total imediato
+    if (type === 'debito') {
+      const totalPedido = orderData?.total || 0;
+      newMethod.amount = totalPedido;
+      console.log(`[DEBUG] Débito adicionado com valor total: R$ ${totalPedido.toFixed(2)}`);
+    }
+
+    setPaymentMethods(prev => [...prev, newMethod]);
   };
 
   // Remover método de pagamento
@@ -198,6 +293,13 @@ function CheckoutPage() {
     if (paymentMethods.length <= 1) return;
 
     setPaymentMethods(prev => prev.filter(method => method.id !== id));
+    
+    // Limpar dados do cartão do método removido
+    setCardDetails(prev => {
+      const newCardDetails = { ...prev };
+      delete newCardDetails[id];
+      return newCardDetails;
+    });
   };
 
   // Calcular total dos pagamentos
@@ -265,22 +367,31 @@ function CheckoutPage() {
 
   // Finalizar pedido
   const handleFinalizarPedido = async () => {
+    console.log('[DEBUG] Iniciando finalização do pedido');
+
     if (!selectedAddress) {
-      alert('Selecione um endereço de entrega');
+      console.log('[DEBUG] Erro: Nenhum endereço selecionado');
+      showError('Selecione um endereço de entrega');
       return;
     }
 
     const metodosComValor = paymentMethods.filter(method => method.amount > 0);
+    console.log(`[DEBUG] Métodos de pagamento com valor: ${metodosComValor.length}`, metodosComValor);
+
     if (metodosComValor.length === 0) {
-      alert('Adicione pelo menos um método de pagamento com valor');
+      console.log('[DEBUG] Erro: Nenhum método de pagamento com valor');
+      showError('Adicione pelo menos um método de pagamento com valor');
       return;
     }
 
     const totalPagamentos = calcularTotalPagamentos();
     const totalPedido = orderData?.total || 0;
 
+    console.log(`[DEBUG] Total pagamentos: R$ ${totalPagamentos.toFixed(2)}, Total pedido: R$ ${totalPedido.toFixed(2)}`);
+
     if (Math.abs(totalPagamentos - totalPedido) > 0.01) {
-      alert('O total dos pagamentos deve ser igual ao valor do pedido');
+      console.log(`[DEBUG] Erro: Total dos pagamentos não corresponde ao total do pedido`);
+      showError('O total dos pagamentos deve ser igual ao valor do pedido');
       return;
     }
 
@@ -305,16 +416,49 @@ function CheckoutPage() {
         observacoes: ''
       };
 
-      // Criar pedido via API
-      const response = await clienteService.criarPedido(dadosPedido);
+      console.log('[DEBUG] Dados do pedido preparados:', {
+        enderecoId: dadosPedido.enderecoId,
+        itensCount: dadosPedido.itens.length,
+        metodosPagamento: dadosPedido.metodosPagamento,
+        frete: dadosPedido.frete,
+        total: totalPedido
+      });
 
-      if (response.data.paymentUrl) {
-        // Redirecionar para Mercado Pago
-        window.location.href = response.data.paymentUrl;
+      // Criar pedido via API
+      console.log('[DEBUG] Enviando pedido para API...');
+      const response = await clienteService.criarPedido(dadosPedido);
+      console.log('[DEBUG] Resposta da API:', response);
+
+      // Pagamento simulado - sempre aprovado
+      if (response.data.paymentStatus === 'pago') {
+        console.log('[DEBUG] Pagamento simulado aprovado, mostrando comprovante');
+
+        // Gerar dados do comprovante com dados fictícios
+        const receipt = {
+          orderId: `PED-${response.data.pedidoId}`,
+          date: new Date().toLocaleString('pt-BR'),
+          items: selectedItems,
+          address: selectedAddress,
+          paymentMethods: metodosComValor,
+          subtotal: orderData.subtotal,
+          frete: orderData.frete,
+          total: orderData.total,
+          clientName: user?.nome || 'Cliente',
+          paymentData: response.data.paymentData // Dados fictícios do pagamento
+        };
+
+        setReceiptData(receipt);
+        setOrderComplete(true);
+
+        // Limpar carrinho
+        clearCart();
+
+        showSuccess('Pedido realizado e pago com sucesso!');
         return;
       }
 
-      // Fallback: gerar dados do comprovante (se não houver URL de pagamento)
+      // Fallback para outros casos (não deve acontecer com simulação)
+      console.log('[DEBUG] Fallback: gerando comprovante sem processamento de pagamento');
       const receipt = {
         orderId: `PED-${response.data.pedidoId}`,
         date: new Date().toLocaleString('pt-BR'),
@@ -335,7 +479,7 @@ function CheckoutPage() {
 
     } catch (error) {
       console.error('Erro ao finalizar pedido:', error);
-      alert('Erro ao processar pedido: ' + (error.response?.data?.errors?.join('\n') || error.message));
+      showError('Erro ao processar pedido: ' + (error.response?.data?.errors?.join('\n') || error.message));
     } finally {
       setProcessingOrder(false);
     }
@@ -379,7 +523,7 @@ function CheckoutPage() {
       });
     } else {
       navigator.clipboard.writeText(receiptText);
-      alert('Comprovante copiado para a área de transferência!');
+      showSuccess('Comprovante copiado para a área de transferência!');
     }
   };
 
@@ -905,61 +1049,67 @@ function CheckoutPage() {
                               value={method.amount || ''}
                               onChange={(e) => updatePaymentAmount(method.id, e.target.value)}
                               placeholder="0,00"
-                              className="flex-1 px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
+                              disabled={method.type === 'debito'} // Débito sempre paga o total imediato
+                              className={`flex-1 px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm ${
+                                method.type === 'debito' ? 'bg-slate-50 cursor-not-allowed' : ''
+                              }`}
                             />
+                            {method.type === 'debito' && (
+                              <span className="text-xs text-blue-600 font-medium ml-2">Pagamento total imediato</span>
+                            )}
                           </div>
 
-                          {/* Card details for credit/debit cards */}
-                          {(method.type === 'cartao' || method.type === 'debito') && method.amount > 0 && (
+                          {/* Opções de parcelas e preço à vista */}
+                          {method.amount > 0 && (
                             <div className="space-y-3 p-3 bg-slate-50 rounded-lg">
-                              <h4 className="text-sm font-medium text-slate-900">Dados do Cartão</h4>
-                              <div className="grid grid-cols-1 gap-3">
+                              {/* Preço à vista com desconto */}
+                              <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
                                 <div>
-                                  <label className="block text-xs font-medium text-slate-700 mb-1">Número do Cartão</label>
-                                  <input
-                                    type="text"
-                                    value={cardDetails.number}
-                                    onChange={(e) => setCardDetails(prev => ({ ...prev, number: e.target.value.replace(/\D/g, '').replace(/(\d{4})(?=\d)/g, '$1 ') }))}
-                                    placeholder="0000 0000 0000 0000"
-                                    maxLength="19"
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
-                                  />
+                                  <p className="text-sm font-medium text-green-800">Preço à vista</p>
+                                  <p className="text-xs text-green-600">
+                                    {calculateCashPrice(method.amount).discountPercent}% de desconto
+                                  </p>
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div>
-                                    <label className="block text-xs font-medium text-slate-700 mb-1">Validade</label>
-                                    <input
-                                      type="text"
-                                      value={cardDetails.expiry}
-                                      onChange={(e) => setCardDetails(prev => ({ ...prev, expiry: e.target.value.replace(/\D/g, '').replace(/(\d{2})(?=\d)/, '$1/') }))}
-                                      placeholder="MM/AA"
-                                      maxLength="5"
-                                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-slate-700 mb-1">CVV</label>
-                                    <input
-                                      type="text"
-                                      value={cardDetails.cvv}
-                                      onChange={(e) => setCardDetails(prev => ({ ...prev, cvv: e.target.value.replace(/\D/g, '') }))}
-                                      placeholder="000"
-                                      maxLength="4"
-                                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
-                                    />
-                                  </div>
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-slate-700 mb-1">Nome no Cartão</label>
-                                  <input
-                                    type="text"
-                                    value={cardDetails.name}
-                                    onChange={(e) => setCardDetails(prev => ({ ...prev, name: e.target.value.toUpperCase() }))}
-                                    placeholder="NOME COMPLETO"
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
-                                  />
+                                <div className="text-right">
+                                  <p className="text-lg font-bold text-green-800">
+                                    R$ {calculateCashPrice(method.amount).final.toFixed(2)}
+                                  </p>
+                                  <button
+                                    onClick={() => applyCashDiscount(method.id)}
+                                    className="text-xs text-green-600 hover:text-green-800 underline"
+                                  >
+                                    Aplicar desconto
+                                  </button>
                                 </div>
                               </div>
+
+                              {/* Parcelas para cartão de crédito */}
+                              {method.type === 'cartao' && (
+                                <div>
+                                  <h4 className="text-sm font-medium text-slate-900 mb-2">Parcelas</h4>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {calculateInstallments(method.amount).slice(0, 6).map((installment, index) => (
+                                      <button
+                                        key={index}
+                                        onClick={() => {
+                                          updateInstallments(method.id, installment.installments);
+                                          showInfo(`Parcelamento em ${installment.installments}x selecionado`);
+                                        }}
+                                        className={`p-2 text-xs border rounded-lg transition-colors ${
+                                          installments[method.id] === installment.installments
+                                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                            : 'border-slate-200 hover:border-slate-300 text-slate-700'
+                                        }`}
+                                      >
+                                        {installment.label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              
+                              
                             </div>
                           )}
                         </div>

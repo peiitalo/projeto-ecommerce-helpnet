@@ -7,6 +7,11 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import useDebounce from '../../hooks/useDebounce';
 import apiCache from '../../utils/cache';
 import LazyImage from '../../components/LazyImage';
+import ProductDetailsModal from '../../components/ProductDetailsModal';
+import CategoryFilter from '../../components/CategoryFilter';
+import LoadingSkeleton from '../../components/LoadingSkeleton';
+import { buildImageUrl, buildImageUrls, getFirstValidImage } from '../../utils/imageUtils';
+import { useNotifications } from '../../hooks/useNotifications';
 import {
   FaShoppingCart,
   FaUser,
@@ -20,7 +25,8 @@ import {
   FaFilter,
   FaCheck,
   FaSignOutAlt,
-  FaRegHeart
+  FaRegHeart,
+  FaEye
 } from 'react-icons/fa';
 import {
   FiSearch,
@@ -43,12 +49,6 @@ function Home() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchResultsOpen, setSearchResultsOpen] = useState(false);
 
-  // Helper to build full image URL
-  const buildImageUrl = (imagePath) => {
-    if (!imagePath) return '/placeholder-image.svg';
-    const baseUrl = (import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:3001/api').replace('/api', '');
-    return `${baseUrl}/uploads/${imagePath}`;
-  };
 
   // Estados para pesquisa e filtros
   const [query, setQuery] = useState('');
@@ -67,11 +67,14 @@ function Home() {
   const { count: cartCount, addItem, removeItem, items } = useCart();
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const { showSuccess, showError, showWarning } = useNotifications();
   const [savedCount, setSavedCount] = useState(0);
   const [notifCount] = useState(3);
   const [favorites, setFavorites] = useState([]);
   const [favoritesLoading, setFavoritesLoading] = useState(true);
   const [favoriteLoading, setFavoriteLoading] = useState(null); // productId being toggled
+  const [productModalId, setProductModalId] = useState(null);
+  const [showProductModal, setShowProductModal] = useState(false);
 
   // Logo configuration - you can change this to use an image
   const logoConfig = {
@@ -81,63 +84,50 @@ function Home() {
     textLogo: 'HelpNet'
   };
 
-  // Opções de filtros disponíveis
-  const filterOptions = [
-    { type: 'category', label: 'Eletrônicos', value: 'Eletrônicos' },
-    { type: 'category', label: 'Casa e Decoração', value: 'Casa e Decoração' },
-    { type: 'category', label: 'Beleza e Saúde', value: 'Beleza e Saúde' },
-    { type: 'category', label: 'Moda e Acessórios', value: 'Moda e Acessórios' },
-    { type: 'category', label: 'Esportes e Lazer', value: 'Esportes e Lazer' },
-    { type: 'category', label: 'Livros e Entretenimento', value: 'Livros e Entretenimento' },
-    { type: 'category', label: 'Outras', value: 'Outras' },
-    { type: 'price', label: 'Até R$ 100', value: 'price-100' },
-    { type: 'price', label: 'R$ 100 - R$ 500', value: 'price-100-500' },
-    { type: 'price', label: 'R$ 500 - R$ 1000', value: 'price-500-1000' },
-    { type: 'price', label: 'Acima de R$ 1000', value: 'price-1000+' },
-    { type: 'rating', label: '4+ estrelas', value: 'rating-4+' },
-    { type: 'rating', label: '4.5+ estrelas', value: 'rating-4.5+' },
-    { type: 'shipping', label: 'Frete grátis', value: 'free-shipping' },
-    { type: 'discount', label: 'Com desconto', value: 'with-discount' },
-  ];
+  // Category filter options are now handled by the CategoryFilter component
 
   // Menu lateral do cliente (sem perfil/carrinho/favoritos)
   const clienteMenu = [
     { label: 'Explore', to: '/explorer', icon: <FiSearch className="text-slate-500" /> },
     { label: 'Pedidos', to: '/meus-pedidos', icon: <FiPackage className="text-slate-500" /> },
     { label: 'Histórico', to: '/historico', icon: <FiClock className="text-slate-500" /> },
-    { label: 'Categorias', to: '/categorias', icon: <FiTag className="text-slate-500" /> },
     { label: 'Meus Cupons', to: '/cupons', icon: <FiCreditCard className="text-slate-500" /> },
     { label: 'Endereços', to: '/enderecos', icon: <FiMapPin className="text-slate-500" /> },
     { label: 'Suporte', to: '/suporte', icon: <FiHelpCircle className="text-slate-500" /> },
     { label: 'Configurações', to: '/configuracoes', icon: <FiSettings className="text-slate-500" /> },
   ];
 
-  // Slides do carrossel
+  // Slides do carrossel - banners funcionais com links para categorias ou promoções
   const slides = [
     {
       id: 1,
       title: 'Ofertas da Semana',
       subtitle: 'Descontos exclusivos em eletrônicos e acessórios',
-      cta: { label: 'Ver Ofertas', to: '/explorer?categoria=eletronicos' },
+      cta: { label: 'Ver Ofertas', to: '/promocoes' }, // Link para página de promoções
       image: 'https://images.unsplash.com/photo-1518779578993-ec3579fee39f?q=80&w=1600&auto=format&fit=crop'
     },
     {
       id: 2,
       title: 'Novidades em Moda',
       subtitle: 'Coleção outono com até 40% OFF',
-      cta: { label: 'Explorar Moda', to: '/explorer?categoria=moda' },
+      cta: { label: 'Explorar Moda', to: '/categoria/moda' }, // Link para categoria moda
       image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1600&auto=format&fit=crop'
     },
     {
       id: 3,
       title: 'Casa e Decoração',
       subtitle: 'Renove seus ambientes com estilo e economia',
-      cta: { label: 'Ver Casa & Decor', to: '/explorer?categoria=casa' },
+      cta: { label: 'Ver Casa & Decor', to: '/categoria/casa-decoracao' }, // Link para categoria casa e decoração
       image: 'https://images.unsplash.com/photo-1505692794403-34d4982f88aa?q=80&w=1600&auto=format&fit=crop'
     }
   ];
 
   const [activeSlide, setActiveSlide] = useState(0);
+
+  // Estados para funcionalidade de swipe no mobile
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
+  const minSwipeDistance = 50; // Distância mínima para considerar swipe
 
   // Rotação automática do carrossel
   useEffect(() => {
@@ -147,8 +137,26 @@ function Home() {
     return () => clearInterval(interval);
   }, [slides.length]);
 
+  // Funções de navegação do carrossel
   const goPrev = () => setActiveSlide((activeSlide - 1 + slides.length) % slides.length);
   const goNext = () => setActiveSlide((activeSlide + 1) % slides.length);
+
+  // Handlers para swipe no mobile
+  const onTouchStart = (e) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e) => setTouchEnd(e.targetTouches[0].clientX);
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    if (isLeftSwipe) goNext(); // Swipe para esquerda = próximo slide
+    if (isRightSwipe) goPrev(); // Swipe para direita = slide anterior
+  };
 
   // Carregar produtos e favoritos da API
   useEffect(() => {
@@ -184,8 +192,8 @@ function Home() {
         name: produto.Nome || produto.name,
         price: produto.Preco || produto.price,
         originalPrice: produto.PrecoOriginal || produto.originalPrice,
-        image: buildImageUrl(produto.Imagens && produto.Imagens[0]),
-        images: (produto.Imagens || []).map(img => buildImageUrl(img)), // Array of full URLs
+        image: getFirstValidImage(produto.Imagens),
+        images: buildImageUrls(produto.Imagens), // Array of full URLs
         rating: 4.5, // Mock rating - pode ser implementado depois
         sales: Math.floor(Math.random() * 2000) + 100, // Mock sales - pode ser implementado depois
         category: produto.categoria?.Nome || produto.category || 'Geral',
@@ -193,7 +201,8 @@ function Home() {
         discount: produto.Desconto || produto.discount || 0,
         breveDescricao: produto.BreveDescricao || produto.breveDescricao || '',
         vendedorNome: produto.vendedor?.Nome || null,
-        empresaNome: produto.empresa?.Nome || null
+        empresaNome: produto.empresa?.Nome || null,
+        estoque: produto.Estoque || 0
       }));
 
       setProducts(produtosMapeados);
@@ -255,13 +264,6 @@ function Home() {
   };
 
   // Funções para gerenciar filtros
-  const addFilter = (filter) => {
-    if (!selectedFilters.find(f => f.value === filter.value)) {
-      setSelectedFilters([...selectedFilters, filter]);
-    }
-    setFiltersOpen(false);
-  };
-
   const removeFilter = (filterValue) => {
     setSelectedFilters(selectedFilters.filter(f => f.value !== filterValue));
   };
@@ -369,11 +371,13 @@ function Home() {
   // Função para adicionar ao carrinho
   const handleAddToCart = (product) => {
     addItem(product, 1);
+    showSuccess(`${product.name} adicionado ao carrinho!`);
   };
 
   // Função para remover do carrinho
   const handleRemoveFromCart = (productId) => {
     removeItem(productId);
+    showWarning('Produto removido do carrinho');
   };
 
   // Verificar se produto está no carrinho
@@ -409,10 +413,16 @@ function Home() {
 
   // Função para logout
   const handleLogout = () => {
-    if (window.confirm('Deseja realmente sair?')) {
-      logout();
-      navigate('/login');
-    }
+    // Usar notificação em vez de confirm
+    showWarning('Deseja realmente sair?', {
+      autoClose: false,
+      closeOnClick: false,
+      draggable: false,
+      onClose: () => {
+        logout();
+        navigate('/login');
+      }
+    });
   };
 
 
@@ -629,16 +639,13 @@ function Home() {
                         <p className="text-sm font-medium text-slate-700">Filtros</p>
                       </div>
                       <div className="p-2">
-                        {filterOptions.map((option) => (
-                          <button
-                            key={option.value}
-                            onClick={() => addFilter(option)}
-                            disabled={selectedFilters.find(f => f.value === option.value)}
-                            className="w-full text-left px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                          >
-                            {option.label}
-                          </button>
-                        ))}
+                        {/* Reusable CategoryFilter component for standardized category filtering */}
+                        <CategoryFilter
+                          selectedCategories={selectedFilters}
+                          onCategoryChange={setSelectedFilters}
+                          multiSelect={true}
+                          showAllOption={true}
+                        />
                       </div>
                     </div>
                   )}
@@ -809,28 +816,38 @@ function Home() {
         <section className="bg-slate-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              {/* Carrossel Principal */}
-              <div className="lg:col-span-3 relative rounded-2xl overflow-hidden border border-slate-200">
+              {/* Carrossel Principal - com navegação por botões e swipe no mobile */}
+              <div
+                className="lg:col-span-3 relative rounded-2xl overflow-hidden border border-slate-200"
+                onTouchStart={onTouchStart}
+                onTouchMove={onTouchMove}
+                onTouchEnd={onTouchEnd}
+              >
+              {/* Renderização dos slides do carrossel */}
               {slides.map((slide, idx) => (
                 <div
                   key={slide.id}
                   className={`absolute inset-0 transition-opacity duration-700 ${idx === activeSlide ? 'opacity-100' : 'opacity-0'}`}
                   aria-hidden={idx !== activeSlide}
                 >
+                  {/* Imagem do slide com fallback para acessibilidade */}
                   <img
                     src={slide.image}
-                    alt={slide.title}
+                    alt={slide.title} // Alt text para acessibilidade
                     className="w-full h-[260px] sm:h-[360px] lg:h-[440px] object-cover"
                     onError={(e) => {
                       e.target.src = '/placeholder-image.svg';
                       e.target.alt = 'Imagem não disponível';
                     }}
                   />
+                  {/* Overlay gradiente para melhor legibilidade do texto */}
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-slate-900/20 to-transparent" />
+                  {/* Conteúdo do slide com título, subtítulo e botão de ação */}
                   <div className="absolute inset-0 p-6 sm:p-10 lg:p-14 flex flex-col justify-end">
                     <h2 className="text-2xl sm:text-4xl font-bold text-white drop-shadow">{slide.title}</h2>
                     <p className="text-slate-100 mt-1 sm:mt-2 text-sm sm:text-base max-w-xl">{slide.subtitle}</p>
                     <div className="mt-4">
+                      {/* Link para categoria ou promoções usando React Router */}
                       <Link
                         to={slide.cta.to}
                         className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-white text-blue-700 font-semibold hover:shadow-md hover:scale-[1.02] transition"
@@ -1023,32 +1040,27 @@ function Home() {
             
             {/* Loading de produtos */}
             {loading ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
-                {[...Array(10)].map((_, i) => (
-                  <div key={i} className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm animate-pulse">
-                    <div className="aspect-square bg-slate-200"></div>
-                    <div className="p-3">
-                      <div className="h-4 bg-slate-200 rounded mb-2"></div>
-                      <div className="h-3 bg-slate-200 rounded w-3/4 mb-2"></div>
-                      <div className="h-4 bg-slate-200 rounded w-1/2"></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <LoadingSkeleton type="product-grid" />
             ) : (
               /* Grid de produtos */
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
               {paginatedProducts.map((p) => (
-            <div key={p.id} className="group bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition flex flex-col h-full">
+            // Card de produto - clicável com efeitos de hover para melhor UX
+            <div key={p.id} className="group bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm hover:shadow-lg hover:border-blue-300 transition-all duration-200 flex flex-col h-full">
+            {/* Imagem do produto com link para página individual */}
             <Link to={`/produto/${p.id}`} className="relative aspect-square overflow-hidden">
             <LazyImage
               src={p.image}
-              alt={p.name}
+              alt={p.name} // Alt text para acessibilidade descrevendo o produto
               className="w-full h-full group-hover:scale-105 transition-transform duration-300"
               fallback="/placeholder-image.svg"
+              onError={(e) => {
+                console.warn('Failed to load product image:', p.image);
+                e.target.src = '/placeholder-image.svg';
+              }}
             />
-            
-            {/* Badges */}
+
+            {/* Badges informativos sobre desconto e frete */}
             <div className="absolute top-2 left-2 flex flex-col gap-1">
             {p.discount > 0 && (
             <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded flex items-center gap-0.5 shadow-sm">
@@ -1062,8 +1074,28 @@ function Home() {
             Grátis
             </span>
             )}
+            {p.estoque <= 0 && (
+            <span className="px-1.5 py-0.5 bg-gray-500 text-white text-[10px] font-bold rounded shadow-sm">
+            Esgotado
+            </span>
+            )}
             </div>
-            
+
+            {/* Botão para abrir modal de detalhes do produto */}
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setProductModalId(p.id);
+                setShowProductModal(true);
+              }}
+              className="absolute top-2 right-12 p-1.5 rounded-full bg-white/90 hover:bg-white shadow-sm hover:shadow-md transition-all text-slate-700 hover:text-blue-600"
+              aria-label="Ver detalhes do produto"
+            >
+              <FaEye className="text-xs" />
+            </button>
+
+            {/* Botão de favorito com estados loading e toggle */}
             <button
             onClick={(e) => {
             e.preventDefault();
@@ -1086,21 +1118,25 @@ function Home() {
             </button>
             </Link>
             
+            {/* Conteúdo textual do card do produto */}
             <div className="p-3 flex flex-col flex-1">
+            {/* Título do produto com link para página individual */}
             <Link to={`/produto/${p.id}`}>
             <h4 className="font-medium text-slate-900 text-sm leading-tight mb-2 line-clamp-2 min-h-[2.5rem] flex-shrink-0 hover:text-blue-700 transition-colors">{p.name}</h4>
             </Link>
 
+            {/* Descrição breve se disponível */}
             {p.breveDescricao && (
               <p className="text-slate-600 text-xs leading-tight mb-2 line-clamp-2 flex-shrink-0">{p.breveDescricao}</p>
             )}
 
-
+            {/* Avaliação por estrelas e número de vendas */}
             <div className="flex items-center justify-between mb-2 flex-shrink-0">
             {renderStars(p.rating)}
             <span className="text-[10px] text-slate-500">({p.sales.toLocaleString('pt-BR')})</span>
             </div>
-            
+
+            {/* Preço e botão de adicionar ao carrinho */}
             <div className="mt-auto">
             {p.originalPrice && (
             <div className="mb-1">
@@ -1109,21 +1145,27 @@ function Home() {
             )}
             <div className="flex items-center justify-between">
             <span className="text-sm font-bold text-blue-700 flex-1 mr-2">{formatPrice(p.price)}</span>
+            {/* Botão de carrinho com estados para adicionar/remover */}
             <button
             onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            if (p.estoque <= 0) return; // Prevent action if out of stock
             if (isInCart(p.id)) {
               handleRemoveFromCart(p.id);
             } else {
               handleAddToCart(p);
             }
             }}
+            disabled={p.estoque <= 0}
             className={`p-1.5 rounded-lg text-white transition-colors shadow-sm hover:shadow-md flex-shrink-0 ${
-              isInCart(p.id)
+              p.estoque <= 0
+                ? 'bg-gray-400 cursor-not-allowed'
+                : isInCart(p.id)
                 ? 'bg-green-500 hover:bg-green-600'
                 : 'bg-blue-600 hover:bg-blue-700'
             }`}
+            aria-label={p.estoque <= 0 ? "Produto esgotado" : isInCart(p.id) ? "Remover do carrinho" : "Adicionar ao carrinho"}
             >
             {isInCart(p.id) ? (
               <FaCheck className="text-xs" />
@@ -1194,15 +1236,26 @@ function Home() {
           </div>
         </section>
 
+        {/* Product Details Modal */}
+        <ProductDetailsModal
+          productId={productModalId}
+          isOpen={showProductModal}
+          onClose={() => {
+            setShowProductModal(false);
+            setProductModalId(null);
+          }}
+        />
+
         {/* Footer simples */}
         <footer className="bg-slate-900 text-slate-300">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
               <p className="text-sm">© {new Date().getFullYear()} HelpNet. Todos os direitos reservados.</p>
-              <div className="flex items-center gap-5 text-sm">
-                <Link to="/termos" className="hover:text-white">Termos</Link>
-                <Link to="/privacidade" className="hover:text-white">Privacidade</Link>
-                <Link to="/contato" className="hover:text-white">Contato</Link>
+              <div className="flex flex-col md:flex-row items-center gap-3 md:gap-5 text-sm">
+                <Link to="/termos" className="hover:text-white transition-colors">Termos</Link>
+                <Link to="/politica-privacidade" className="hover:text-white transition-colors">Política de Privacidade</Link>
+                <Link to="/suporte" className="hover:text-white transition-colors">Suporte</Link>
+                <Link to="/contato" className="hover:text-white transition-colors">Contato</Link>
               </div>
             </div>
           </div>

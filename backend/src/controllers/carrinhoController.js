@@ -5,6 +5,11 @@ import { logControllerError } from '../utils/logger.js';
 export const listar = async (req, res) => {
   try {
     const userId = req.user?.id;
+    logger.info('listar carrinho called', { userId });
+    if (!userId) {
+      return res.status(401).json({ erro: 'Usuário não autenticado' });
+    }
+
     const items = await prisma.carrinhoItem.findMany({
       where: { ClienteID: userId },
       include: { produto: { select: { ProdutoID: true, Nome: true, Preco: true, Imagens: true, SKU: true, Ativo: true } } },
@@ -20,6 +25,10 @@ export const listar = async (req, res) => {
 export const adicionar = async (req, res) => {
   try {
     const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ erro: 'Usuário não autenticado' });
+    }
+
     const { produtoId, quantidade } = req.body || {};
     if (!produtoId) return res.status(400).json({ erro: 'produtoId é obrigatório' });
     const qtd = Math.max(1, parseInt(quantidade || 1));
@@ -44,6 +53,10 @@ export const adicionar = async (req, res) => {
 export const atualizar = async (req, res) => {
   try {
     const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ erro: 'Usuário não autenticado' });
+    }
+
     const { produtoId } = req.params;
     const { quantidade } = req.body || {};
     const qtd = parseInt(quantidade);
@@ -66,6 +79,10 @@ export const atualizar = async (req, res) => {
 export const remover = async (req, res) => {
   try {
     const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ erro: 'Usuário não autenticado' });
+    }
+
     const { produtoId } = req.params;
     await prisma.carrinhoItem.delete({
       where: { ClienteID_ProdutoID: { ClienteID: userId, ProdutoID: parseInt(produtoId) } }
@@ -80,6 +97,10 @@ export const remover = async (req, res) => {
 export const limpar = async (req, res) => {
   try {
     const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ erro: 'Usuário não autenticado' });
+    }
+
     await prisma.carrinhoItem.deleteMany({ where: { ClienteID: userId } });
     res.json({ mensagem: 'Carrinho limpo' });
   } catch (error) {

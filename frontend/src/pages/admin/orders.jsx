@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react';
 import { FiPackage, FiSearch, FiFilter, FiEdit, FiEye, FiCheck, FiX } from 'react-icons/fi';
+import { FaEye } from 'react-icons/fa';
 import AdminLayout from '../../components/AdminLayout';
-import { apiRequest } from '../../services/api';
+import api from '../../services/api';
+import { useNotifications } from '../../hooks/useNotifications';
+import OrderDetailsModal from '../../components/OrderDetailsModal';
 
 function AdminOrdersPage() {
+  const { showSuccess, showError } = useNotifications();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -16,6 +20,8 @@ function AdminOrdersPage() {
   const [newStatus, setNewStatus] = useState('');
   const [statusNotes, setStatusNotes] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [orderModalId, setOrderModalId] = useState(null);
+  const [showOrderModal, setShowOrderModal] = useState(false);
 
   const ordersPerPage = 10;
 
@@ -70,7 +76,7 @@ function AdminOrdersPage() {
 
       if (statusFilter) params.append('status', statusFilter);
 
-      const response = await apiRequest(`/admin/pedidos?${params}`);
+      const response = await api.get(`/admin/pedidos?${params}`);
 
       if (response.success) {
         setOrders(response.pedidos || []);
@@ -92,12 +98,9 @@ function AdminOrdersPage() {
     try {
       setUpdatingStatus(true);
 
-      const response = await apiRequest(`/admin/pedidos/${selectedOrder.PedidoID}/status`, {
-        method: 'PUT',
-        body: JSON.stringify({
-          status: newStatus,
-          observacoes: statusNotes
-        })
+      const response = await api.put(`/admin/pedidos/${selectedOrder.PedidoID}/status`, {
+        status: newStatus,
+        observacoes: statusNotes
       });
 
       if (response.success) {
@@ -107,13 +110,13 @@ function AdminOrdersPage() {
         setSelectedOrder(null);
         setNewStatus('');
         setStatusNotes('');
-        alert('Status do pedido atualizado com sucesso!');
+        showSuccess('Status do pedido atualizado com sucesso!');
       } else {
-        alert(response.errors?.[0] || 'Erro ao atualizar status');
+        showError(response.errors?.[0] || 'Erro ao atualizar status');
       }
     } catch (err) {
       console.error('Erro ao atualizar status:', err);
-      alert('Erro ao atualizar status. Tente novamente.');
+      showError('Erro ao atualizar status. Tente novamente.');
     } finally {
       setUpdatingStatus(false);
     }
@@ -256,6 +259,16 @@ function AdminOrdersPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex justify-end gap-2">
                             <button
+                              onClick={() => {
+                                setOrderModalId(order.PedidoID);
+                                setShowOrderModal(true);
+                              }}
+                              className="text-blue-600 hover:text-blue-900 p-1"
+                              title="Ver detalhes do pedido"
+                            >
+                              <FaEye className="w-4 h-4" />
+                            </button>
+                            <button
                               onClick={() => openStatusModal(order)}
                               className="text-blue-600 hover:text-blue-900 p-1"
                               title="Alterar status"
@@ -358,6 +371,17 @@ function AdminOrdersPage() {
             </div>
           </div>
         )}
+
+        {/* Order Details Modal */}
+        <OrderDetailsModal
+          orderId={orderModalId}
+          isOpen={showOrderModal}
+          onClose={() => {
+            setShowOrderModal(false);
+            setOrderModalId(null);
+          }}
+          isAdmin={true}
+        />
       </div>
     </AdminLayout>
   );

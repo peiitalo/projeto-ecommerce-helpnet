@@ -35,6 +35,7 @@ function OrdersPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedSeller, setSelectedSeller] = useState(null);
   const [deliveryTracking, setDeliveryTracking] = useState({});
   const { logout } = useAuth();
 
@@ -83,11 +84,13 @@ function OrdersPage() {
           name: item.produto.Nome,
           quantity: item.Quantidade,
           price: parseFloat(item.PrecoUnitario),
-          seller: item.produto.vendedor ? item.produto.vendedor.Nome : 'N/A'
+          seller: item.produto.vendedor ? item.produto.vendedor.Nome : 'N/A',
+          sellerId: item.produto.vendedor?.VendedorID || null
         })),
+        sellers: [...new Set(pedido.itensPedido.map(item => item.produto.vendedor?.Nome).filter(Boolean))],
         address: pedido.Endereco ? {
           name: pedido.Endereco.Nome || 'Endereço não informado',
-          street: `${pedido.Endereco.Logradouro || ''}, ${pedido.Endereco.Numero || ''}`.trim(),
+          street: `${pedido.Endereco.Nome || ''}, ${pedido.Endereco.Numero || ''}`.trim(),
           city: `${pedido.Endereco.Cidade || ''} - ${pedido.Endereco.UF || ''}`.trim(),
           cep: pedido.Endereco.CEP || 'Não informado'
         } : {
@@ -376,6 +379,27 @@ function OrdersPage() {
                         <p className="text-sm text-slate-600">{order.items.length} item(s)</p>
                       </div>
                     </div>
+
+                    {/* Vendedores */}
+                    {order.sellers && order.sellers.length > 0 && (
+                      <div className="bg-slate-50 rounded-lg p-4 mb-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <FaUser className="text-blue-600" />
+                          <span className="text-sm font-medium text-slate-900">Vendedor{order.sellers.length > 1 ? 'es' : ''}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {order.sellers.map((seller, index) => (
+                            <button
+                              key={index}
+                              onClick={() => setSelectedSeller({ name: seller, id: order.items.find(item => item.seller === seller)?.sellerId })}
+                              className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-sm text-blue-600 hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                            >
+                              {seller}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Status e entrega */}
                     <div className="bg-slate-50 rounded-lg p-4 mb-4">
@@ -676,6 +700,50 @@ function OrdersPage() {
             <div className="p-6 border-t border-slate-200">
               <button
                 onClick={() => setSelectedOrder(null)}
+                className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Informações do Vendedor */}
+      {selectedSeller && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-slate-900">Informações do Vendedor</h3>
+                <button
+                  onClick={() => setSelectedSeller(null)}
+                  className="text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <FiX className="text-xl" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <span className="text-sm font-medium text-slate-600">Nome:</span>
+                  <p className="text-slate-900">{selectedSeller.name || 'Não informado'}</p>
+                </div>
+
+                <div>
+                  <span className="text-sm font-medium text-slate-600">ID do Vendedor:</span>
+                  <p className="text-slate-900">{selectedSeller.id || 'Não informado'}</p>
+                </div>
+
+                {/* Adicionar mais informações se disponíveis */}
+                <div className="text-sm text-slate-500 mt-4">
+                  <p>Para mais informações ou suporte, entre em contato conosco.</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-200">
+              <button
+                onClick={() => setSelectedSeller(null)}
                 className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
               >
                 Fechar

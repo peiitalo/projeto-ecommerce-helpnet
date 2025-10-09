@@ -20,7 +20,6 @@ function VendorLayout({ children }) {
     { label: 'Visão Geral', to: '/vendedor', icon: <FiHome className="text-slate-500" /> },
     { label: 'Pedidos', to: '/vendedor/pedidos', icon: <FiPackage className="text-slate-500" /> },
     { label: 'Produtos', to: '/vendedor/produtos', icon: <FiBox className="text-slate-500" /> },
-    { label: 'Categorias', to: '/vendedor/categorias', icon: <FiTag className="text-slate-500" /> },
     { label: 'Entregas', to: '/vendedor/entregas', icon: <FiTruck className="text-slate-500" /> },
     { label: 'Clientes', to: '/vendedor/clientes', icon: <FiUsers className="text-slate-500" /> },
     { label: 'Vendedores', to: '/vendedor/vendedores', icon: <FiBriefcase className="text-slate-500" /> },

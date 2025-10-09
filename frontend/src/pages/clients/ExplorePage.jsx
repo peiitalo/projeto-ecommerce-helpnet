@@ -5,6 +5,8 @@ import { log } from '../../utils/logger';
 import { useCart } from '../../context/CartContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import LazyImage from '../../components/LazyImage';
+import ProductDetailsModal from '../../components/ProductDetailsModal';
+import LoadingSkeleton from '../../components/LoadingSkeleton';
 import {
   FaShoppingCart,
   FaUser,
@@ -18,7 +20,10 @@ import {
   FaRegStar,
   FaStarHalfAlt,
   FaSignOutAlt,
-  FaPercent
+  FaPercent,
+  FaTruck,
+  FaTimes,
+  FaEye
 } from 'react-icons/fa';
 import {
   FiSearch,
@@ -51,15 +56,23 @@ function ExplorePage() {
   // Helper to build full image URL
   const buildImageUrl = (imagePath) => {
     if (!imagePath) return '/placeholder-image.svg';
-    const baseUrl = (import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:3001/api').replace('/api', '');
-    return `${baseUrl}/uploads/${imagePath}`;
+    // Remove leading slash if present to avoid double slashes
+    const cleanPath = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath;
+    return `/api/${cleanPath}`;
   };
 
   // Estados para busca e filtros na categoria
   const [categorySearchQuery, setCategorySearchQuery] = useState('');
   const [categoryFilters, setCategoryFilters] = useState([]);
+  const [priceMin, setPriceMin] = useState('');
+  const [priceMax, setPriceMax] = useState('');
+  const [stockMin, setStockMin] = useState('');
+  const [stockMax, setStockMax] = useState('');
   const [sortBy, setSortBy] = useState('relevance');
   const [favorites, setFavorites] = useState([]);
+  const [searchTimeout, setSearchTimeout] = useState(null);
+  const [productModalId, setProductModalId] = useState(null);
+  const [showProductModal, setShowProductModal] = useState(false);
 
   // Logo configuration
   const logoConfig = {
@@ -81,12 +94,15 @@ function ExplorePage() {
     { label: 'Configurações', to: '/configuracoes', icon: <FiSettings className="text-slate-500" /> },
   ];
 
-  // Opções de filtros para categoria (apenas preço e estrelas)
+  // Opções de filtros para categoria
   const categoryFilterOptions = [
-    { type: 'price', label: 'Até R$ 100', value: 'price-100' },
+    { type: 'price', label: 'Até R$ 100', value: 'price-0-100' },
     { type: 'price', label: 'R$ 100 - R$ 500', value: 'price-100-500' },
     { type: 'price', label: 'R$ 500 - R$ 1000', value: 'price-500-1000' },
-    { type: 'price', label: 'Acima de R$ 1000', value: 'price-1000+' },
+    { type: 'price', label: 'Acima de R$ 1000', value: 'price-1000-999999' },
+    { type: 'stock', label: 'Em estoque', value: 'stock-1-999999' },
+    { type: 'stock', label: 'Estoque baixo (1-10)', value: 'stock-1-10' },
+    { type: 'stock', label: 'Estoque alto (50+)', value: 'stock-50-999999' },
     { type: 'rating', label: '4+ estrelas', value: 'rating-4+' },
     { type: 'rating', label: '4.5+ estrelas', value: 'rating-4.5+' },
   ];
@@ -108,20 +124,71 @@ function ExplorePage() {
     }
   }, [searchParams, categories]);
 
+  // Read initial filters from URL params
+  useEffect(() => {
+    if (selectedCategory) {
+      const busca = searchParams.get('busca') || '';
+      const precoMin = searchParams.get('precoMin') || '';
+      const precoMax = searchParams.get('precoMax') || '';
+      const estoqueMin = searchParams.get('estoqueMin') || '';
+      const estoqueMax = searchParams.get('estoqueMax') || '';
+
+      setCategorySearchQuery(busca);
+      setPriceMin(precoMin);
+      setPriceMax(precoMax);
+      setStockMin(estoqueMin);
+      setStockMax(estoqueMax);
+
+      // Reconstruct categoryFilters from params
+      const newFilters = [];
+      if (precoMin || precoMax) {
+        // Find matching price filter
+        const priceFilter = categoryFilterOptions.find(f =>
+          f.type === 'price' &&
+          f.value === `price-${precoMin || '0'}-${precoMax || '999999'}`
+        );
+        if (priceFilter) newFilters.push(priceFilter);
+      }
+      if (estoqueMin || estoqueMax) {
+        const stockFilter = categoryFilterOptions.find(f =>
+          f.type === 'stock' &&
+          f.value === `stock-${estoqueMin || '0'}-${estoqueMax || '999999'}`
+        );
+        if (stockFilter) newFilters.push(stockFilter);
+      }
+      setCategoryFilters(newFilters);
+
+      // Fetch with initial filters
+      if (busca || precoMin || precoMax || estoqueMin || estoqueMax) {
+        fetchProductsWithFilters();
+      }
+    }
+  }, [selectedCategory, searchParams]);
+
   // Aplicar filtros quando produtos mudam
   useEffect(() => {
     if (products.length > 0) {
       setFilteredProducts(products);
-      applyFiltersAndSearch();
     }
   }, [products]);
 
-  // Reaplicar filtros quando busca, filtros ou ordenação mudam
-  useEffect(() => {
-    if (products.length > 0) {
-      applyFiltersAndSearch();
+  // Debounce para busca
+  const handleSearchChange = (value) => {
+    setCategorySearchQuery(value);
+
+    // Limpar timeout anterior
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
     }
-  }, [categorySearchQuery, categoryFilters, sortBy]);
+
+    // Definir novo timeout
+    const timeout = setTimeout(() => {
+      updateUrlParams();
+      fetchProductsWithFilters();
+    }, 300);
+
+    setSearchTimeout(timeout);
+  };
 
   const carregarCategorias = async () => {
     try {
@@ -129,7 +196,7 @@ function ExplorePage() {
       log.info('explore_categories_fetch_start');
       const response = await categoriaService.listar();
 
-      // Mapear categorias da API
+      // Mapear categorias da API para o formato esperado pelo ExplorePage
       const categoriasMapeadas = (response.categorias || response).map(categoria => ({
         id: categoria.CategoriaID || categoria.id,
         name: categoria.Nome || categoria.nome,
@@ -141,7 +208,7 @@ function ExplorePage() {
       log.info('explore_categories_fetch_success', { total: categoriasMapeadas.length });
     } catch (error) {
       log.error('explore_categories_fetch_error', { error: error.message });
-      // Fallback para categorias mockadas
+      // Fallback para categorias mockadas se a API falhar
       setCategories([
         {
           id: 'cat1',
@@ -196,16 +263,26 @@ function ExplorePage() {
     }
   };
 
-  const handleCategorySelect = async (category) => {
-    setSelectedCategory(category);
+  const fetchProductsWithFilters = async () => {
+    if (!selectedCategory) return;
+
     setLoadingProducts(true);
 
     try {
-      log.info('explore_products_fetch_start', { categoryId: category.id });
-      const response = await produtoService.listar({
-        categoria: category.name,
-        status: 'ativo'
-      });
+      log.info('explore_products_fetch_start', { categoryId: selectedCategory.id });
+
+      // Build filters object
+      const filtros = {
+        categoria: selectedCategory.name,
+        status: 'ativo',
+        busca: categorySearchQuery.trim() || undefined,
+        precoMin: priceMin || undefined,
+        precoMax: priceMax || undefined,
+        estoqueMin: stockMin || undefined,
+        estoqueMax: stockMax || undefined,
+      };
+
+      const response = await produtoService.listar(filtros);
 
       // Mapear produtos da API
       const produtosMapeados = (response.produtos || response).map(produto => ({
@@ -217,18 +294,20 @@ function ExplorePage() {
         images: (produto.Imagens || []).map(img => buildImageUrl(img)), // Array of full URLs
         rating: 4.5,
         sales: Math.floor(Math.random() * 2000) + 100,
-        category: produto.categoria?.Nome || produto.category || category.name,
+        category: produto.categoria?.Nome || produto.category || selectedCategory.name,
         freeShipping: produto.FreteGratis || produto.freeShipping || false,
         discount: produto.Desconto || produto.discount || 0,
         breveDescricao: produto.BreveDescricao || produto.breveDescricao || '',
         vendedorNome: produto.vendedor?.Nome || null,
-        empresaNome: produto.empresa?.Nome || null
+        empresaNome: produto.empresa?.Nome || null,
+        estoque: produto.Estoque || 0
       }));
 
       setProducts(produtosMapeados);
+      setFilteredProducts(produtosMapeados); // Since API already filters, set both
       log.info('explore_products_fetch_success', { total: produtosMapeados.length });
     } catch (error) {
-      log.error('explore_products_fetch_error', { categoryId: category.id, error: error.message });
+      log.error('explore_products_fetch_error', { categoryId: selectedCategory.id, error: error.message });
       // Fallback para produtos mockados
       setProducts([
         {
@@ -239,16 +318,34 @@ function ExplorePage() {
           image: 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?q=80&w=400&auto=format&fit=crop',
           rating: 4.5,
           sales: 1240,
-          category: category.name,
+          category: selectedCategory.name,
           freeShipping: true,
           discount: 23,
           vendedorNome: null,
-          empresaNome: null
+          empresaNome: null,
+          estoque: 10
         }
       ]);
+      setFilteredProducts(products);
     } finally {
       setLoadingProducts(false);
     }
+  };
+
+  const handleCategorySelect = async (category) => {
+    setSelectedCategory(category);
+    // Reset filters when selecting new category
+    setCategorySearchQuery('');
+    setCategoryFilters([]);
+    setPriceMin('');
+    setPriceMax('');
+    setStockMin('');
+    setStockMax('');
+    setSortBy('relevance');
+    // Update URL params
+    setSearchParams({ categoria: category.name });
+    // Fetch products
+    await fetchProductsWithFilters();
   };
 
   const handleBackToCategories = () => {
@@ -269,80 +366,49 @@ function ExplorePage() {
     }
   };
 
-  // Funções para filtros e busca na categoria
-  const addCategoryFilter = (filter) => {
-    if (!categoryFilters.find(f => f.value === filter.value)) {
-      setCategoryFilters([...categoryFilters, filter]);
-    }
+
+  const updateUrlParams = () => {
+    const params = new URLSearchParams();
+    if (selectedCategory) params.set('categoria', selectedCategory.name);
+    if (categorySearchQuery.trim()) params.set('busca', categorySearchQuery.trim());
+    if (priceMin) params.set('precoMin', priceMin);
+    if (priceMax) params.set('precoMax', priceMax);
+    if (stockMin) params.set('estoqueMin', stockMin);
+    if (stockMax) params.set('estoqueMax', stockMax);
+    setSearchParams(params);
   };
 
   const removeCategoryFilter = (filterValue) => {
-    setCategoryFilters(categoryFilters.filter(f => f.value !== filterValue));
+    const newFilters = categoryFilters.filter(f => f.value !== filterValue);
+    setCategoryFilters(newFilters);
+
+    // Reset price/stock if removing the last filter of that type
+    const filterToRemove = categoryFilters.find(f => f.value === filterValue);
+    if (filterToRemove) {
+      if (filterToRemove.type === 'price' && !newFilters.some(f => f.type === 'price')) {
+        setPriceMin('');
+        setPriceMax('');
+      } else if (filterToRemove.type === 'stock' && !newFilters.some(f => f.type === 'stock')) {
+        setStockMin('');
+        setStockMax('');
+      }
+    }
+
+    updateUrlParams();
+    fetchProductsWithFilters();
   };
 
   const clearCategoryFilters = () => {
     setCategoryFilters([]);
     setCategorySearchQuery('');
+    setPriceMin('');
+    setPriceMax('');
+    setStockMin('');
+    setStockMax('');
+    updateUrlParams();
+    fetchProductsWithFilters();
   };
 
-  // Aplicar filtros e busca aos produtos
-  const applyFiltersAndSearch = () => {
-    let filtered = [...products];
-
-    // Filtro por texto
-    if (categorySearchQuery.trim()) {
-      const q = categorySearchQuery.trim().toLowerCase();
-      filtered = filtered.filter(p =>
-        p.name.toLowerCase().includes(q) ||
-        p.breveDescricao?.toLowerCase().includes(q) ||
-        p.vendedorNome?.toLowerCase().includes(q)
-      );
-    }
-
-    // Aplicar filtros selecionados
-    categoryFilters.forEach(filter => {
-      switch (filter.type) {
-        case 'price':
-          if (filter.value === 'price-100') {
-            filtered = filtered.filter(p => p.price <= 100);
-          } else if (filter.value === 'price-100-500') {
-            filtered = filtered.filter(p => p.price > 100 && p.price <= 500);
-          } else if (filter.value === 'price-500-1000') {
-            filtered = filtered.filter(p => p.price > 500 && p.price <= 1000);
-          } else if (filter.value === 'price-1000+') {
-            filtered = filtered.filter(p => p.price > 1000);
-          }
-          break;
-        case 'rating':
-          if (filter.value === 'rating-4+') {
-            filtered = filtered.filter(p => p.rating >= 4);
-          } else if (filter.value === 'rating-4.5+') {
-            filtered = filtered.filter(p => p.rating >= 4.5);
-          }
-          break;
-      }
-    });
-
-    // Ordenação
-    if (['price-low','price-high','rating','sales'].includes(sortBy)) {
-      filtered.sort((a, b) => {
-        switch (sortBy) {
-          case 'price-low':
-            return a.price - b.price;
-          case 'price-high':
-            return b.price - a.price;
-          case 'rating':
-            return b.rating - a.rating;
-          case 'sales':
-            return b.sales - a.sales;
-          default:
-            return 0;
-        }
-      });
-    }
-
-    setFilteredProducts(filtered);
-  };
 
   const renderStars = (rating) => {
     const stars = [];
@@ -383,10 +449,7 @@ function ExplorePage() {
     return (
       <div className="min-h-screen bg-white flex">
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-slate-600">Carregando categorias...</p>
-          </div>
+          <LoadingSkeleton type="page" message="Carregando categorias..." />
         </div>
       </div>
     );
@@ -606,12 +669,7 @@ function ExplorePage() {
               /* Grid de Produtos da Categoria */
               <>
                 {loadingProducts ? (
-                  <div className="flex items-center justify-center py-16">
-                    <div className="text-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                      <p className="text-slate-600">Carregando produtos...</p>
-                    </div>
-                  </div>
+                  <LoadingSkeleton type="product-grid" />
                 ) : (
                   <>
                     {/* Barra de busca e filtros para categoria */}
@@ -625,7 +683,7 @@ function ExplorePage() {
                               type="search"
                               placeholder={`Buscar em ${selectedCategory.name}...`}
                               value={categorySearchQuery}
-                              onChange={(e) => setCategorySearchQuery(e.target.value)}
+                              onChange={(e) => handleSearchChange(e.target.value)}
                               className="w-full pl-10 pr-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                             />
                           </div>
@@ -634,34 +692,49 @@ function ExplorePage() {
                         {/* Filtros */}
                         <div className="flex items-center gap-2">
                           <div className="relative">
-                            <button
-                              onClick={() => setCategoryFilters(categoryFilters.length > 0 ? [] : categoryFilterOptions.slice(0, 4))}
-                              className="flex items-center gap-2 px-4 py-3 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
-                            >
-                              <FaFilter className="text-sm" />
-                              <span>Filtros</span>
-                            </button>
+                            <select
+                              multiple
+                              value={categoryFilters.map(f => f.value)}
+                              onChange={(e) => {
+                                const selectedValues = Array.from(e.target.selectedOptions, option => option.value);
+                                const newFilters = categoryFilterOptions.filter(option => selectedValues.includes(option.value));
+                                setCategoryFilters(newFilters);
 
-                            {/* Dropdown de filtros */}
-                            {categoryFilters.length > 0 && (
-                              <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-96 overflow-y-auto">
-                                <div className="p-3 border-b border-slate-100">
-                                  <p className="text-sm font-medium text-slate-700">Filtros disponíveis</p>
-                                </div>
-                                <div className="p-2">
-                                  {categoryFilterOptions.map((option) => (
-                                    <button
-                                      key={option.value}
-                                      onClick={() => addCategoryFilter(option)}
-                                      disabled={categoryFilters.find(f => f.value === option.value)}
-                                      className="w-full text-left px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                    >
-                                      {option.label}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
+                                // Update price/stock states
+                                const priceFilter = newFilters.find(f => f.type === 'price');
+                                const stockFilter = newFilters.find(f => f.type === 'stock');
+
+                                if (priceFilter) {
+                                  const [min, max] = priceFilter.value.replace('price-', '').split('-').map(v => v === '999999' ? '' : v);
+                                  setPriceMin(min || '');
+                                  setPriceMax(max || '');
+                                } else {
+                                  setPriceMin('');
+                                  setPriceMax('');
+                                }
+
+                                if (stockFilter) {
+                                  const [min, max] = stockFilter.value.replace('stock-', '').split('-').map(v => v === '999999' ? '' : v);
+                                  setStockMin(min || '');
+                                  setStockMax(max || '');
+                                } else {
+                                  setStockMin('');
+                                  setStockMax('');
+                                }
+
+                                updateUrlParams();
+                                fetchProductsWithFilters();
+                              }}
+                              className="px-4 py-3 rounded-lg border border-slate-200 text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 min-w-[200px]"
+                              size="1"
+                            >
+                              <option value="" disabled>Filtros</option>
+                              {categoryFilterOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
                           </div>
 
                           {/* Ordenação */}
@@ -747,7 +820,26 @@ function ExplorePage() {
                                     Grátis
                                   </span>
                                 )}
+                                {product.estoque <= 0 && (
+                                  <span className="px-1.5 py-0.5 bg-gray-500 text-white text-[10px] font-bold rounded shadow-sm">
+                                    Esgotado
+                                  </span>
+                                )}
                               </div>
+
+                              {/* Eye button */}
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setProductModalId(product.id);
+                                  setShowProductModal(true);
+                                }}
+                                className="absolute top-2 right-12 p-1.5 rounded-full bg-white/90 hover:bg-white shadow-sm hover:shadow-md transition-all text-slate-700 hover:text-blue-600"
+                                aria-label="Ver detalhes do produto"
+                              >
+                                <FaEye className="text-xs" />
+                              </button>
 
                               {/* Favorite Button */}
                               <button
@@ -789,17 +881,22 @@ function ExplorePage() {
                                     onClick={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
+                                      if (product.estoque <= 0) return; // Prevent action if out of stock
                                       if (isInCart(product.id)) {
                                         removeItem(product.id);
                                       } else {
                                         handleAddToCart(product);
                                       }
                                     }}
+                                    disabled={product.estoque <= 0}
                                     className={`p-1.5 rounded-lg text-white transition-colors shadow-sm hover:shadow-md flex-shrink-0 ${
-                                      isInCart(product.id)
+                                      product.estoque <= 0
+                                        ? 'bg-gray-400 cursor-not-allowed'
+                                        : isInCart(product.id)
                                         ? 'bg-green-500 hover:bg-green-600'
                                         : 'bg-blue-600 hover:bg-blue-700'
                                     }`}
+                                    aria-label={product.estoque <= 0 ? "Produto esgotado" : isInCart(product.id) ? "Remover do carrinho" : "Adicionar ao carrinho"}
                                   >
                                     {isInCart(product.id) ? (
                                       <FaCheck className="text-xs" />
@@ -843,6 +940,16 @@ function ExplorePage() {
             )}
           </div>
         </main>
+
+        {/* Product Details Modal */}
+        <ProductDetailsModal
+          productId={productModalId}
+          isOpen={showProductModal}
+          onClose={() => {
+            setShowProductModal(false);
+            setProductModalId(null);
+          }}
+        />
 
         {/* Footer simples */}
         <footer className="bg-slate-900 text-slate-300">

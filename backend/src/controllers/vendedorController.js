@@ -380,6 +380,7 @@ export const atualizarVendedor = async (req, res) => {
 export const buscarPerfilVendedor = async (req, res) => {
   try {
     const { user } = req;
+    logger.info('buscarPerfilVendedor called', { userId: user?.id, vendedorId: user?.vendedorId });
 
     if (!user?.vendedorId) {
       return res.status(403).json({
@@ -491,6 +492,10 @@ export const buscarPerfilVendedor = async (req, res) => {
           RazaoSocial: cliente.RazaoSocial,
           InscricaoEstadual: cliente.InscricaoEstadual,
           InscricaoMunicipal: cliente.InscricaoMunicipal,
+          Banco: cliente.Banco,
+          Agencia: cliente.Agencia,
+          ContaCorrente: cliente.ContaCorrente,
+          TipoConta: cliente.TipoConta,
           enderecos: cliente.enderecos
         } : null,
         estatisticas: {
@@ -557,6 +562,170 @@ export const excluirVendedor = async (req, res) => {
 
   } catch (error) {
     logControllerError('excluir_vendedor', error, req);
+    res.status(500).json({
+      success: false,
+      errors: ["Erro interno do servidor"]
+    });
+  }
+};
+
+// Atualizar perfil do vendedor atual
+export const atualizarPerfilVendedor = async (req, res) => {
+  try {
+    const { user } = req;
+
+    if (!user?.vendedorId) {
+      return res.status(403).json({
+        success: false,
+        errors: ["Acesso negado. Vendedor não identificado."]
+      });
+    }
+
+    const {
+      NomeCompleto,
+      Email,
+      TelefoneCelular,
+      TelefoneFixo,
+      Whatsapp,
+      RazaoSocial,
+      InscricaoEstadual,
+      InscricaoMunicipal,
+      Banco,
+      Agencia,
+      ContaCorrente,
+      TipoConta
+    } = req.body;
+
+    // Validações básicas
+    if (!NomeCompleto || !Email) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Nome completo e e-mail são obrigatórios"]
+      });
+    }
+
+    // Validação de e-mail
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(Email)) {
+      return res.status(400).json({
+        success: false,
+        errors: ["E-mail inválido"]
+      });
+    }
+
+    // Validação de dados bancários se fornecidos
+    if (Banco || Agencia || ContaCorrente) {
+      if (!Banco || !Agencia || !ContaCorrente) {
+        return res.status(400).json({
+          success: false,
+          errors: ["Para dados bancários, banco, agência e conta corrente são obrigatórios"]
+        });
+      }
+
+      if (TipoConta && !['corrente', 'poupanca'].includes(TipoConta)) {
+        return res.status(400).json({
+          success: false,
+          errors: ["Tipo de conta deve ser 'corrente' ou 'poupanca'"]
+        });
+      }
+    }
+
+    // Verificar se e-mail já existe (se foi alterado)
+    const vendedorAtual = await prisma.vendedor.findUnique({
+      where: { VendedorID: user.vendedorId }
+    });
+
+    if (!vendedorAtual) {
+      return res.status(404).json({
+        success: false,
+        errors: ["Vendedor não encontrado"]
+      });
+    }
+
+    if (Email !== vendedorAtual.Email) {
+      const emailExistente = await prisma.vendedor.findUnique({
+        where: { Email: Email }
+      });
+
+      if (emailExistente) {
+        return res.status(400).json({
+          success: false,
+          errors: ["E-mail já cadastrado"]
+        });
+      }
+    }
+
+    // Buscar cliente associado ao vendedor
+    const cliente = await prisma.cliente.findUnique({
+      where: { Email: vendedorAtual.Email }
+    });
+
+    if (!cliente) {
+      return res.status(404).json({
+        success: false,
+        errors: ["Dados do cliente não encontrados"]
+      });
+    }
+
+    // Atualizar vendedor
+    const vendedorAtualizado = await prisma.vendedor.update({
+      where: { VendedorID: user.vendedorId },
+      data: {
+        Nome: NomeCompleto,
+        Email: Email
+      }
+    });
+
+    // Atualizar cliente
+    const clienteAtualizado = await prisma.cliente.update({
+      where: { ClienteID: cliente.ClienteID },
+      data: {
+        NomeCompleto: NomeCompleto,
+        Email: Email,
+        TelefoneCelular: TelefoneCelular || null,
+        TelefoneFixo: TelefoneFixo || null,
+        Whatsapp: Whatsapp || null,
+        RazaoSocial: RazaoSocial || null,
+        InscricaoEstadual: InscricaoEstadual || null,
+        InscricaoMunicipal: InscricaoMunicipal || null,
+        Banco: Banco || null,
+        Agencia: Agencia || null,
+        ContaCorrente: ContaCorrente || null,
+        TipoConta: TipoConta || null
+      }
+    });
+
+    logger.info('perfil_vendedor_atualizado', {
+      vendedorId: user.vendedorId,
+      clienteId: cliente.ClienteID
+    });
+
+    res.json({
+      success: true,
+      message: 'Perfil atualizado com sucesso',
+      vendedor: {
+        VendedorID: vendedorAtualizado.VendedorID,
+        Nome: vendedorAtualizado.Nome,
+        Email: vendedorAtualizado.Email
+      },
+      cliente: {
+        NomeCompleto: clienteAtualizado.NomeCompleto,
+        Email: clienteAtualizado.Email,
+        TelefoneCelular: clienteAtualizado.TelefoneCelular,
+        TelefoneFixo: clienteAtualizado.TelefoneFixo,
+        Whatsapp: clienteAtualizado.Whatsapp,
+        RazaoSocial: clienteAtualizado.RazaoSocial,
+        InscricaoEstadual: clienteAtualizado.InscricaoEstadual,
+        InscricaoMunicipal: clienteAtualizado.InscricaoMunicipal,
+        Banco: clienteAtualizado.Banco,
+        Agencia: clienteAtualizado.Agencia,
+        ContaCorrente: clienteAtualizado.ContaCorrente,
+        TipoConta: clienteAtualizado.TipoConta
+      }
+    });
+
+  } catch (error) {
+    logControllerError('atualizar_perfil_vendedor', error, req);
     res.status(500).json({
       success: false,
       errors: ["Erro interno do servidor"]

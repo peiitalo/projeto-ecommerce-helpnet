@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { clienteService } from '../../services/api';
 import { useBuscarCep } from '../../hooks/useBuscarCep';
+import { useNotifications } from '../../hooks/useNotifications';
 import {
   FaMapMarkerAlt,
   FaPlus,
@@ -50,8 +51,11 @@ function AddressPage() {
   });
   const [saving, setSaving] = useState(false);
   const [formErrors, setFormErrors] = useState([]);
+  const [deletingAddressId, setDeletingAddressId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const { buscarCep, loading: cepLoading } = useBuscarCep();
   const { logout } = useAuth();
+  const { showSuccess, showError, showWarning } = useNotifications();
 
   // Logo configuration
   const logoConfig = {
@@ -92,10 +96,15 @@ function AddressPage() {
   };
 
   const handleLogout = () => {
-    if (window.confirm('Tem certeza que deseja sair da conta?')) {
-      logout();
-      window.location.href = '/login';
-    }
+    showWarning('Tem certeza que deseja sair da conta?', {
+      autoClose: false,
+      closeOnClick: false,
+      draggable: false,
+      onClose: () => {
+        logout();
+        window.location.href = '/login';
+      }
+    });
   };
 
   const handleAddAddress = () => {
@@ -119,7 +128,7 @@ function AddressPage() {
       CEP: address.CEP || '',
       Cidade: address.Cidade || '',
       UF: address.UF || '',
-      TipoEndereco: address.TipoEndereco || 'Residencial',
+      TipoEndereco: address.TipoEndereco || 'Residencial', // Preservar o tipo existente
       Numero: address.Numero || '',
       Bairro: address.Bairro || ''
     });
@@ -156,6 +165,7 @@ function AddressPage() {
       }
       await carregarEnderecos();
       handleCancelForm();
+      showSuccess(editingAddress ? 'Endereço atualizado com sucesso!' : 'Endereço adicionado com sucesso!');
     } catch (error) {
       console.error('Erro ao salvar endereço:', error);
       // Extract error messages from API response
@@ -166,33 +176,40 @@ function AddressPage() {
       } else {
         setFormErrors(['Erro ao salvar endereço. Tente novamente.']);
       }
+      showError('Erro ao salvar endereço. Verifique os dados e tente novamente.');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDeleteAddress = async (addressId) => {
-    if (window.confirm('Tem certeza que deseja excluir este endereço?')) {
-      try {
-        await clienteService.excluirEndereco(addressId);
-        await carregarEnderecos();
-      } catch (error) {
-        console.error('Erro ao excluir endereço:', error);
-        // Show user-friendly error message
-        const errorMessage = error.errors?.join(', ') || error.message || 'Erro ao excluir endereço';
-        alert(`Erro: ${errorMessage}`);
-      }
+  const handleDeleteAddress = (addressId) => {
+    setDeletingAddressId(addressId);
+  };
+
+  const confirmDeleteAddress = async () => {
+    if (!deletingAddressId) return;
+
+    try {
+      setDeleting(true);
+      await clienteService.excluirEndereco(deletingAddressId);
+      // Update local state by filtering out the deleted address
+      setAddresses(prev => prev.filter(addr => addr.EnderecoID !== deletingAddressId));
+      showSuccess('Endereço excluído com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir endereço:', error);
+      // Show user-friendly error message
+      const errorMessage = error.errors?.join(', ') || error.message || 'Erro ao excluir endereço';
+      showError(`Erro: ${errorMessage}`);
+    } finally {
+      setDeleting(false);
+      setDeletingAddressId(null);
     }
   };
 
-  const handleSetDefaultAddress = async (addressId) => {
-    try {
-      await clienteService.definirEnderecoPadrao(addressId);
-      await carregarEnderecos();
-    } catch (error) {
-      console.error('Erro ao definir endereço padrão:', error);
-    }
+  const cancelDeleteAddress = () => {
+    setDeletingAddressId(null);
   };
+
 
   const handleCepChange = async (cep) => {
     setAddressForm(prev => ({ ...prev, CEP: cep }));
@@ -409,7 +426,9 @@ function AddressPage() {
                           <span className={`px-2 py-1 text-xs rounded-full ${
                             address.TipoEndereco === 'Residencial'
                               ? 'bg-blue-100 text-blue-800'
-                              : 'bg-green-100 text-green-800'
+                              : address.TipoEndereco === 'Comercial'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-gray-100 text-gray-800'
                           }`}>
                             {address.TipoEndereco}
                           </span>
@@ -605,6 +624,7 @@ function AddressPage() {
                   >
                     <option value="Residencial">Residencial</option>
                     <option value="Comercial">Comercial</option>
+                    <option value="Outros">Outros</option>
                   </select>
                 </div>
                 <div className="md:col-span-2">
@@ -633,6 +653,47 @@ function AddressPage() {
               >
                 {saving ? 'Salvando...' : (editingAddress ? 'Atualizar' : 'Adicionar')}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Delete */}
+      {deletingAddressId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-shrink-0 w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                  <FaTrash className="text-red-600 text-xl" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Excluir Endereço</h3>
+                  <p className="text-slate-600 text-sm">Esta ação não pode ser desfeita.</p>
+                </div>
+              </div>
+              <p className="text-slate-700 mb-6">
+                Tem certeza que deseja excluir este endereço? Todos os dados associados serão removidos permanentemente.
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={cancelDeleteAddress}
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg"
+                  disabled={deleting}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmDeleteAddress}
+                  disabled={deleting}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {deleting && (
+                    <div className="animate-spin rounded-full h-4 w-4 border border-white border-t-transparent"></div>
+                  )}
+                  <span>{deleting ? 'Excluindo...' : 'Excluir'}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

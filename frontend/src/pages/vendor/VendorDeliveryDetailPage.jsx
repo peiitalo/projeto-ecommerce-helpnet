@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import VendorLayout from '../../components/VendorLayout.jsx';
 import { entregaApi } from '../../services/api.js';
+import { useNotifications } from '../../hooks/useNotifications';
 import {
   FaArrowLeft,
   FaTruck,
@@ -18,6 +19,7 @@ import {
 
 function VendorDeliveryDetailPage() {
   const { pedidoId } = useParams();
+  const { showSuccess, showError } = useNotifications();
   const navigate = useNavigate();
   const [delivery, setDelivery] = useState(null);
   const [tracking, setTracking] = useState([]);
@@ -51,7 +53,7 @@ function VendorDeliveryDetailPage() {
       loadDeliveryDetails();
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
-      alert('Erro ao atualizar status da entrega');
+      showError('Erro ao atualizar status da entrega');
     } finally {
       setUpdating(false);
     }

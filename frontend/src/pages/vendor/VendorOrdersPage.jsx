@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import VendorLayout from '../../layouts/VendorLayout';
 import { useAuth } from '../../context/AuthContext';
 import vendedorApi from '../../services/vendedorApi';
-import { FiEye, FiPackage, FiTruck, FiCheckCircle, FiXCircle, FiClock, FiSearch, FiX, FiMapPin, FiUser, FiCalendar } from 'react-icons/fi';
+import { FiEye, FiPackage, FiTruck, FiCheckCircle, FiXCircle, FiClock, FiSearch, FiX, FiMapPin, FiUser, FiCalendar, FiPhone } from 'react-icons/fi';
 
 function VendorOrdersPage() {
   const { user } = useAuth();
@@ -241,7 +241,7 @@ function VendorOrdersPage() {
                               }}
                             />
                             <span className="text-gray-900">{item.produto?.Nome || 'Produto'}</span>
-                            <span className="text-gray-600">SKU: {item.produto?.SKU || 'N/A'}</span>
+                            {item.produto?.SKU && <span className="text-gray-600">SKU: {item.produto.SKU}</span>}
                           </div>
                           <div className="text-right">
                             <span className="text-gray-600">{item.Quantidade}x</span>
@@ -341,6 +341,14 @@ function VendorOrdersPage() {
                       <div className="text-sm text-gray-600">
                         Email: {selectedOrder.cliente?.Email || 'N/A'}
                       </div>
+                      {selectedOrder.cliente?.TelefoneCelular && (
+                        <div className="flex items-center space-x-2">
+                          <FiPhone className="text-gray-400 w-4 h-4" />
+                          <span className="text-sm text-gray-600">
+                            Telefone: {selectedOrder.cliente.TelefoneCelular}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -377,7 +385,7 @@ function VendorOrdersPage() {
                           />
                           <div>
                             <p className="text-sm font-medium text-gray-900">{item.produto?.Nome || 'Produto'}</p>
-                            <p className="text-xs text-gray-600">SKU: {item.produto?.SKU || 'N/A'}</p>
+                            {item.produto?.SKU && <p className="text-xs text-gray-600">SKU: {item.produto.SKU}</p>}
                           </div>
                         </div>
                         <div className="text-right">

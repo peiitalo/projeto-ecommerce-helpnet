@@ -7,9 +7,9 @@ const getFullImageUrl = (imagePath) => {
   if (!imagePath) return null;
   if (imagePath.startsWith('http')) return imagePath; // Already full URL
 
-  // Get API base URL without /api suffix
-  const API_BASE_URL = (import.meta?.env?.VITE_API_BASE_URL) || ((typeof window !== 'undefined' && window?.location) ? `${window.location.protocol}//${window.location.hostname}:${3001}` : 'http://localhost:3001');
-  return `${API_BASE_URL}${imagePath}`;
+  // Remove leading slash if present to avoid double slashes
+  const cleanPath = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath;
+  return `/api/${cleanPath}`;
 };
 
 const CartContext = createContext(null);
@@ -33,7 +33,7 @@ export function CartProvider({ children }) {
   const { user } = useAuth();
   const STORAGE_KEY = user ? `helpnet_cart_${user.id}` : 'helpnet_cart_guest';
 
-  const [items, setItems] = useState(() => safeStorageGet(STORAGE_KEY, []));
+  const [items, setItems] = useState([]);
   const [freightOptions, setFreightOptions] = useState([]);
   const [selectedFreight, setSelectedFreight] = useState(null);
   const [selectedAddress, setSelectedAddress] = useState(null);
@@ -45,51 +45,41 @@ export function CartProvider({ children }) {
     safeStorageSet(STORAGE_KEY, items);
   }, [items, STORAGE_KEY]);
 
+  // Limpa carrinho quando usuário muda (logout/login com outra conta)
+  useEffect(() => {
+    const prevUserId = localStorage.getItem('cart_prev_user_id');
+    const currentUserId = user?.id || null;
+
+    if (prevUserId !== currentUserId?.toString()) {
+      // Usuário mudou, limpa carrinho local
+      setItems([]);
+      localStorage.setItem('cart_prev_user_id', currentUserId || '');
+    }
+  }, [user?.id]);
+
   // Sync cart when user logs in
   useEffect(() => {
     if (user) {
-      const guestKey = 'helpnet_cart_guest';
-      const guestItems = safeStorageGet(guestKey, []);
-      if (guestItems.length > 0) {
-        // Add guest items to backend
-        Promise.all(guestItems.map(item => carrinhoService.adicionar(item.id, item.quantity))).then(() => {
-          // Clear guest cart
-          safeStorageSet(guestKey, []);
-          // Fetch updated cart
-          return carrinhoService.listar();
-        }).then(data => {
-          const backendItems = data.itens.map(item => ({
-            id: item.produto.ProdutoID,
-            name: item.produto.Nome,
-            price: item.produto.Preco,
-            image: getFullImageUrl(item.produto.Imagens?.[0]) || null,
-            sku: item.produto.SKU,
-            estoque: item.produto.Estoque,
-            quantity: item.Quantidade,
-          }));
-          setItems(backendItems);
-        }).catch(error => {
-          console.error('Erro ao sync carrinho:', error);
-          setItems([]);
-        });
-      } else {
-        // Fetch cart from backend
-        carrinhoService.listar().then(data => {
-          const backendItems = data.itens.map(item => ({
-            id: item.produto.ProdutoID,
-            name: item.produto.Nome,
-            price: item.produto.Preco,
-            image: getFullImageUrl(item.produto.Imagens?.[0]) || null,
-            sku: item.produto.SKU,
-            estoque: item.produto.Estoque,
-            quantity: item.Quantidade,
-          }));
-          setItems(backendItems);
-        }).catch(error => {
-          console.error('Erro ao carregar carrinho:', error);
-          setItems([]);
-        });
-      }
+      // Sempre carrega do backend quando usuário está logado
+      carrinhoService.listar().then(data => {
+        const backendItems = (data.itens || []).map(item => ({
+          id: item.produto.ProdutoID,
+          name: item.produto.Nome,
+          price: item.produto.Preco,
+          image: getFullImageUrl(item.produto.Imagens?.[0]) || null,
+          sku: item.produto.SKU,
+          estoque: item.produto.Estoque,
+          quantity: item.Quantidade,
+        }));
+        setItems(backendItems);
+      }).catch(error => {
+        console.error('Erro ao carregar carrinho:', error);
+        setItems([]);
+      });
+    } else {
+      // Usuário não logado, carrega do localStorage guest
+      const guestItems = safeStorageGet('helpnet_cart_guest', []);
+      setItems(guestItems);
     }
   }, [user]);
 

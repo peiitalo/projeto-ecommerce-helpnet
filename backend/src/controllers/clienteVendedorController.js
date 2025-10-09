@@ -16,51 +16,71 @@ export const listarClientesVendedor = async (req, res) => {
       });
     }
 
-    const whereClause = {
-      VendedorID: user.vendedorId,
-      ...(search && {
-        cliente: {
+    // Query distinct ClienteID from Pedido where items are from vendor's products
+    let clienteIdsQuery = prisma.pedido.findMany({
+      select: { ClienteID: true },
+      distinct: ['ClienteID'],
+      where: {
+        itensPedido: {
+          some: {
+            produto: { VendedorID: user.vendedorId }
+          }
+        }
+      }
+    });
+
+    // If search, filter clients
+    let clientesFiltrados = [];
+    if (search) {
+      // Get all client IDs first, then filter by search
+      const allClienteIds = await clienteIdsQuery;
+      const clienteIds = allClienteIds.map(c => c.ClienteID);
+
+      const clientesSearch = await prisma.cliente.findMany({
+        where: {
+          ClienteID: { in: clienteIds },
           OR: [
             { NomeCompleto: { contains: search, mode: 'insensitive' } },
             { Email: { contains: search, mode: 'insensitive' } },
             { CPF_CNPJ: { contains: search } }
           ]
-        }
-      })
-    };
-
-    const [clientesVendedor, total] = await prisma.$transaction([
-      prisma.clienteVendedor.findMany({
-        where: whereClause,
-        include: {
-          cliente: {
-            select: {
-              ClienteID: true,
-              NomeCompleto: true,
-              Email: true,
-              CPF_CNPJ: true,
-              TelefoneCelular: true,
-              DataCadastro: true
-            }
-          }
         },
-        orderBy: { UltimoPedidoEm: 'desc' },
-        skip,
-        take: parseInt(limit)
-      }),
-      prisma.clienteVendedor.count({ where: whereClause })
-    ]);
+        select: { ClienteID: true }
+      });
 
-    // Buscar estatísticas de pedidos para cada cliente
+      clientesFiltrados = clientesSearch.map(c => c.ClienteID);
+    } else {
+      const allClienteIds = await clienteIdsQuery;
+      clientesFiltrados = allClienteIds.map(c => c.ClienteID);
+    }
+
+    const total = clientesFiltrados.length;
+
+    // Paginate the client IDs
+    const paginatedClienteIds = clientesFiltrados.slice(skip, skip + parseInt(limit));
+
+    // Get client details and statistics
     const clientesComEstatisticas = await Promise.all(
-      clientesVendedor.map(async (cv) => {
+      paginatedClienteIds.map(async (clienteId) => {
+        const cliente = await prisma.cliente.findUnique({
+          where: { ClienteID: clienteId },
+          select: {
+            ClienteID: true,
+            NomeCompleto: true,
+            Email: true,
+            CPF_CNPJ: true,
+            TelefoneCelular: true,
+            DataCadastro: true
+          }
+        });
+
         const pedidosCliente = await prisma.pedido.findMany({
           where: {
-            ClienteID: cv.cliente.ClienteID,
+            ClienteID: clienteId,
             itensPedido: {
               some: {
                 produto: {
-                  VendedorID: cv.VendedorID
+                  VendedorID: user.vendedorId
                 }
               }
             }
@@ -70,14 +90,16 @@ export const listarClientesVendedor = async (req, res) => {
             DataPedido: true,
             Total: true,
             Status: true
-          }
+          },
+          orderBy: { DataPedido: 'desc' }
         });
 
         const valorTotal = pedidosCliente.reduce((sum, pedido) => sum + pedido.Total, 0);
         const pedidosAtivos = pedidosCliente.filter(p => p.Status !== 'Cancelado').length;
 
         return {
-          ...cv,
+          ClienteID: clienteId,
+          cliente,
           estatisticas: {
             totalPedidos: pedidosCliente.length,
             pedidosAtivos,

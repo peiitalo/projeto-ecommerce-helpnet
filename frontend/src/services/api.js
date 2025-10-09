@@ -38,7 +38,7 @@ const apiRequest = async (endpoint, options = {}, retryCount = 0) => {
           Authorization: `Bearer ${token}`,
         };
       }
-    } catch {}
+    } catch {} 
 
     const response = await fetch(url, config);
 
@@ -124,16 +124,20 @@ export const produtoService = {
   // Listar produtos
   listar: async (filtros = {}) => {
     const params = new URLSearchParams();
-    
+
     if (filtros.categoria) params.append('categoria', filtros.categoria);
     if (filtros.status) params.append('status', filtros.status);
     if (filtros.busca) params.append('busca', filtros.busca);
     if (filtros.page || filtros.pagina) params.append('pagina', filtros.pagina || filtros.page);
     if (filtros.limit) params.append('limit', filtros.limit);
+    if (filtros.precoMin !== undefined) params.append('precoMin', filtros.precoMin);
+    if (filtros.precoMax !== undefined) params.append('precoMax', filtros.precoMax);
+    if (filtros.estoqueMin !== undefined) params.append('estoqueMin', filtros.estoqueMin);
+    if (filtros.estoqueMax !== undefined) params.append('estoqueMax', filtros.estoqueMax);
 
     const queryString = params.toString();
     const endpoint = `/produtos${queryString ? `?${queryString}` : ''}`;
-    
+
     return apiRequest(endpoint);
   },
 
@@ -172,6 +176,8 @@ export const produtoService = {
       body: JSON.stringify({ acao, produtoIds }),
     });
   },
+
+
 
   // Gerar SKU único
   gerarSKU: async () => {
@@ -560,6 +566,11 @@ export const vendedorService = {
   // Dashboard do vendedor
   dashboard: async () => {
     return apiRequest('/vendedor/dashboard');
+  },
+
+  // Dados financeiros do vendedor
+  financeiro: async (periodo = '30d') => {
+    return apiRequest(`/vendedor/financeiro?periodo=${periodo}`);
   },
 };
 
