@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../../context/CartContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { freteService, clienteService } from '../../services/api.js';
+import { buildImageUrl } from '../../utils/imageUtils.js';
 import { FaTrash, FaArrowLeft, FaTruck, FaMapMarkerAlt, FaShoppingCart } from 'react-icons/fa';
 
 export default function CartPage() {
@@ -181,14 +182,12 @@ export default function CartPage() {
                   onChange={() => toggleSelectItem(item.id)}
                   className="h-5 w-5 text-blue-600"
                 />
+                {/* Correção: Padronização de URLs de imagem usando buildImageUrl para consistência com outras telas */}
                 <div className="w-24 h-24 rounded-lg bg-slate-100 overflow-hidden flex items-center justify-center">
                   <img
-                    src={item.image || '/placeholder-image.png'}
+                    src={buildImageUrl(item.image)}
                     alt={item.name}
                     className="w-full h-full object-contain"
-                    onError={(e) => {
-                      e.target.src = '/placeholder-image.png';
-                    }}
                   />
                 </div>
                 <div className="flex-1">

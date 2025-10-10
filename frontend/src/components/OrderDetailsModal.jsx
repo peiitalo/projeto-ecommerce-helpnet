@@ -33,7 +33,7 @@ const OrderDetailsModal = ({ orderId, isOpen, onClose, isAdmin = false }) => {
          }
        } else {
          response = await clienteService.buscarPedido(orderId);
-         setOrder(response);
+         setOrder(response.pedido);
        }
 
        // Fetch delivery tracking data for client orders
@@ -49,6 +49,10 @@ const OrderDetailsModal = ({ orderId, isOpen, onClose, isAdmin = false }) => {
            // Don't set error for delivery, just log - delivery is optional
          }
        }
+
+       // Debug logs to inspect received data
+       console.log('OrderDetailsModal - Order data:', order);
+       console.log('OrderDetailsModal - Delivery data:', delivery);
      } catch (err) {
        console.error('Erro ao buscar detalhes do pedido:', err);
        setError('Erro ao carregar detalhes do pedido');
@@ -91,6 +95,9 @@ const OrderDetailsModal = ({ orderId, isOpen, onClose, isAdmin = false }) => {
   };
 
   const formatPrice = (price) => {
+    if (price == null || isNaN(price)) {
+      return 'R$ 0,00';
+    }
     return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 

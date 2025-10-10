@@ -13,6 +13,7 @@ router.use(vendorScope);
 // Listar produtos do vendedor logado
 router.get('/', async (req, res) => {
   try {
+    console.log('Debug: vendorId:', req.vendorId, 'vendorEmpresaId:', req.vendorEmpresaId, 'query:', req.query);
     const { status, busca, categoria, pagina = 1, limit = 10 } = req.query;
     const skip = (parseInt(pagina) - 1) * parseInt(limit);
 
@@ -35,6 +36,7 @@ router.get('/', async (req, res) => {
     }
 
     const where = { AND: andClauses };
+    console.log('Debug: where clause:', JSON.stringify(where));
 
     const [produtos, total] = await prisma.$transaction([
       prisma.produto.findMany({
@@ -62,6 +64,7 @@ router.get('/', async (req, res) => {
     res.json({ produtos, total });
   } catch (error) {
     console.error('Erro ao listar produtos do vendedor:', error);
+    console.error('Debug: Detailed error:', error.message, error.stack);
     res.status(500).json({ erro: 'Erro interno do servidor' });
   }
 });
@@ -69,6 +72,7 @@ router.get('/', async (req, res) => {
 // Criar produto do vendedor logado
 router.post('/', async (req, res) => {
   try {
+    console.log('Debug POST /: vendorId:', req.vendorId, 'vendorEmpresaId:', req.vendorEmpresaId, 'body keys:', Object.keys(req.body));
     const data = req.body;
     if (!data.nome || !data.preco || !data.categoriaId || !data.sku) {
       return res.status(400).json({ erro: 'Campos obrigatórios: nome, preco, categoriaId, sku' });
@@ -124,6 +128,7 @@ router.post('/', async (req, res) => {
 // Atualizar produto do vendedor logado
 router.put('/:id', async (req, res) => {
   try {
+    console.log('Debug PUT /:id vendorId:', req.vendorId, 'vendorEmpresaId:', req.vendorEmpresaId, 'id:', req.params.id, 'body keys:', Object.keys(req.body));
     const id = parseInt(req.params.id);
     const data = req.body;
 
@@ -190,6 +195,7 @@ router.put('/:id', async (req, res) => {
 // Ação em lote para produtos do vendedor logado
 router.post('/acao-em-lote', async (req, res) => {
   try {
+    console.log('Debug POST /acao-em-lote: vendorId:', req.vendorId, 'vendorEmpresaId:', req.vendorEmpresaId, 'acao:', req.body.acao, 'produtoIds length:', req.body.produtoIds?.length);
     const { acao, produtoIds } = req.body;
     if (!acao || !produtoIds || !Array.isArray(produtoIds)) {
       return res.status(400).json({ erro: 'Ação e IDs dos produtos são obrigatórios' });
@@ -258,6 +264,7 @@ router.post('/acao-em-lote', async (req, res) => {
 // Excluir/desativar produto do vendedor logado
 router.delete('/:id', async (req, res) => {
   try {
+    console.log('Debug DELETE /:id vendorId:', req.vendorId, 'vendorEmpresaId:', req.vendorEmpresaId, 'id:', req.params.id);
     const id = parseInt(req.params.id);
 
     const produto = await prisma.produto.findUnique({ where: { ProdutoID: id } });

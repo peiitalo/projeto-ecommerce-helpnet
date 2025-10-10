@@ -13,6 +13,7 @@ import { sendVendorLowStockEmail } from "../services/emailService.js";
  */
 export const listarProdutos = async (req, res) => {
   try {
+    console.log('Debug listarProdutos: query:', req.query);
     const { categoria, status, busca, pagina = 1, limit = 10, precoMin, precoMax, estoqueMin, estoqueMax } = req.query;
     const skip = (pagina - 1) * limit;
 
@@ -68,6 +69,7 @@ export const listarProdutos = async (req, res) => {
       where.Estoque = { ...where.Estoque, lte: parseInt(estoqueMax) };
     }
 
+    console.log('Debug listarProdutos: where clause:', JSON.stringify(where));
     const [produtos, total] = await prisma.$transaction([
       prisma.produto.findMany({
         where,

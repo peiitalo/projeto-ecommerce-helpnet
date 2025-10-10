@@ -1,4 +1,7 @@
 const API_BASE_URL = (import.meta?.env?.VITE_API_BASE_URL) || '/api';
+
+// Exportar API_BASE_URL para uso em outros módulos
+export { API_BASE_URL };
 const withEmpresaHeader = (empresaId, options = {}) => ({
   ...options,
   headers: {
@@ -363,6 +366,11 @@ export const clienteService = {
   // Listar pedidos do cliente
   listarPedidos: async () => {
     return apiRequest('/pedidos');
+  },
+
+  // Buscar pedido por ID
+  buscarPedido: async (id) => {
+    return apiRequest(`/pedidos/${id}`);
   },
 
   // Criar pedido

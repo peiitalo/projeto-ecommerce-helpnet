@@ -625,9 +625,19 @@ export const buscarPedidoPorId = async (req, res) => {
     const { user } = req;
     const { id } = req.params;
 
+    // Extrair o número do ID no formato "PED-XX"
+    const match = id.match(/^PED-(\d+)$/);
+    if (!match) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Formato de ID inválido. Use PED-XX onde XX é um número."]
+      });
+    }
+    const pedidoId = parseInt(match[1]);
+
     const pedido = await prisma.pedido.findFirst({
       where: {
-        PedidoID: parseInt(id),
+        PedidoID: pedidoId,
         ClienteID: user.id
       },
       select: {
@@ -686,7 +696,7 @@ export const buscarPedidoPorId = async (req, res) => {
       });
     }
 
-    logger.info('buscar_pedido_ok', { pedidoId: id, clienteId: user.id });
+    logger.info('buscar_pedido_ok', { pedidoId: pedidoId, clienteId: user.id });
     res.json({ success: true, pedido });
 
   } catch (error) {
