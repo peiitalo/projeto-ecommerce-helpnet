@@ -965,8 +965,7 @@ export const solicitarResetSenha = async (req, res) => {
     });
 
     if (!cliente) {
-      // Não revelar se o email existe ou não por segurança
-      return res.json({ success: true, message: 'Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.' });
+      return res.status(400).json({ success: false, errors: ['Este email não está cadastrado no sistema.'] });
     }
 
     // Gerar token único
@@ -1057,3 +1056,4 @@ export const resetarSenha = async (req, res) => {
     res.status(500).json({ success: false, errors: ["Erro interno do servidor"] });
   }
 };
+

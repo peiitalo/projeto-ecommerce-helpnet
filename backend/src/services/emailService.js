@@ -266,21 +266,30 @@ export const sendVendorLowStockEmail = async (stockData) => {
 
 // === LEGACY FUNCTIONS ===
 
-// Função para enviar email de reset de senha (mantida para compatibilidade)
+// Função para enviar email de reset de senha
 export const enviarEmailResetSenha = async (email, resetToken) => {
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-  const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
+  const resetPageUrl = `${frontendUrl}/esqueci-senha`;
 
   const htmlContent = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <h2 style="color: #2563eb;">Redefinição de Senha</h2>
       <p>Olá,</p>
       <p>Recebemos uma solicitação para redefinir sua senha no HelpNet.</p>
-      <p>Clique no link abaixo para redefinir sua senha:</p>
+      <p>Para redefinir sua senha, acesse a página de redefinição e use o token abaixo:</p>
       <div style="text-align: center; margin: 20px 0;">
-        <a href="${resetLink}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block;">Redefinir Senha</a>
+        <a href="${resetPageUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block;">Ir para Redefinição de Senha</a>
       </div>
-      <p>Este link é válido por 1 hora.</p>
+      <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2563eb;">
+        <h3 style="color: #1e293b; margin-top: 0;">Seu Token de Reset:</h3>
+        <p style="font-size: 18px; font-weight: bold; color: #2563eb; word-break: break-all;">${resetToken}</p>
+        <p style="color: #64748b; margin-bottom: 0;"><strong>Informações importantes:</strong></p>
+        <ul style="color: #64748b;">
+          <li>Este token é válido por 1 hora</li>
+          <li>Use-o na página de redefinição de senha</li>
+          <li>Após expirar, solicite um novo token</li>
+        </ul>
+      </div>
       <p>Se você não solicitou esta redefinição, ignore este email.</p>
       <p>Atenciosamente,<br>Equipe HelpNet</p>
     </div>
