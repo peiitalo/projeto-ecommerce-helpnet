@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { apiRequest } from '../../services/api.js';
+import MaskedInput from '../../components/cadastro/MaskedInput.jsx';
 
 export default function PaymentCheckout() {
   const { id } = useParams();
@@ -96,10 +97,22 @@ export default function PaymentCheckout() {
           if (metodo?.metodo?.toLowerCase().includes('cartão')) {
             return (
               <div className="mt-4 space-y-3">
-                <input className="w-full border rounded-lg px-3 py-2" placeholder="Número do Cartão" value={card.number} onChange={e=>setCard({...card, number:e.target.value})} />
-                <input className="w-full border rounded-lg px-3 py-2" placeholder="Nome impresso" value={card.name} onChange={e=>setCard({...card, name:e.target.value})} />
+                <MaskedInput
+                  mask="XXXX XXXX XXXX XXXX"
+                  replacement={{X: /\d/}}
+                  placeholder="Número do Cartão"
+                  value={card.number}
+                  onChange={e=>setCard({...card, number:e.target.value})}
+                />
+                <input className="w-full border rounded-lg px-3 py-2" placeholder="Nome impresso" value={card.name} onChange={e=>setCard({...card, name:e.target.value.toUpperCase()})} />
                 <div className="flex gap-3">
-                  <input className="flex-1 border rounded-lg px-3 py-2" placeholder="Validade (MM/AA)" value={card.expiry} onChange={e=>setCard({...card, expiry:e.target.value})} />
+                  <MaskedInput
+                    mask="MM/YY"
+                    replacement={{M: /\d/, Y: /\d/}}
+                    placeholder="Validade (MM/YY)"
+                    value={card.expiry}
+                    onChange={e=>setCard({...card, expiry:e.target.value})}
+                  />
                   <input className="flex-1 border rounded-lg px-3 py-2" placeholder="CVV" value={card.cvv} onChange={e=>setCard({...card, cvv:e.target.value})} />
                 </div>
               </div>

@@ -1,6 +1,6 @@
 import { InputMask } from '@react-input/mask';
 import { FiLoader } from 'react-icons/fi';
-import { CLASSES } from '../constants/classes';
+import { CLASSES } from '../../constants/classesCadastro.js';
 
 export default function MaskedInput({ 
   mask, 
