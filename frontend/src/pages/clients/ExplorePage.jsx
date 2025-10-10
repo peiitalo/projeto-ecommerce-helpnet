@@ -4,6 +4,7 @@ import { categoriaService, produtoService, favoritoService } from '../../service
 import { log } from '../../utils/logger';
 import { useCart } from '../../context/CartContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { buildImageUrl } from '../../utils/imageUtils';
 import LazyImage from '../../components/LazyImage';
 import ProductDetailsModal from '../../components/ProductDetailsModal';
 import LoadingSkeleton from '../../components/LoadingSkeleton';
@@ -53,13 +54,6 @@ function ExplorePage() {
   const { logout } = useAuth();
   const navigate = useNavigate();
 
-  // Helper to build full image URL
-  const buildImageUrl = (imagePath) => {
-    if (!imagePath) return '/placeholder-image.svg';
-    // Remove leading slash if present to avoid double slashes
-    const cleanPath = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath;
-    return `/api/${cleanPath}`;
-  };
 
   // Estados para busca e filtros na categoria
   const [categorySearchQuery, setCategorySearchQuery] = useState('');
