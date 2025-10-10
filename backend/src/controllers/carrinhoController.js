@@ -1,6 +1,6 @@
 // backend/src/controllers/carrinhoController.js
 import prisma from '../config/prisma.js';
-import { logControllerError } from '../utils/logger.js';
+import { logControllerError, logger } from '../utils/logger.js';
 
 export const listar = async (req, res) => {
   try {

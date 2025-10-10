@@ -365,6 +365,11 @@ export const clienteService = {
     return apiRequest('/pedidos');
   },
 
+  // Buscar pedido por ID
+  buscarPedido: async (id) => {
+    return apiRequest(`/pedidos/${id}`);
+  },
+
   // Criar pedido
   criarPedido: async (dadosPedido) => {
     return apiRequest('/pedidos', {

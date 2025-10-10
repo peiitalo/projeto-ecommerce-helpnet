@@ -232,13 +232,20 @@ export const buscarEntregaCliente = async (req, res) => {
     const { user } = req;
     const { pedidoId } = req.params;
 
+    // Parse pedidoId to handle "PED-XX" format
+    const parsedPedidoId = pedidoId.startsWith('PED-') ? parseInt(pedidoId.substring(4)) : parseInt(pedidoId);
+
+    console.log('DEBUG: buscarEntregaCliente called', { pedidoId, parsedPedidoId, userId: user?.id });
+
     // Verificar se o pedido existe e pertence ao cliente
     const pedido = await prisma.pedido.findFirst({
       where: {
-        PedidoID: parseInt(pedidoId),
+        PedidoID: parsedPedidoId,
         ClienteID: user.id
       }
     });
+
+    console.log('DEBUG: Pedido query result', { pedidoFound: !!pedido });
 
     if (!pedido) {
       return res.status(404).json({
@@ -250,9 +257,10 @@ export const buscarEntregaCliente = async (req, res) => {
     // Buscar entrega do cliente (se existir)
     let entrega = null;
     try {
+      console.log('DEBUG: Querying entrega for pedidoId:', pedidoId, 'parsedPedidoId:', parsedPedidoId);
       entrega = await prisma.entrega.findFirst({
         where: {
-          PedidoID: parseInt(pedidoId)
+          PedidoID: parsedPedidoId
         },
         include: {
           rastreamentos: {
@@ -260,7 +268,9 @@ export const buscarEntregaCliente = async (req, res) => {
           }
         }
       });
+      console.log('DEBUG: Entrega query successful', { entregaFound: !!entrega });
     } catch (entregaError) {
+      console.log('DEBUG: Entrega query error', { code: entregaError.code, message: entregaError.message });
       // Se a tabela Entrega não existir ainda, retornar mensagem apropriada
       if (entregaError.code === 'P2021') {
         return res.json({
@@ -294,6 +304,7 @@ export const buscarEntregaCliente = async (req, res) => {
     });
 
   } catch (error) {
+    console.log('DEBUG: Main catch in buscarEntregaCliente', { message: error.message, stack: error.stack });
     logControllerError('buscar_entrega_cliente_error', error, req);
     res.status(500).json({
       success: false,
