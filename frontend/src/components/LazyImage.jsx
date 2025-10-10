@@ -2,6 +2,8 @@
 // Optimized image component with lazy loading and performance features
 
 import React, { useState, useRef, useEffect } from 'react';
+import { log } from '../utils/logger.js';
+import { checkImageAvailability } from '../utils/imageUtils.js';
 
 /**
  * Optimized image component with lazy loading, error handling, and performance features
@@ -15,23 +17,41 @@ const LazyImage = ({
   fallback = '/placeholder-image.svg',
   onLoad,
   onError,
+  maxRetries = 2,
+  retryDelay = 1000,
   ...props
 }) => {
   const [isInView, setIsInView] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const imgRef = useRef(null);
 
   // Intersection Observer for lazy loading
   useEffect(() => {
     const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
+      async (entries) => {
+        for (const entry of entries) {
           if (entry.isIntersecting) {
+            log.info('LazyImage: Image entered viewport', { src, alt });
+
+            // Verificar disponibilidade da imagem antes de tentar carregar
+            if (src && !src.startsWith('blob:') && !src.startsWith('data:')) {
+              const isAvailable = await checkImageAvailability(src, 3000);
+              if (!isAvailable) {
+                log.warn('LazyImage: Image not available, using fallback', { src, alt });
+                setHasError(true);
+                observer.disconnect();
+                return;
+              }
+            }
+
             setIsInView(true);
             observer.disconnect();
           }
-        });
+        }
       },
       {
         threshold: 0.1,
@@ -44,17 +64,72 @@ const LazyImage = ({
     }
 
     return () => observer.disconnect();
-  }, []);
+  }, [src, alt]);
+
+  // Monitor network connectivity
+  useEffect(() => {
+    const handleOnline = () => {
+      log.info('LazyImage: Network connection restored', { src, alt });
+      setIsOnline(true);
+      // Reset error state if we were offline
+      if (hasError && retryCount < maxRetries) {
+        setHasError(false);
+        setRetryCount(0);
+      }
+    };
+
+    const handleOffline = () => {
+      log.warn('LazyImage: Network connection lost', { src, alt });
+      setIsOnline(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [src, alt, hasError, retryCount, maxRetries]);
 
   // Handle image load
   const handleLoad = () => {
+    log.info('LazyImage: Image loaded successfully', { src, alt, retryCount });
     setIsLoaded(true);
+    setRetryCount(0); // Reset retry count on success
     onLoad?.();
+  };
+
+  // Handle retry logic
+  const attemptRetry = () => {
+    if (retryCount < maxRetries) {
+      setIsRetrying(true);
+      setRetryCount(prev => prev + 1);
+      log.info('LazyImage: Retrying image load', {
+        src,
+        alt,
+        attempt: retryCount + 1,
+        maxRetries
+      });
+
+      setTimeout(() => {
+        setIsRetrying(false);
+        // Force re-render by updating a dummy state
+        setHasError(false);
+      }, retryDelay);
+    } else {
+      log.warn('LazyImage: Max retries reached, using fallback', {
+        src,
+        alt,
+        maxRetries
+      });
+      setHasError(true);
+    }
   };
 
 
   // Determine which image source to use
-  const imageSrc = hasError ? fallback : (isInView ? src : placeholder);
+  const imageSrc = hasError || !isOnline ? fallback : (isRetrying ? placeholder : (isInView ? src : placeholder));
 
   return (
     <div className={`relative overflow-hidden ${className}`}>
@@ -75,11 +150,30 @@ const LazyImage = ({
         }`}
         onLoad={handleLoad}
         onError={(e) => {
-          console.warn('LazyImage: Failed to load image:', src);
-          setHasError(true);
-          // Set fallback image directly on error
-          e.target.src = fallback;
-          onError?.(e);
+          // Check if we should retry
+          if (retryCount < maxRetries && !isRetrying) {
+            log.warn('LazyImage: Failed to load image, attempting retry', {
+              src,
+              alt,
+              attempt: retryCount + 1,
+              maxRetries,
+              error: e?.message || 'Unknown error'
+            });
+            attemptRetry();
+          } else {
+            log.warn('LazyImage: Failed to load image, using fallback', {
+              src,
+              alt,
+              fallback,
+              retryCount,
+              maxRetries,
+              error: e?.message || 'Unknown error'
+            });
+            setHasError(true);
+            // Set fallback image directly on error
+            e.target.src = fallback;
+            onError?.(e);
+          }
         }}
         loading="lazy"
         decoding="async"
@@ -93,7 +187,14 @@ const LazyImage = ({
             <svg className="w-12 h-12 mx-auto mb-2 opacity-50" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
             </svg>
-            <p className="text-sm">Imagem não disponível</p>
+            <p className="text-sm">
+              {!isOnline ? 'Sem conexão - imagem indisponível' : 'Imagem não disponível'}
+            </p>
+            {!isOnline && (
+              <p className="text-xs text-slate-400 mt-1">
+                Tente novamente quando conectar à internet
+              </p>
+            )}
           </div>
         </div>
       )}

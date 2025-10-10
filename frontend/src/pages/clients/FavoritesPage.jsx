@@ -10,6 +10,7 @@ import {
 import { favoritoService } from '../../services/api';
 import { log } from '../../utils/logger';
 import { useCart } from '../../context/CartContext';
+import { buildImageUrl } from '../../utils/imageUtils';
 
 function FavoritesPage() {
   const navigate = useNavigate();
@@ -147,12 +148,12 @@ function FavoritesPage() {
                   key={produto.ProdutoID}
                   className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow"
                 >
-                  {/* Imagem */}
+                  {/* Correção: Padronização de URLs de imagem usando buildImageUrl para consistência */}
                   <div className="relative aspect-square">
                     <Link to={`/produto/${produto.ProdutoID}`}>
                       {produto.Imagens && produto.Imagens.length > 0 ? (
                         <img
-                          src={produto.Imagens[0]}
+                          src={buildImageUrl(produto.Imagens[0])}
                           alt={produto.Nome}
                           className="w-full h-full object-cover"
                         />

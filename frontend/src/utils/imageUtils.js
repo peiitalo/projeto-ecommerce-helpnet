@@ -1,7 +1,15 @@
 /**
  * Utilitários para manipulação de imagens
  * Centraliza a lógica de construção de URLs de imagens
+ *
+ * PADRONIZAÇÃO DE URLs DE IMAGEM:
+ * - Todas as imagens agora usam /api/uploads via proxy do Vite
+ * - O proxy do Vite mapeia /api para o backend, garantindo consistência
+ * - Removidas URLs diretas como http://localhost:3001/uploads
+ * - Função buildImageUrl padronizada em todo o frontend
  */
+
+import { log } from './logger.js';
 
 /**
  * Constrói URL completa para imagem do produto
@@ -9,40 +17,63 @@
  * @returns {string} URL completa da imagem
  */
 export const buildImageUrl = (imagePath) => {
-  if (!imagePath) return '/placeholder-image.svg';
+   if (!imagePath) {
+     log.debug('buildImageUrl: No image path provided, using placeholder');
+     return '/placeholder-image.svg';
+   }
 
-  // Se já é uma URL completa, retornar como está
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
-  }
+   // Se já é uma URL completa, retornar como está
+   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+     log.debug('buildImageUrl: Absolute URL detected, returning as-is', { imagePath });
+     return imagePath;
+   }
 
-  // Se é um blob URL, retornar como está
-  if (imagePath.startsWith('blob:')) {
-    return imagePath;
-  }
+   // Se é um blob URL, retornar como está
+   if (imagePath.startsWith('blob:')) {
+     log.debug('buildImageUrl: Blob URL detected, returning as-is', { imagePath });
+     return imagePath;
+   }
 
-  // Se é um data URL, retornar como está
-  if (imagePath.startsWith('data:')) {
-    return imagePath;
-  }
+   // Se é um data URL, retornar como está
+   if (imagePath.startsWith('data:')) {
+     log.debug('buildImageUrl: Data URL detected, returning as-is');
+     return imagePath;
+   }
 
-  // Get base URL from environment or default
-  const baseUrl = (import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:3001').replace('/api', '');
+   // Padronização: sempre usar /api/uploads via proxy do Vite
+   // O proxy do Vite mapeia /api para o backend, garantindo consistência
+   let cleanPath = imagePath;
 
-  // Se começa com /uploads, usar diretamente com base URL
-  if (imagePath.startsWith('/uploads/')) {
-    return `${baseUrl}${imagePath}`;
-  }
+   // Remover prefixos existentes se houver
+   if (imagePath.startsWith('/uploads/')) {
+     cleanPath = imagePath.slice(8); // Remove '/uploads/'
+   } else if (imagePath.startsWith('uploads/')) {
+     cleanPath = imagePath.slice(8); // Remove 'uploads/'
+   } else if (imagePath.startsWith('/')) {
+     cleanPath = imagePath.slice(1); // Remove barra inicial
+   }
 
-  // Se começa com uploads/, adicionar barra inicial e base URL
-  if (imagePath.startsWith('uploads/')) {
-    return `${baseUrl}/${imagePath}`;
-  }
+   // Correção: remover barras iniciais de cleanPath para evitar duplicação (ex: /api/uploads//products/)
+   // Isso trata casos onde o caminho original tem prefixos malformados como '/uploads//products/'
+   cleanPath = cleanPath.replace(/^\/+/, '');
 
-  // Para outros casos, assumir que precisa do prefixo /uploads/
-  const cleanPath = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath;
-  return `${baseUrl}/uploads/${cleanPath}`;
-};
+   const finalUrl = `/api/uploads/${cleanPath}`;
+   log.debug('buildImageUrl: Built relative URL', { originalPath: imagePath, finalUrl });
+
+   // Validação adicional: garantir que a URL final seja segura
+   try {
+     const url = new URL(finalUrl, window.location.origin);
+     if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+       log.warn('buildImageUrl: Invalid protocol in final URL', { finalUrl });
+       return '/placeholder-image.svg';
+     }
+   } catch (error) {
+     log.warn('buildImageUrl: Invalid URL format', { finalUrl, error: error.message });
+     return '/placeholder-image.svg';
+   }
+
+   return finalUrl;
+ };
 
 /**
  * Constrói array de URLs para múltiplas imagens
@@ -107,4 +138,75 @@ export const generatePlaceholderSVG = (text = 'Sem imagem') => {
       </text>
     </svg>
   `)}`;
+};
+
+/**
+ * Verifica se uma URL de imagem está acessível
+ * @param {string} url - URL da imagem a ser verificada
+ * @param {number} timeout - Timeout em ms (padrão: 5000)
+ * @returns {Promise<boolean>} True se a imagem está acessível
+ */
+export const checkImageAvailability = (url, timeout = 5000) => {
+  return new Promise((resolve) => {
+    if (!url || typeof url !== 'string') {
+      log.debug('checkImageAvailability: Invalid URL provided', { url });
+      resolve(false);
+      return;
+    }
+
+    // Para URLs blob e data, considerar sempre disponíveis
+    if (url.startsWith('blob:') || url.startsWith('data:')) {
+      resolve(true);
+      return;
+    }
+
+    const img = new Image();
+    let timeoutId;
+
+    const cleanup = () => {
+      img.onload = null;
+      img.onerror = null;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+
+    img.onload = () => {
+      cleanup();
+      log.debug('checkImageAvailability: Image is available', { url });
+      resolve(true);
+    };
+
+    img.onerror = () => {
+      cleanup();
+      log.debug('checkImageAvailability: Image is not available', { url });
+      resolve(false);
+    };
+
+    // Timeout para evitar espera infinita
+    timeoutId = setTimeout(() => {
+      cleanup();
+      log.debug('checkImageAvailability: Image check timed out', { url, timeout });
+      resolve(false);
+    }, timeout);
+
+    img.src = url;
+  });
+};
+
+/**
+ * Verifica conectividade de rede básica
+ * @returns {Promise<boolean>} True se há conectividade
+ */
+export const checkNetworkConnectivity = async () => {
+  try {
+    // Tentar fazer uma requisição HEAD para um endpoint pequeno
+    const response = await fetch('/api/health', {
+      method: 'HEAD',
+      cache: 'no-cache',
+      signal: AbortSignal.timeout(3000)
+    });
+    return response.ok;
+  } catch (error) {
+    log.debug('checkNetworkConnectivity: Network check failed', { error: error.message });
+    return navigator.onLine; // Fallback para navigator.onLine
+  }
 };
