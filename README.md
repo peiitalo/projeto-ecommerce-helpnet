@@ -172,44 +172,6 @@ A aplicação estará disponível em:
 - **Frontend**: http://localhost:5173
 - **API Backend**: http://localhost:3001
 
-## ⚙️ Configuração do Ambiente
-
-### Backend (.env)
-
-```env
-# Banco de Dados
-DATABASE_URL="postgresql://username:password@localhost:5432/helpnet_db"
-
-# Configuração JWT
-JWT_SECRET="your-super-secure-jwt-secret-here"
-JWT_REFRESH_SECRET="your-refresh-token-secret-here"
-
-# Integração Mercado Pago
-MERCADO_PAGO_ACCESS_TOKEN="your-mercado-pago-access-token"
-
-# Serviço de Email (SendGrid)
-SENDGRID_API_KEY="your-sendgrid-api-key"
-FROM_EMAIL="noreply@helpnet.com"
-
-# URLs da Aplicação
-FRONTEND_URL="http://localhost:5173"
-BACKEND_URL="http://localhost:3001"
-
-# Configuração do Servidor
-NODE_ENV="development"
-PORT=3001
-
-# Upload de Arquivos
-MAX_FILE_SIZE=10485760
-UPLOAD_PATH="./uploads"
-```
-
-### Frontend (.env)
-
-```env
-VITE_API_BASE_URL="http://localhost:3001"
-VITE_APP_NAME="HelpNet E-commerce"
-```
 
 ## 🗄️ Configuração do Banco de Dados
 
