@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
-import { FiSave, FiMail, FiPercent, FiPalette, FiGlobe, FiShield, FiCreditCard } from 'react-icons/fi';
+import { FiSave, FiMail, FiPercent, FiSettings, FiGlobe, FiShield, FiCreditCard } from 'react-icons/fi';
 
 function ConfiguracoesPage() {
   const [settings, setSettings] = useState({
@@ -57,7 +57,7 @@ function ConfiguracoesPage() {
     { id: 'general', label: 'Geral', icon: <FiGlobe /> },
     { id: 'taxes', label: 'Impostos', icon: <FiPercent /> },
     { id: 'email', label: 'E-mail', icon: <FiMail /> },
-    { id: 'theme', label: 'Tema', icon: <FiPalette /> },
+    { id: 'theme', label: 'Tema', icon: <FiSettings /> },
     { id: 'payment', label: 'Pagamentos', icon: <FiCreditCard /> },
     { id: 'security', label: 'Segurança', icon: <FiShield /> }
   ];

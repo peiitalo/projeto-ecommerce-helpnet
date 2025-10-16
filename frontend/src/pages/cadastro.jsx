@@ -17,7 +17,7 @@ import {
   FiCheckCircle,
   FiLoader,
 } from "react-icons/fi";
-import InputMask from "react-input-mask";
+import { InputMask } from "@react-input/mask";
 import InputSenha from "../components/cadastro/InputSenha";
 import InputConfirmarSenha from "../components/cadastro/InputConfirmarSenha";
 import {
@@ -354,7 +354,8 @@ function Cadastro() {
 
     setDadosFormulario((prev) => ({ ...prev, [name]: valorMascarado }));
 
-    if (name === "cep") {
+    // Only trigger CEP search for CEP fields when they have the complete masked value
+    if (name === "cep" && value.length === 9) { // CEP format: XXXXX-XXX = 9 characters
       const resultado = await buscarCep(value);
       if (resultado?.erro) {
         console.error("CEP não encontrado:", value); // log do CEP inválido
@@ -370,7 +371,7 @@ function Cadastro() {
         }));
       }
     }
-    if (name === "cepCobranca") {
+    if (name === "cepCobranca" && value.length === 9) { // CEP format: XXXXX-XXX = 9 characters
       const resultado = await buscarCep(value);
       if (resultado?.erro) {
         console.error("CEP de cobrança não encontrado:", value); // log do CEP cobrança inválido
@@ -626,6 +627,7 @@ function Cadastro() {
               <FaMapMarkerAlt className={classeIconeInput} />
               <InputMask
                 mask="99999-999"
+                replacement={{ 9: /\d/ }}
                 value={dadosFormulario.cep}
                 onChange={lidarComAlteracao}
                 name="cep"
@@ -739,6 +741,7 @@ function Cadastro() {
                   <FaMapMarkerAlt className={classeIconeInput} />
                   <InputMask
                     mask="99999-999"
+                    replacement={{ 9: /\d/ }}
                     value={dadosFormulario.cepCobranca}
                     onChange={lidarComAlteracao}
                     name="cepCobranca"

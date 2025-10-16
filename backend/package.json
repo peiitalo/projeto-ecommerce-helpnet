@@ -7,6 +7,9 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
+    "create-clients": "node src/scripts/createSampleClients.js",
+    "create-products": "node src/scripts/createSampleProducts.js",
+    "create-payment-methods": "node src/scripts/createPaymentMethods.js",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

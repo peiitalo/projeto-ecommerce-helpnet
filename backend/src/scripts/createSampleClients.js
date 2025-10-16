@@ -3,14 +3,14 @@ import prisma from '../config/prisma.js';
 import cryptoService from '../services/cryptoService.js';
 
 const sampleClients = [
-  // Pessoa Física
+  // 5 Pessoas Físicas
   {
     NomeCompleto: 'João Silva Santos',
     TipoPessoa: 'Física',
     CPF_CNPJ: '123.456.789-01',
     Email: 'joao.silva@email.com',
     TelefoneCelular: '(11) 99999-0001',
-    senha: 'senha123',
+    senha: 'Senha@123',
     endereco: {
       CEP: '01000-000',
       Cidade: 'São Paulo',
@@ -20,32 +20,13 @@ const sampleClients = [
       Complemento: 'Apto 45'
     }
   },
-  // Pessoa Jurídica
-  {
-    NomeCompleto: 'Empresa ABC Ltda',
-    TipoPessoa: 'Jurídica',
-    CPF_CNPJ: '12.345.678/0001-90',
-    Email: 'contato@empresaabc.com.br',
-    TelefoneCelular: '(11) 99999-0002',
-    RazaoSocial: 'Empresa ABC Ltda',
-    senha: 'senha123',
-    endereco: {
-      CEP: '02000-000',
-      Cidade: 'São Paulo',
-      UF: 'SP',
-      Bairro: 'Vila Mariana',
-      Numero: '456',
-      Complemento: 'Sala 101'
-    }
-  },
-  // Pessoa Física
   {
     NomeCompleto: 'Maria Oliveira Costa',
     TipoPessoa: 'Física',
     CPF_CNPJ: '234.567.890-12',
     Email: 'maria.oliveira@email.com',
     TelefoneCelular: '(21) 99999-0003',
-    senha: 'senha123',
+    senha: 'Senha@123',
     endereco: {
       CEP: '20000-000',
       Cidade: 'Rio de Janeiro',
@@ -55,32 +36,13 @@ const sampleClients = [
       Complemento: 'Bloco B'
     }
   },
-  // Pessoa Jurídica
-  {
-    NomeCompleto: 'Tech Solutions S.A.',
-    TipoPessoa: 'Jurídica',
-    CPF_CNPJ: '23.456.789/0001-01',
-    Email: 'admin@techsolutions.com.br',
-    TelefoneCelular: '(21) 99999-0004',
-    RazaoSocial: 'Tech Solutions S.A.',
-    senha: 'senha123',
-    endereco: {
-      CEP: '21000-000',
-      Cidade: 'Rio de Janeiro',
-      UF: 'RJ',
-      Bairro: 'Barra da Tijuca',
-      Numero: '101',
-      Complemento: 'Torre A'
-    }
-  },
-  // Pessoa Física
   {
     NomeCompleto: 'Carlos Eduardo Lima',
     TipoPessoa: 'Física',
     CPF_CNPJ: '345.678.901-23',
     Email: 'carlos.lima@email.com',
     TelefoneCelular: '(31) 99999-0005',
-    senha: 'senha123',
+    senha: 'Senha@123',
     endereco: {
       CEP: '30000-000',
       Cidade: 'Belo Horizonte',
@@ -90,32 +52,13 @@ const sampleClients = [
       Complemento: 'Casa'
     }
   },
-  // Pessoa Jurídica
-  {
-    NomeCompleto: 'Comércio Geral Ltda',
-    TipoPessoa: 'Jurídica',
-    CPF_CNPJ: '34.567.890/0001-12',
-    Email: 'vendas@comerciogeral.com.br',
-    TelefoneCelular: '(31) 99999-0006',
-    RazaoSocial: 'Comércio Geral Ltda',
-    senha: 'senha123',
-    endereco: {
-      CEP: '31000-000',
-      Cidade: 'Belo Horizonte',
-      UF: 'MG',
-      Bairro: 'Centro',
-      Numero: '303',
-      Complemento: 'Loja 5'
-    }
-  },
-  // Pessoa Física
   {
     NomeCompleto: 'Ana Paula Rodrigues',
     TipoPessoa: 'Física',
     CPF_CNPJ: '456.789.012-34',
     Email: 'ana.rodrigues@email.com',
     TelefoneCelular: '(71) 99999-0007',
-    senha: 'senha123',
+    senha: 'Senha@123',
     endereco: {
       CEP: '40000-000',
       Cidade: 'Salvador',
@@ -125,32 +68,13 @@ const sampleClients = [
       Complemento: 'Apto 67'
     }
   },
-  // Pessoa Jurídica
-  {
-    NomeCompleto: 'Indústria XYZ Ltda',
-    TipoPessoa: 'Jurídica',
-    CPF_CNPJ: '45.678.901/0001-23',
-    Email: 'rh@industriaxyz.com.br',
-    TelefoneCelular: '(71) 99999-0008',
-    RazaoSocial: 'Indústria XYZ Ltda',
-    senha: 'senha123',
-    endereco: {
-      CEP: '41000-000',
-      Cidade: 'Salvador',
-      UF: 'BA',
-      Bairro: 'Imbuí',
-      Numero: '505',
-      Complemento: 'Galpão 2'
-    }
-  },
-  // Pessoa Física
   {
     NomeCompleto: 'Roberto Fernandes',
     TipoPessoa: 'Física',
     CPF_CNPJ: '567.890.123-45',
     Email: 'roberto.fernandes@email.com',
     TelefoneCelular: '(41) 99999-0009',
-    senha: 'senha123',
+    senha: 'Senha@123',
     endereco: {
       CEP: '80000-000',
       Cidade: 'Curitiba',
@@ -160,7 +84,75 @@ const sampleClients = [
       Complemento: 'Cobertura'
     }
   },
-  // Pessoa Jurídica
+  // 5 Pessoas Jurídicas (Vendedores)
+  {
+    NomeCompleto: 'Empresa ABC Ltda',
+    TipoPessoa: 'Jurídica',
+    CPF_CNPJ: '12.345.678/0001-90',
+    Email: 'contato@empresaabc.com.br',
+    TelefoneCelular: '(11) 99999-0002',
+    RazaoSocial: 'Empresa ABC Ltda',
+    senha: 'Senha@123',
+    endereco: {
+      CEP: '02000-000',
+      Cidade: 'São Paulo',
+      UF: 'SP',
+      Bairro: 'Vila Mariana',
+      Numero: '456',
+      Complemento: 'Sala 101'
+    }
+  },
+  {
+    NomeCompleto: 'Tech Solutions S.A.',
+    TipoPessoa: 'Jurídica',
+    CPF_CNPJ: '23.456.789/0001-01',
+    Email: 'admin@techsolutions.com.br',
+    TelefoneCelular: '(21) 99999-0004',
+    RazaoSocial: 'Tech Solutions S.A.',
+    senha: 'Senha@123',
+    endereco: {
+      CEP: '21000-000',
+      Cidade: 'Rio de Janeiro',
+      UF: 'RJ',
+      Bairro: 'Barra da Tijuca',
+      Numero: '101',
+      Complemento: 'Torre A'
+    }
+  },
+  {
+    NomeCompleto: 'Comércio Geral Ltda',
+    TipoPessoa: 'Jurídica',
+    CPF_CNPJ: '34.567.890/0001-12',
+    Email: 'vendas@comerciogeral.com.br',
+    TelefoneCelular: '(31) 99999-0006',
+    RazaoSocial: 'Comércio Geral Ltda',
+    senha: 'Senha@123',
+    endereco: {
+      CEP: '31000-000',
+      Cidade: 'Belo Horizonte',
+      UF: 'MG',
+      Bairro: 'Centro',
+      Numero: '303',
+      Complemento: 'Loja 5'
+    }
+  },
+  {
+    NomeCompleto: 'Indústria XYZ Ltda',
+    TipoPessoa: 'Jurídica',
+    CPF_CNPJ: '45.678.901/0001-23',
+    Email: 'rh@industriaxyz.com.br',
+    TelefoneCelular: '(71) 99999-0008',
+    RazaoSocial: 'Indústria XYZ Ltda',
+    senha: 'Senha@123',
+    endereco: {
+      CEP: '41000-000',
+      Cidade: 'Salvador',
+      UF: 'BA',
+      Bairro: 'Imbuí',
+      Numero: '505',
+      Complemento: 'Galpão 2'
+    }
+  },
   {
     NomeCompleto: 'Serviços Digitais Ltda',
     TipoPessoa: 'Jurídica',
@@ -168,7 +160,7 @@ const sampleClients = [
     Email: 'suporte@servicosdigitais.com.br',
     TelefoneCelular: '(41) 99999-0010',
     RazaoSocial: 'Serviços Digitais Ltda',
-    senha: 'senha123',
+    senha: 'Senha@123',
     endereco: {
       CEP: '81000-000',
       Cidade: 'Curitiba',
