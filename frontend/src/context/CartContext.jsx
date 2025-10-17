@@ -165,16 +165,29 @@ export function CartProvider({ children }) {
     }
   };
 
-  const clear = async () => {
+  const clear = async (itemIds = null) => {
     if (user) {
       try {
-        await carrinhoService.limpar();
-        setItems([]);
+        if (itemIds && itemIds.length > 0) {
+          // Remove only specific items
+          await Promise.all(itemIds.map(id => carrinhoService.remover(id)));
+          setItems((prev) => prev.filter((p) => !itemIds.includes(p.id)));
+        } else {
+          // Clear all items
+          await carrinhoService.limpar();
+          setItems([]);
+        }
       } catch (error) {
         console.error('Erro ao limpar carrinho:', error);
       }
     } else {
-      setItems([]);
+      if (itemIds && itemIds.length > 0) {
+        // Remove only specific items from localStorage
+        setItems((prev) => prev.filter((p) => !itemIds.includes(p.id)));
+      } else {
+        // Clear all items
+        setItems([]);
+      }
     }
   };
 

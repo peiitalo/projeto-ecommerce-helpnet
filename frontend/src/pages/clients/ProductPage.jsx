@@ -177,7 +177,7 @@ function ProductPage() {
           avaliacaoService.listarPorProduto(id),
           avaliacaoService.minhaDoProduto(id).catch(() => null) // Pode não existir avaliação do usuário
         ]);
-        
+
         setAvaliacoes(avaliacoesResponse.data || []);
         setMinhaAvaliacao(minhaAvaliacaoResponse?.data || null);
       } catch (error) {
@@ -391,7 +391,7 @@ function ProductPage() {
     }
   };
 
-  const handleDeleteComment = async (avaliacaoId) => {
+  const handleDeleteComment = async () => {
     showWarning('Tem certeza que deseja apagar a avaliação?', {
       autoClose: false,
       closeOnClick: false,
@@ -399,16 +399,16 @@ function ProductPage() {
       onClose: async () => {
         try {
           await avaliacaoService.remover(id);
-          
+
           // Recarregar avaliações
           const [avaliacoesResponse, minhaAvaliacaoResponse] = await Promise.all([
             avaliacaoService.listarPorProduto(id),
             avaliacaoService.minhaDoProduto(id).catch(() => null)
           ]);
-          
+
           setAvaliacoes(avaliacoesResponse.data || []);
           setMinhaAvaliacao(minhaAvaliacaoResponse?.data || null);
-          
+
           showSuccess('Avaliação removida com sucesso!');
         } catch (error) {
           log.error('avaliacao_delete_error', { produtoId: id, error: error.message });
@@ -911,7 +911,7 @@ function ProductPage() {
                     <div className="flex items-center justify-between mb-4">
                       <h4 className="font-semibold text-blue-900">Sua Avaliação</h4>
                       <button
-                        onClick={() => handleDeleteComment(minhaAvaliacao.id)}
+                        onClick={handleDeleteComment}
                         className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                         title="Excluir avaliação"
                       >
@@ -919,11 +919,11 @@ function ProductPage() {
                       </button>
                     </div>
                     <div className="flex items-center gap-3 mb-3">
-                      {renderStars(minhaAvaliacao.nota, 'text-sm')}
-                      <span className="text-sm text-blue-700 font-medium">{minhaAvaliacao.nota}/5</span>
+                      {renderStars(minhaAvaliacao.Nota, 'text-sm')}
+                      <span className="text-sm text-blue-700 font-medium">{minhaAvaliacao.Nota}/5</span>
                     </div>
-                    {minhaAvaliacao.comentario && (
-                      <p className="text-blue-800 leading-relaxed">{minhaAvaliacao.comentario}</p>
+                    {minhaAvaliacao.Comentario && (
+                      <p className="text-blue-800 leading-relaxed">{minhaAvaliacao.Comentario}</p>
                     )}
                   </div>
                 )}
@@ -942,7 +942,7 @@ function ProductPage() {
                     </div>
                   ) : (
                     avaliacoes.map((avaliacao) => (
-                      <div key={avaliacao.id} className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                      <div key={avaliacao.AvaliacaoID} className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
                         <div className="flex items-start justify-between mb-4">
                           <div className="flex items-center gap-4">
                             <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center shadow-sm">
@@ -950,20 +950,20 @@ function ProductPage() {
                             </div>
                             <div>
                               <h5 className="font-semibold text-slate-900 mb-1">
-                                {avaliacao.cliente?.nome || 'Cliente'}
+                                {avaliacao.cliente?.Nome || 'Cliente'}
                               </h5>
                               <div className="flex items-center gap-3">
-                                {renderStars(avaliacao.nota, 'text-sm')}
+                                {renderStars(avaliacao.Nota, 'text-sm')}
                                 <span className="text-sm text-slate-500">
-                                  {new Date(avaliacao.dataAvaliacao).toLocaleDateString('pt-BR')}
+                                  {new Date(avaliacao.CriadoEm).toLocaleDateString('pt-BR')}
                                 </span>
                               </div>
                             </div>
                           </div>
                         </div>
-                        
-                        {avaliacao.comentario && (
-                          <p className="text-slate-700 leading-relaxed mb-4 pl-16">{avaliacao.comentario}</p>
+
+                        {avaliacao.Comentario && (
+                          <p className="text-slate-700 leading-relaxed mb-4 pl-16">{avaliacao.Comentario}</p>
                         )}
                       </div>
                     ))

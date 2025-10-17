@@ -58,7 +58,7 @@ function CheckoutPage() {
   const [installments, setInstallments] = useState({});
   const [cashDiscount, setCashDiscount] = useState(0.05); // 5% de desconto à vista
 
-  const { items, count, clearCart, freight, freightOptions, selectedFreight, setSelectedFreight, calculateFreight, freightLoading, freightError, selectedAddress, setSelectedAddress, total, subtotal } = useCart();
+  const { items, count, clear, freight, freightOptions, selectedFreight, setSelectedFreight, calculateFreight, freightLoading, freightError, selectedAddress, setSelectedAddress, total, subtotal } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { showSuccess, showError, showWarning, showInfo } = useNotifications();
@@ -451,8 +451,9 @@ function CheckoutPage() {
         setReceiptData(receipt);
         setOrderComplete(true);
 
-        // Limpar carrinho
-        clearCart();
+        // Limpar apenas os produtos comprados do carrinho
+        const purchasedItemIds = selectedItems.map(item => item.id);
+        clear(purchasedItemIds);
 
         showSuccess('Pedido realizado e pago com sucesso!');
         return;
@@ -475,8 +476,9 @@ function CheckoutPage() {
       setReceiptData(receipt);
       setOrderComplete(true);
 
-      // Limpar carrinho
-      clearCart();
+      // Limpar apenas os produtos comprados do carrinho
+      const purchasedItemIds = selectedItems.map(item => item.id);
+      clear(purchasedItemIds);
 
     } catch (error) {
       console.error('Erro ao finalizar pedido:', error);
