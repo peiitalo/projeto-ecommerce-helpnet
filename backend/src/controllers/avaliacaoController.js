@@ -9,15 +9,15 @@ export const listarPorProduto = async (req, res) => {
     const avaliacoes = await prisma.avaliacao.findMany({
       where: { ProdutoID: parseInt(produtoId) },
       orderBy: { CriadoEm: 'desc' },
-      select: {
-        AvaliacaoID: true,
-        ClienteID: true,
-        Nota: true,
-        Comentario: true,
-        CriadoEm: true,
+      include: {
+        cliente: {
+          select: {
+            Nome: true
+          }
+        }
       }
     });
-    res.json({ avaliacoes });
+    res.json({ data: avaliacoes });
   } catch (error) {
     logControllerError('listar_avaliacoes_error', error, req);
     res.status(500).json({ erro: 'Erro interno do servidor' });
@@ -31,7 +31,7 @@ export const minhaDoProduto = async (req, res) => {
     const avaliacao = await prisma.avaliacao.findUnique({
       where: { ClienteID_ProdutoID: { ClienteID: userId, ProdutoID: parseInt(produtoId) } }
     });
-    res.json({ avaliacao });
+    res.json({ data: avaliacao });
   } catch (error) {
     logControllerError('minha_avaliacao_error', error, req);
     res.status(500).json({ erro: 'Erro interno do servidor' });
@@ -89,7 +89,7 @@ export const avaliar = async (req, res) => {
       // Não falhar a operação por causa do email
     }
 
-    res.status(201).json({ avaliacao });
+    res.status(201).json({ data: avaliacao });
   } catch (error) {
     logControllerError('avaliar_error', error, req);
     res.status(500).json({ erro: 'Erro interno do servidor' });

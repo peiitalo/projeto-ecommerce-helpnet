@@ -7,7 +7,7 @@ const router = express.Router();
 
 router.get('/produto/:produtoId', avaliacaoController.listarPorProduto);
 router.use(authMiddleware);
-router.get('/me/produto/:produtoId', avaliacaoController.minhaDoProduto);
+router.get('/produto/:produtoId/minha', avaliacaoController.minhaDoProduto);
 router.post('/produto/:produtoId', avaliacaoController.avaliar);
 router.delete('/produto/:produtoId', avaliacaoController.remover);
 
