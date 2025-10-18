@@ -26,7 +26,7 @@ services:
     container_name: ecommerce-frontend-mobile
     restart: unless-stopped
     environment:
-      VITE_API_BASE_URL: http://192.168.0.104:3001
+      VITE_API_BASE_URL: http://backend:3001
     ports:
       - "0.0.0.0:5173:5173"
     depends_on:

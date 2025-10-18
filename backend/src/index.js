@@ -40,14 +40,58 @@ import rateLimit from 'express-rate-limit';
 
 const app = express();
 
-// Configuração CORS com credenciais (para cookies httpOnly de refresh)
-app.use(cors({
-  origin: (origin, callback) => callback(null, true), // reflete a origem da requisição
+// Configuração CORS mais segura
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Permitir requests sem origin (como mobile apps, Postman)
+    if (!origin) return callback(null, true);
+
+    // Lista de origens permitidas
+    const allowedOrigins = [
+      'http://localhost:5173', // Desenvolvimento frontend
+      'http://localhost:3000', // Desenvolvimento alternativo
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:3000',
+      'http://frontend:5173', // Docker development
+      'http://frontend:80', // Docker production
+      'https://helpnet.com.br', // Domínio de produção (exemplo)
+      'https://www.helpnet.com.br',
+      /^https:\/\/.*\.helpnet\.com\.br$/, // Subdomínios
+    ];
+
+    // Verificar se a origem está na lista permitida
+    const isAllowed = allowedOrigins.some(allowed => {
+      if (typeof allowed === 'string') {
+        return allowed === origin;
+      } else if (allowed instanceof RegExp) {
+        return allowed.test(origin);
+      }
+      return false;
+    });
+
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Empresa-ID'],
-  exposedHeaders: ['Set-Cookie'],
-}));
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Empresa-ID',
+    'X-Requested-With',
+    'Accept',
+    'Accept-Encoding',
+    'Accept-Language',
+    'Cache-Control'
+  ],
+  exposedHeaders: ['Set-Cookie', 'X-Total-Count', 'X-Rate-Limit-Remaining'],
+  maxAge: 86400, // Cache preflight por 24 horas
+};
+
+app.use(cors(corsOptions));
 
 // Middlewares
 // Parser de JSON e URL-encoded com limites (previne DoS por payloads grandes)
