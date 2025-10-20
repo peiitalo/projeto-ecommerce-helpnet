@@ -77,9 +77,10 @@ function App() {
           {/* Admin */}
           <Route>
             <Route path="/admin" element={<Dashboard />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin/pedidos" element={<AdminOrdersPage />} />
-            <Route path="/vendedores" element={<VendedoresPage />} />
-            <Route path="/configuracoes" element={<ConfiguracoesPage />} />
+            <Route path="/admin/vendedores" element={<VendedoresPage />} />
+            <Route path="/admin/configuracoes" element={<ConfiguracoesPage />} />
           </Route>
 
           {/* Vendedor */}
