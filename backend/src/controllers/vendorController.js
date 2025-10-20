@@ -1,6 +1,6 @@
 // backend/src/controllers/vendorController.js
 import prisma from '../config/prisma.js';
-import { logControllerError } from '../utils/logger.js';
+import { logger, logControllerError } from '../utils/logger.js';
 
 export const dashboard = async (req, res) => {
   try {

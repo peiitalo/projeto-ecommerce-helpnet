@@ -144,6 +144,158 @@ export const obterDashboardStats = async (req, res) => {
   }
 };
 
+// Listar vendedores para admin
+export const listarVendedores = async (req, res) => {
+  try {
+    const { user } = req;
+    const { pagina = 1, limit = 10, search = '', status = 'all' } = req.query;
+
+    if (user.role !== 'admin' && user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        errors: ["Acesso negado."]
+      });
+    }
+
+    const skip = (pagina - 1) * limit;
+    const whereClause = {
+      ...(status !== 'all' && { Ativo: status === 'ativo' }),
+      ...(search && {
+        OR: [
+          { Nome: { contains: search, mode: 'insensitive' } },
+          { Email: { contains: search, mode: 'insensitive' } }
+        ]
+      })
+    };
+
+    const [vendedores, total] = await Promise.all([
+      prisma.vendedor.findMany({
+        where: whereClause,
+        select: {
+          VendedorID: true,
+          Nome: true,
+          Email: true,
+          CriadoEm: true,
+          Ativo: true,
+          empresa: {
+            select: {
+              Nome: true,
+              Documento: true,
+              Email: true,
+              Telefone: true
+            }
+          },
+          enderecosVendedor: {
+            select: {
+              Nome: true,
+              CEP: true,
+              Cidade: true,
+              UF: true,
+              Bairro: true,
+              Numero: true,
+              Complemento: true,
+              TipoEndereco: true
+            },
+            take: 1
+          },
+          _count: {
+            select: {
+              produtos: true,
+              clientesVendedor: true
+            }
+          }
+        },
+        orderBy: { CriadoEm: 'desc' },
+        skip,
+        take: parseInt(limit)
+      }),
+      prisma.vendedor.count({ where: whereClause })
+    ]);
+
+    // Buscar dados dos clientes associados e calcular estatísticas
+    const vendedoresComDados = await Promise.all(
+      vendedores.map(async (vendedor) => {
+        // Buscar cliente associado pelo email
+        const cliente = await prisma.cliente.findUnique({
+          where: { Email: vendedor.Email },
+          select: {
+            CPF_CNPJ: true,
+            TelefoneCelular: true,
+            TelefoneFixo: true,
+            Whatsapp: true,
+            RazaoSocial: true
+          }
+        });
+
+        // Calcular vendas totais
+        const vendasTotais = await prisma.pedido.aggregate({
+          where: {
+            itensPedido: {
+              some: {
+                produto: {
+                  VendedorID: vendedor.VendedorID
+                }
+              }
+            },
+            StatusPagamento: 'PAGO'
+          },
+          _sum: { Total: true },
+          _count: true
+        });
+
+        const primeiroEndereco = vendedor.enderecosVendedor[0];
+        let enderecoFormatado = null;
+        if (primeiroEndereco) {
+          enderecoFormatado = `${primeiroEndereco.Bairro || ''}, ${primeiroEndereco.Numero || 's/n'}`;
+          if (primeiroEndereco.Complemento) {
+            enderecoFormatado += ` - ${primeiroEndereco.Complemento}`;
+          }
+        }
+
+        return {
+          id: vendedor.VendedorID.toString(),
+          name: vendedor.Nome,
+          email: vendedor.Email,
+          joinDate: vendedor.CriadoEm.toISOString(),
+          status: vendedor.Ativo ? 'active' : 'inactive',
+          totalProducts: vendedor._count.produtos,
+          totalOrders: vendasTotais._count || 0,
+          totalSales: vendasTotais._sum.Total || 0,
+          phone: cliente?.TelefoneCelular || cliente?.TelefoneFixo || vendedor.empresa?.Telefone,
+          whatsapp: cliente?.Whatsapp,
+          cpfCnpj: cliente?.CPF_CNPJ,
+          razaoSocial: cliente?.RazaoSocial || vendedor.empresa?.Nome,
+          address: enderecoFormatado,
+          city: primeiroEndereco?.Cidade,
+          state: primeiroEndereco?.UF,
+          cep: primeiroEndereco?.CEP,
+          empresa: {
+            nome: vendedor.empresa?.Nome,
+            documento: vendedor.empresa?.Documento,
+            email: vendedor.empresa?.Email,
+            telefone: vendedor.empresa?.Telefone
+          }
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      vendedores: vendedoresComDados,
+      total,
+      pagina: parseInt(pagina),
+      limit: parseInt(limit)
+    });
+
+  } catch (error) {
+    logControllerError('listar_vendedores', error, req);
+    res.status(500).json({
+      success: false,
+      errors: ["Erro interno do servidor"]
+    });
+  }
+};
+
 // Listar empresas/vendedores
 export const listarEmpresas = async (req, res) => {
   try {

@@ -262,9 +262,15 @@ function ProductPage() {
     ...(dimensoes && { dimensoes })
   };
 
-  // Avaliação e reviews (mock se não vier do backend)
-  const rating = product?.Avaliacao || product?.rating || 4.5;
-  const reviewCount = product?.NumeroAvaliacoes || product?.reviewCount || 0;
+  // Calcular rating médio das avaliações
+  const calculateAverageRating = () => {
+    if (!avaliacoes || avaliacoes.length === 0) return 0;
+    const sum = avaliacoes.reduce((acc, av) => acc + (av.Nota || 0), 0);
+    return sum / avaliacoes.length;
+  };
+  
+  const rating = calculateAverageRating();
+  const reviewCount = avaliacoes.length;
 
   if (loading) {
     return <LoadingSkeleton type="product-detail" />;
@@ -392,30 +398,25 @@ function ProductPage() {
   };
 
   const handleDeleteComment = async () => {
-    showWarning('Tem certeza que deseja apagar a avaliação?', {
-      autoClose: false,
-      closeOnClick: false,
-      draggable: false,
-      onClose: async () => {
-        try {
-          await avaliacaoService.remover(id);
+    if (window.confirm('Tem certeza que deseja apagar sua avaliação?')) {
+      try {
+        await avaliacaoService.remover(id);
 
-          // Recarregar avaliações
-          const [avaliacoesResponse, minhaAvaliacaoResponse] = await Promise.all([
-            avaliacaoService.listarPorProduto(id),
-            avaliacaoService.minhaDoProduto(id).catch(() => null)
-          ]);
+        // Recarregar avaliações
+        const [avaliacoesResponse, minhaAvaliacaoResponse] = await Promise.all([
+          avaliacaoService.listarPorProduto(id),
+          avaliacaoService.minhaDoProduto(id).catch(() => null)
+        ]);
 
-          setAvaliacoes(avaliacoesResponse.data || []);
-          setMinhaAvaliacao(minhaAvaliacaoResponse?.data || null);
+        setAvaliacoes(avaliacoesResponse.data || []);
+        setMinhaAvaliacao(minhaAvaliacaoResponse?.data || null);
 
-          showSuccess('Avaliação removida com sucesso!');
-        } catch (error) {
-          log.error('avaliacao_delete_error', { produtoId: id, error: error.message });
-          showError('Erro ao remover avaliação. Tente novamente.');
-        }
+        showSuccess('Avaliação removida com sucesso!');
+      } catch (error) {
+        log.error('avaliacao_delete_error', { produtoId: id, error: error.message });
+        showError('Erro ao remover avaliação. Tente novamente.');
       }
-    });
+    }
   };
 
 
@@ -852,7 +853,7 @@ function ProductPage() {
                   <h3 className="text-xl font-semibold text-slate-900">Avaliações dos Clientes</h3>
                   <div className="flex items-center gap-2">
                     {renderStars(rating, 'text-lg')}
-                    <span className="text-lg font-semibold text-slate-900">{rating}</span>
+                    <span className="text-lg font-semibold text-slate-900">{rating.toFixed(1)}</span>
                     <span className="text-slate-600">({avaliacoes.length} avaliações)</span>
                   </div>
                 </div>
@@ -942,28 +943,30 @@ function ProductPage() {
                     </div>
                   ) : (
                     avaliacoes.map((avaliacao) => (
-                      <div key={avaliacao.AvaliacaoID} className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                      <div key={avaliacao.AvaliacaoID} className="bg-gradient-to-r from-white to-slate-50 border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-lg transition-all duration-200">
                         <div className="flex items-start justify-between mb-4">
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center shadow-sm">
-                              <FaUser className="text-blue-600" />
-                            </div>
-                            <div>
-                              <h5 className="font-semibold text-slate-900 mb-1">
-                                {avaliacao.cliente?.Nome || 'Cliente'}
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h5 className="font-semibold text-slate-900">
+                                {avaliacao.cliente?.Nome || avaliacao.Cliente?.Nome || 'Cliente Anônimo'}
                               </h5>
-                              <div className="flex items-center gap-3">
-                                {renderStars(avaliacao.Nota, 'text-sm')}
-                                <span className="text-sm text-slate-500">
-                                  {new Date(avaliacao.CriadoEm).toLocaleDateString('pt-BR')}
-                                </span>
-                              </div>
+                              <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
+                                {new Date(avaliacao.CriadoEm).toLocaleDateString('pt-BR')}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {renderStars(avaliacao.Nota, 'text-base')}
+                              <span className="text-sm font-medium text-slate-700">
+                                {avaliacao.Nota}/5
+                              </span>
                             </div>
                           </div>
                         </div>
 
                         {avaliacao.Comentario && (
-                          <p className="text-slate-700 leading-relaxed mb-4 pl-16">{avaliacao.Comentario}</p>
+                          <div className="mt-4 p-4 bg-white/70 rounded-lg border-l-4 border-blue-500">
+                            <p className="text-slate-700 leading-relaxed italic">"{avaliacao.Comentario}"</p>
+                          </div>
                         )}
                       </div>
                     ))
@@ -1099,19 +1102,37 @@ function ProductPage() {
                 
                 <div>
                   <span className="text-sm font-medium text-slate-600">Email:</span>
-                  <p className="text-slate-900">{product?.Vendedor?.email || 'Não informado'}</p>
+                  <p className="text-slate-900">{product?.vendedor?.Email || 'Não informado'}</p>
                 </div>
                 
                 <div>
                   <span className="text-sm font-medium text-slate-600">Telefone:</span>
-                  <p className="text-slate-900">{product?.Vendedor?.telefone || 'Não informado'}</p>
+                  <p className="text-slate-900">
+                    {product?.vendedor?.telefone || product?.vendedor?.empresa?.Telefone || 'Não informado'}
+                  </p>
                 </div>
+                
+                {product?.vendedor?.whatsapp && (
+                  <div>
+                    <span className="text-sm font-medium text-slate-600">WhatsApp:</span>
+                    <p className="text-slate-900">{product.vendedor.whatsapp}</p>
+                  </div>
+                )}
+                
+                {product?.vendedor?.cpfCnpj && (
+                  <div>
+                    <span className="text-sm font-medium text-slate-600">CNPJ:</span>
+                    <p className="text-slate-900">{product.vendedor.cpfCnpj}</p>
+                  </div>
+                )}
                 
                 <div>
                   <span className="text-sm font-medium text-slate-600">Endereço:</span>
                   <p className="text-slate-900">
-                    {product?.Vendedor?.endereco ? 
-                      `${product.Vendedor.endereco.rua}, ${product.Vendedor.endereco.cidade} - ${product.Vendedor.endereco.estado}` :
+                    {product?.vendedor?.endereco ? 
+                      `${product.vendedor.endereco.rua}, ${product.vendedor.endereco.bairro}, ${product.vendedor.endereco.cidade} - ${product.vendedor.endereco.estado}` :
+                      product?.vendedor?.enderecosVendedor?.[0] ?
+                      `${product.vendedor.enderecosVendedor[0].Bairro}, ${product.vendedor.enderecosVendedor[0].Cidade} - ${product.vendedor.enderecosVendedor[0].UF}` :
                       'Não informado'
                     }
                   </p>

@@ -1,55 +1,64 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
-import { FiSearch, FiCheck, FiX, FiEye, FiBarChart2, FiUsers, FiTrendingUp } from 'react-icons/fi';
+import { FiSearch, FiCheck, FiX, FiEye, FiBarChart2, FiUsers, FiTrendingUp, FiPhone } from 'react-icons/fi';
 
 function VendedoresPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [loading, setLoading] = useState(false);
 
-  // Mock data for vendors
-  const [vendors, setVendors] = useState([
-    {
-      id: 1,
-      nome: 'Loja do João',
-      email: 'joao@loja.com',
-      status: 'aprovado',
-      dataCadastro: '2024-01-15',
-      produtos: 45,
-      vendas: 1250,
-      receita: 45600
-    },
-    {
-      id: 2,
-      nome: 'Eletrônicos Silva',
-      email: 'silva@eletronicos.com',
-      status: 'pendente',
-      dataCadastro: '2024-02-20',
-      produtos: 23,
-      vendas: 890,
-      receita: 32100
-    },
-    {
-      id: 3,
-      nome: 'Moda & Estilo',
-      email: 'contato@modaestilo.com',
-      status: 'rejeitado',
-      dataCadastro: '2024-01-10',
-      produtos: 67,
-      vendas: 2100,
-      receita: 78900
-    },
-    {
-      id: 4,
-      nome: 'Casa Linda',
-      email: 'vendas@casalinda.com',
-      status: 'aprovado',
-      dataCadastro: '2024-03-05',
-      produtos: 34,
-      vendas: 1560,
-      receita: 52300
+  const [vendors, setVendors] = useState([]);
+
+  useEffect(() => {
+    loadVendors();
+  }, []);
+
+  const loadVendors = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('accessToken');
+      
+      if (!token) {
+        console.error('Token de acesso não encontrado');
+        return;
+      }
+
+      const response = await fetch('/api/admin/vendedores', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.vendedores) {
+          setVendors(data.vendedores.map(v => ({
+            id: v.id,
+            nome: v.name,
+            email: v.email,
+            status: v.status === 'active' ? 'aprovado' : 'pendente',
+            dataCadastro: v.joinDate,
+            produtos: v.totalProducts || 0,
+            vendas: v.totalOrders || 0,
+            receita: v.totalSales || 0,
+            telefone: v.phone,
+            whatsapp: v.whatsapp,
+            cpfCnpj: v.cpfCnpj,
+            endereco: v.address,
+            cidade: v.city,
+            estado: v.state,
+            empresa: v.empresa
+          })));
+        }
+      } else {
+        console.error('Erro ao carregar vendedores:', response.status);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar vendedores:', error);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
 
   const filteredVendors = vendors.filter(vendor => {
     const matchesSearch = vendor.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -193,19 +202,16 @@ function VendedoresPage() {
                     Vendedor
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Contato
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Localização
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Data Cadastro
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Produtos
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Vendas
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Receita
+                    Estatísticas
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Ações
@@ -219,6 +225,52 @@ function VendedoresPage() {
                       <div>
                         <div className="text-sm font-medium text-gray-900">{vendor.nome}</div>
                         <div className="text-sm text-gray-500">{vendor.email}</div>
+                        {vendor.cpfCnpj && (
+                          <div className="text-xs text-gray-400">CNPJ: {vendor.cpfCnpj}</div>
+                        )}
+                        {vendor.empresa?.nome && (
+                          <div className="text-xs text-gray-400">Empresa: {vendor.empresa.nome}</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="space-y-1">
+                        {vendor.telefone && (
+                          <div className="text-sm text-gray-900 flex items-center gap-1">
+                            <FiPhone className="text-gray-400 w-3 h-3" />
+                            {vendor.telefone}
+                          </div>
+                        )}
+                        {vendor.whatsapp && (
+                          <div className="text-sm text-green-600 flex items-center gap-1">
+                            <FiPhone className="text-green-500 w-3 h-3" />
+                            WhatsApp: {vendor.whatsapp}
+                          </div>
+                        )}
+                        {vendor.empresa?.email && vendor.empresa.email !== vendor.email && (
+                          <div className="text-xs text-gray-500">
+                            Empresa: {vendor.empresa.email}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="space-y-1">
+                        {vendor.endereco ? (
+                          <div className="text-sm text-gray-900">{vendor.endereco}</div>
+                        ) : (
+                          <div className="text-sm text-gray-500">Endereço não informado</div>
+                        )}
+                        {vendor.cidade && vendor.estado && (
+                          <div className="text-xs text-gray-500">
+                            {vendor.cidade} - {vendor.estado}
+                          </div>
+                        )}
+                        {vendor.dataCadastro && (
+                          <div className="text-xs text-gray-400">
+                            Cadastro: {new Date(vendor.dataCadastro).toLocaleDateString('pt-BR')}
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -226,17 +278,18 @@ function VendedoresPage() {
                         {getStatusText(vendor.status)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(vendor.dataCadastro).toLocaleDateString('pt-BR')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {vendor.produtos}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {vendor.vendas}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      R$ {vendor.receita.toLocaleString('pt-BR')}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="space-y-1">
+                        <div className="text-sm text-gray-900">
+                          {vendor.produtos} produtos
+                        </div>
+                        <div className="text-sm text-gray-900">
+                          {vendor.vendas} vendas
+                        </div>
+                        <div className="text-sm font-medium text-green-600">
+                          R$ {vendor.receita.toLocaleString('pt-BR')}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center gap-2">

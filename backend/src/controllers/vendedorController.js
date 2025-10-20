@@ -56,6 +56,27 @@ export const listarVendedores = async (req, res) => {
           Email: true,
           CriadoEm: true,
           Ativo: true,
+          empresa: {
+            select: {
+              Nome: true,
+              Documento: true,
+              Email: true,
+              Telefone: true
+            }
+          },
+          enderecosVendedor: {
+            select: {
+              Nome: true,
+              CEP: true,
+              Cidade: true,
+              UF: true,
+              Bairro: true,
+              Numero: true,
+              Complemento: true,
+              TipoEndereco: true
+            },
+            take: 1
+          },
           _count: {
             select: {
               produtos: true,
@@ -79,6 +100,11 @@ export const listarVendedores = async (req, res) => {
               },
               cliente: {
                 select: {
+                  TelefoneCelular: true,
+                  TelefoneFixo: true,
+                  Whatsapp: true,
+                  CPF_CNPJ: true,
+                  RazaoSocial: true,
                   pedidos: {
                     where: {
                       Status: 'Entregue'
@@ -89,7 +115,8 @@ export const listarVendedores = async (req, res) => {
                   }
                 }
               }
-            }
+            },
+            take: 1
           }
         },
         orderBy: { CriadoEm: 'desc' },
@@ -109,6 +136,20 @@ export const listarVendedores = async (req, res) => {
         return acc + cv.cliente.pedidos.reduce((pedidoAcc, pedido) => pedidoAcc + pedido.Total, 0);
       }, 0);
 
+      // Pegar informações do primeiro cliente associado (se houver)
+      const primeiroCliente = vendedor.clientesVendedor[0]?.cliente;
+      
+      // Pegar primeiro endereço (se houver)
+      const primeiroEndereco = vendedor.enderecosVendedor[0];
+      
+      let enderecoFormatado = null;
+      if (primeiroEndereco) {
+        enderecoFormatado = `${primeiroEndereco.Bairro || ''}, ${primeiroEndereco.Numero || 's/n'}`;
+        if (primeiroEndereco.Complemento) {
+          enderecoFormatado += ` - ${primeiroEndereco.Complemento}`;
+        }
+      }
+
       return {
         id: vendedor.VendedorID.toString(),
         name: vendedor.Nome,
@@ -116,7 +157,22 @@ export const listarVendedores = async (req, res) => {
         joinDate: vendedor.CriadoEm.toISOString(),
         status: vendedor.Ativo ? 'active' : 'inactive',
         totalSales: totalVendas,
-        totalOrders: totalPedidos
+        totalOrders: totalPedidos,
+        // Informações adicionais
+        phone: primeiroCliente?.TelefoneCelular || primeiroCliente?.TelefoneFixo || vendedor.empresa?.Telefone,
+        whatsapp: primeiroCliente?.Whatsapp,
+        cpfCnpj: primeiroCliente?.CPF_CNPJ,
+        razaoSocial: primeiroCliente?.RazaoSocial || vendedor.empresa?.Nome,
+        address: enderecoFormatado,
+        city: primeiroEndereco?.Cidade,
+        state: primeiroEndereco?.UF,
+        cep: primeiroEndereco?.CEP,
+        empresa: {
+          nome: vendedor.empresa?.Nome,
+          documento: vendedor.empresa?.Documento,
+          email: vendedor.empresa?.Email,
+          telefone: vendedor.empresa?.Telefone
+        }
       };
     });
 
@@ -402,6 +458,19 @@ export const buscarPerfilVendedor = async (req, res) => {
             Email: true
           }
         },
+        enderecosVendedor: {
+          select: {
+            EnderecoVendedorID: true,
+            Nome: true,
+            CEP: true,
+            Cidade: true,
+            UF: true,
+            Numero: true,
+            Bairro: true,
+            Complemento: true,
+            TipoEndereco: true
+          }
+        },
         _count: {
           select: {
             produtos: true,
@@ -498,6 +567,7 @@ export const buscarPerfilVendedor = async (req, res) => {
           TipoConta: cliente.TipoConta,
           enderecos: cliente.enderecos
         } : null,
+        enderecosVendedor: vendedor.enderecosVendedor || [],
         estatisticas: {
           totalProdutos: vendedor._count.produtos,
           totalClientes: vendedor._count.clientesVendedor,
@@ -726,6 +796,216 @@ export const atualizarPerfilVendedor = async (req, res) => {
 
   } catch (error) {
     logControllerError('atualizar_perfil_vendedor', error, req);
+    res.status(500).json({
+      success: false,
+      errors: ["Erro interno do servidor"]
+    });
+  }
+};
+
+// Listar endereços do vendedor
+export const listarEnderecosVendedor = async (req, res) => {
+  try {
+    const { user } = req;
+
+    if (!user?.vendedorId) {
+      return res.status(403).json({
+        success: false,
+        errors: ["Acesso negado. Vendedor não identificado."]
+      });
+    }
+
+    const enderecos = await prisma.enderecoVendedor.findMany({
+      where: {
+        VendedorID: user.vendedorId
+      },
+      orderBy: { EnderecoVendedorID: 'asc' }
+    });
+
+    res.json({
+      success: true,
+      enderecos
+    });
+
+  } catch (error) {
+    logControllerError('listar_enderecos_vendedor', error, req);
+    res.status(500).json({
+      success: false,
+      errors: ["Erro interno do servidor"]
+    });
+  }
+};
+
+// Criar endereço do vendedor
+export const criarEnderecoVendedor = async (req, res) => {
+  try {
+    const { user } = req;
+    const { Nome, Complemento, CEP, Cidade, UF, TipoEndereco, Numero, Bairro } = req.body;
+
+    if (!user?.vendedorId) {
+      return res.status(403).json({
+        success: false,
+        errors: ["Acesso negado. Vendedor não identificado."]
+      });
+    }
+
+    // Validações
+    if (!Nome || !CEP || !Cidade || !UF || !Bairro) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Nome, CEP, cidade, UF e bairro são obrigatórios"]
+      });
+    }
+
+    const endereco = await prisma.enderecoVendedor.create({
+      data: {
+        VendedorID: user.vendedorId,
+        Nome,
+        Complemento: Complemento || null,
+        CEP,
+        Cidade,
+        UF,
+        TipoEndereco: TipoEndereco || 'Comercial',
+        Numero: Numero || null,
+        Bairro
+      }
+    });
+
+    logger.info('endereco_vendedor_criado', {
+      vendedorId: user.vendedorId,
+      enderecoId: endereco.EnderecoVendedorID
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Endereço criado com sucesso',
+      endereco
+    });
+
+  } catch (error) {
+    logControllerError('criar_endereco_vendedor', error, req);
+    res.status(500).json({
+      success: false,
+      errors: ["Erro interno do servidor"]
+    });
+  }
+};
+
+// Atualizar endereço do vendedor
+export const atualizarEnderecoVendedor = async (req, res) => {
+  try {
+    const { user } = req;
+    const { enderecoId } = req.params;
+    const { Nome, Complemento, CEP, Cidade, UF, TipoEndereco, Numero, Bairro } = req.body;
+
+    if (!user?.vendedorId) {
+      return res.status(403).json({
+        success: false,
+        errors: ["Acesso negado. Vendedor não identificado."]
+      });
+    }
+
+    // Verificar se o endereço pertence ao vendedor
+    const enderecoExistente = await prisma.enderecoVendedor.findFirst({
+      where: {
+        EnderecoVendedorID: parseInt(enderecoId),
+        VendedorID: user.vendedorId
+      }
+    });
+
+    if (!enderecoExistente) {
+      return res.status(404).json({
+        success: false,
+        errors: ["Endereço não encontrado"]
+      });
+    }
+
+    // Validações
+    if (!Nome || !CEP || !Cidade || !UF || !Bairro) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Nome, CEP, cidade, UF e bairro são obrigatórios"]
+      });
+    }
+
+    const endereco = await prisma.enderecoVendedor.update({
+      where: { EnderecoVendedorID: parseInt(enderecoId) },
+      data: {
+        Nome,
+        Complemento: Complemento || null,
+        CEP,
+        Cidade,
+        UF,
+        TipoEndereco: TipoEndereco || 'Comercial',
+        Numero: Numero || null,
+        Bairro
+      }
+    });
+
+    logger.info('endereco_vendedor_atualizado', {
+      vendedorId: user.vendedorId,
+      enderecoId: endereco.EnderecoVendedorID
+    });
+
+    res.json({
+      success: true,
+      message: 'Endereço atualizado com sucesso',
+      endereco
+    });
+
+  } catch (error) {
+    logControllerError('atualizar_endereco_vendedor', error, req);
+    res.status(500).json({
+      success: false,
+      errors: ["Erro interno do servidor"]
+    });
+  }
+};
+
+// Excluir endereço do vendedor
+export const excluirEnderecoVendedor = async (req, res) => {
+  try {
+    const { user } = req;
+    const { enderecoId } = req.params;
+
+    if (!user?.vendedorId) {
+      return res.status(403).json({
+        success: false,
+        errors: ["Acesso negado. Vendedor não identificado."]
+      });
+    }
+
+    // Verificar se o endereço pertence ao vendedor
+    const enderecoExistente = await prisma.enderecoVendedor.findFirst({
+      where: {
+        EnderecoVendedorID: parseInt(enderecoId),
+        VendedorID: user.vendedorId
+      }
+    });
+
+    if (!enderecoExistente) {
+      return res.status(404).json({
+        success: false,
+        errors: ["Endereço não encontrado"]
+      });
+    }
+
+    await prisma.enderecoVendedor.delete({
+      where: { EnderecoVendedorID: parseInt(enderecoId) }
+    });
+
+    logger.info('endereco_vendedor_excluido', {
+      vendedorId: user.vendedorId,
+      enderecoId: parseInt(enderecoId)
+    });
+
+    res.json({
+      success: true,
+      message: 'Endereço excluído com sucesso'
+    });
+
+  } catch (error) {
+    logControllerError('excluir_endereco_vendedor', error, req);
     res.status(500).json({
       success: false,
       errors: ["Erro interno do servidor"]

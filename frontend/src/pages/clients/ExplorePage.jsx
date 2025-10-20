@@ -38,7 +38,8 @@ import {
   FiMapPin,
   FiHelpCircle,
   FiSettings,
-  FiClock
+  FiClock,
+  FiFilter
 } from 'react-icons/fi';
 
 function ExplorePage() {
@@ -94,9 +95,9 @@ function ExplorePage() {
     { type: 'price', label: 'R$ 100 - R$ 500', value: 'price-100-500' },
     { type: 'price', label: 'R$ 500 - R$ 1000', value: 'price-500-1000' },
     { type: 'price', label: 'Acima de R$ 1000', value: 'price-1000-999999' },
-    { type: 'stock', label: 'Em estoque', value: 'stock-1-999999' },
-    { type: 'stock', label: 'Estoque baixo (1-10)', value: 'stock-1-10' },
-    { type: 'stock', label: 'Estoque alto (50+)', value: 'stock-50-999999' },
+    { type: 'stock', label: 'Disponível', value: 'stock-1-999999' },
+    { type: 'stock', label: 'Estoque baixo', value: 'stock-1-10' },
+    { type: 'stock', label: 'Estoque alto', value: 'stock-50-999999' },
     { type: 'rating', label: '4+ estrelas', value: 'rating-4+' },
     { type: 'rating', label: '4.5+ estrelas', value: 'rating-4.5+' },
   ];
@@ -159,12 +160,33 @@ function ExplorePage() {
     }
   }, [selectedCategory, searchParams]);
 
-  // Aplicar filtros quando produtos mudam
+  // Aplicar filtros e ordenação quando produtos mudam
   useEffect(() => {
     if (products.length > 0) {
-      setFilteredProducts(products);
+      let filtered = [...products];
+      
+      // Aplicar ordenação
+      switch (sortBy) {
+        case 'price-low':
+          filtered.sort((a, b) => a.price - b.price);
+          break;
+        case 'price-high':
+          filtered.sort((a, b) => b.price - a.price);
+          break;
+        case 'rating':
+          filtered.sort((a, b) => b.rating - a.rating);
+          break;
+        case 'sales':
+          filtered.sort((a, b) => b.sales - a.sales);
+          break;
+        default:
+          // relevance - manter ordem original
+          break;
+      }
+      
+      setFilteredProducts(filtered);
     }
-  }, [products]);
+  }, [products, sortBy]);
 
   // Debounce para busca
   const handleSearchChange = (value) => {
@@ -191,11 +213,37 @@ function ExplorePage() {
       const response = await categoriaService.listar();
 
       // Mapear categorias da API para o formato esperado pelo ExplorePage
+      const getCategoryImage = (categoryName) => {
+        const name = categoryName.toLowerCase();
+        if (name.includes('eletrônic') || name.includes('tecnologia')) {
+          return 'https://images.unsplash.com/photo-1498049794561-7780e7231661?q=80&w=400&auto=format&fit=crop';
+        } else if (name.includes('casa') || name.includes('decoração') || name.includes('móveis')) {
+          return 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?q=80&w=400&auto=format&fit=crop';
+        } else if (name.includes('moda') || name.includes('roupa') || name.includes('vestuário')) {
+          return 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=400&auto=format&fit=crop';
+        } else if (name.includes('esporte') || name.includes('fitness') || name.includes('lazer')) {
+          return 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=400&auto=format&fit=crop';
+        } else if (name.includes('beleza') || name.includes('saúde') || name.includes('cosmético')) {
+          return 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=400&auto=format&fit=crop';
+        } else if (name.includes('livro') || name.includes('entretenimento') || name.includes('música')) {
+          return 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?q=80&w=400&auto=format&fit=crop';
+        } else if (name.includes('alimentação') || name.includes('comida') || name.includes('bebida')) {
+          return 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?q=80&w=400&auto=format&fit=crop';
+        } else if (name.includes('automóvel') || name.includes('carro') || name.includes('veículo')) {
+          return 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=400&auto=format&fit=crop';
+        } else if (name.includes('pet') || name.includes('animal') || name.includes('cachorro')) {
+          return 'https://images.unsplash.com/photo-1601758228041-f3b2795255f1?q=80&w=400&auto=format&fit=crop';
+        } else if (name.includes('jardim') || name.includes('planta') || name.includes('jardinagem')) {
+          return 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?q=80&w=400&auto=format&fit=crop';
+        }
+        return 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?q=80&w=400&auto=format&fit=crop';
+      };
+
       const categoriasMapeadas = (response.categorias || response).map(categoria => ({
         id: categoria.CategoriaID || categoria.id,
         name: categoria.Nome || categoria.nome,
         description: categoria.Descricao || categoria.descricao || '',
-        image: categoria.Imagem || categoria.image || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=400&auto=format&fit=crop'
+        image: categoria.Imagem || categoria.image || getCategoryImage(categoria.Nome || categoria.nome || '')
       }));
 
       setCategories(categoriasMapeadas);
@@ -232,7 +280,7 @@ function ExplorePage() {
           id: 'cat5',
           name: 'Beleza e Saúde',
           description: 'Produtos de beleza, higiene e saúde',
-          image: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?q=80&w=400&auto=format&fit=crop'
+          image: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=400&auto=format&fit=crop'
         },
         {
           id: 'cat6',
@@ -279,23 +327,35 @@ function ExplorePage() {
       const response = await produtoService.listar(filtros);
 
       // Mapear produtos da API
-      const produtosMapeados = (response.produtos || response).map(produto => ({
-        id: produto.ProdutoID || produto.id,
-        name: produto.Nome || produto.name,
-        price: produto.Preco || produto.price,
-        originalPrice: produto.PrecoOriginal || produto.originalPrice,
-        image: buildImageUrl(produto.Imagens && produto.Imagens[0]),
-        images: (produto.Imagens || []).map(img => buildImageUrl(img)), // Array of full URLs
-        rating: 4.5,
-        sales: Math.floor(Math.random() * 2000) + 100,
-        category: produto.categoria?.Nome || produto.category || selectedCategory.name,
-        freeShipping: produto.FreteGratis || produto.freeShipping || false,
-        discount: produto.Desconto || produto.discount || 0,
-        breveDescricao: produto.BreveDescricao || produto.breveDescricao || '',
-        vendedorNome: produto.vendedor?.Nome || null,
-        empresaNome: produto.empresa?.Nome || null,
-        estoque: produto.Estoque || 0
-      }));
+      const produtosMapeados = (response.produtos || response).map(produto => {
+        // Calcular rating real
+        let rating = 0;
+        let reviewCount = 0;
+        if (produto.avaliacoes && produto.avaliacoes.length > 0) {
+          const somaNotas = produto.avaliacoes.reduce((acc, av) => acc + av.Nota, 0);
+          rating = somaNotas / produto.avaliacoes.length;
+          reviewCount = produto.avaliacoes.length;
+        }
+        
+        return {
+          id: produto.ProdutoID || produto.id,
+          name: produto.Nome || produto.name,
+          price: produto.Preco || produto.price,
+          originalPrice: produto.PrecoOriginal || produto.originalPrice,
+          image: buildImageUrl(produto.Imagens && produto.Imagens[0]) || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?q=80&w=400&auto=format&fit=crop',
+          images: (produto.Imagens || []).map(img => buildImageUrl(img)),
+          rating: rating || 0,
+          reviewCount: reviewCount,
+          sales: reviewCount * 10 + Math.floor(Math.random() * 100),
+          category: produto.categoria?.Nome || produto.category || selectedCategory.name,
+          freeShipping: produto.FreteGratis || produto.freeShipping || false,
+          discount: produto.Desconto || produto.discount || 0,
+          breveDescricao: produto.BreveDescricao || produto.breveDescricao || '',
+          vendedorNome: produto.vendedor?.Nome || null,
+          empresaNome: produto.empresa?.Nome || null,
+          estoque: produto.Estoque || 0
+        };
+      });
 
       setProducts(produtosMapeados);
       setFilteredProducts(produtosMapeados); // Since API already filters, set both
@@ -328,6 +388,7 @@ function ExplorePage() {
 
   const handleCategorySelect = async (category) => {
     setSelectedCategory(category);
+    setLoadingProducts(true);
     // Reset filters when selecting new category
     setCategorySearchQuery('');
     setCategoryFilters([]);
@@ -338,8 +399,51 @@ function ExplorePage() {
     setSortBy('relevance');
     // Update URL params
     setSearchParams({ categoria: category.name });
-    // Fetch products
-    await fetchProductsWithFilters();
+    
+    try {
+      const filtros = {
+        categoria: category.name,
+        status: 'ativo'
+      };
+      
+      const response = await produtoService.listar(filtros);
+      const produtosMapeados = (response.produtos || response).map(produto => {
+        // Calcular rating real
+        let rating = 0;
+        let reviewCount = 0;
+        if (produto.avaliacoes && produto.avaliacoes.length > 0) {
+          const somaNotas = produto.avaliacoes.reduce((acc, av) => acc + av.Nota, 0);
+          rating = somaNotas / produto.avaliacoes.length;
+          reviewCount = produto.avaliacoes.length;
+        }
+        
+        return {
+          id: produto.ProdutoID || produto.id,
+          name: produto.Nome || produto.name,
+          price: produto.Preco || produto.price,
+          originalPrice: produto.PrecoOriginal || produto.originalPrice,
+          image: buildImageUrl(produto.Imagens && produto.Imagens[0]) || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?q=80&w=400&auto=format&fit=crop',
+          images: (produto.Imagens || []).map(img => buildImageUrl(img)),
+          rating: rating || 0,
+          reviewCount: reviewCount,
+          sales: reviewCount * 10 + Math.floor(Math.random() * 100),
+          category: produto.categoria?.Nome || produto.category || category.name,
+          freeShipping: produto.FreteGratis || produto.freeShipping || false,
+          discount: produto.Desconto || produto.discount || 0,
+          breveDescricao: produto.BreveDescricao || produto.breveDescricao || '',
+          vendedorNome: produto.vendedor?.Nome || null,
+          empresaNome: produto.empresa?.Nome || null,
+          estoque: produto.Estoque || 0
+        };
+      });
+      
+      setProducts(produtosMapeados);
+    } catch (error) {
+      console.error('Erro ao carregar produtos:', error);
+      setProducts([]);
+    } finally {
+      setLoadingProducts(false);
+    }
   };
 
   const handleBackToCategories = () => {
@@ -684,76 +788,138 @@ function ExplorePage() {
                         </div>
 
                         {/* Filtros */}
-                        <div className="flex items-center gap-2">
-                          <div className="relative">
-                            <select
-                              multiple
-                              value={categoryFilters.map(f => f.value)}
-                              onChange={(e) => {
-                                const selectedValues = Array.from(e.target.selectedOptions, option => option.value);
-                                const newFilters = categoryFilterOptions.filter(option => selectedValues.includes(option.value));
-                                setCategoryFilters(newFilters);
+                        <div className="flex flex-wrap items-center gap-2">
+                          {/* Filtros de Preço */}
+                          <div className="flex items-center gap-2">
+                            <div className="relative">
+                              <FiTag className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                              <select
+                                value={categoryFilters.find(f => f.type === 'price')?.value || ''}
+                                onChange={(e) => {
+                                  const newFilters = categoryFilters.filter(f => f.type !== 'price');
+                                  if (e.target.value) {
+                                    const priceFilter = categoryFilterOptions.find(f => f.value === e.target.value);
+                                    if (priceFilter) {
+                                      newFilters.push(priceFilter);
+                                      const [min, max] = priceFilter.value.replace('price-', '').split('-').map(v => v === '999999' ? '' : v);
+                                      setPriceMin(min || '');
+                                      setPriceMax(max || '');
+                                    }
+                                  } else {
+                                    setPriceMin('');
+                                    setPriceMax('');
+                                  }
+                                  setCategoryFilters(newFilters);
+                                  updateUrlParams();
+                                  fetchProductsWithFilters();
+                                }}
+                                className="pl-10 pr-3 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                              >
+                                <option value="">Preço</option>
+                                {categoryFilterOptions.filter(f => f.type === 'price').map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
 
-                                // Update price/stock states
-                                const priceFilter = newFilters.find(f => f.type === 'price');
-                                const stockFilter = newFilters.find(f => f.type === 'stock');
+                          {/* Filtros de Avaliação */}
+                          <div className="flex items-center gap-2">
+                            <div className="relative">
+                              <FaStar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                              <select
+                                value={categoryFilters.find(f => f.type === 'rating')?.value || ''}
+                                onChange={(e) => {
+                                  const newFilters = categoryFilters.filter(f => f.type !== 'rating');
+                                  if (e.target.value) {
+                                    const ratingFilter = categoryFilterOptions.find(f => f.value === e.target.value);
+                                    if (ratingFilter) newFilters.push(ratingFilter);
+                                  }
+                                  setCategoryFilters(newFilters);
+                                  updateUrlParams();
+                                  fetchProductsWithFilters();
+                                }}
+                                className="pl-10 pr-3 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                              >
+                                <option value="">Avaliação</option>
+                                {categoryFilterOptions.filter(f => f.type === 'rating').map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
 
-                                if (priceFilter) {
-                                  const [min, max] = priceFilter.value.replace('price-', '').split('-').map(v => v === '999999' ? '' : v);
-                                  setPriceMin(min || '');
-                                  setPriceMax(max || '');
-                                } else {
-                                  setPriceMin('');
-                                  setPriceMax('');
-                                }
-
-                                if (stockFilter) {
-                                  const [min, max] = stockFilter.value.replace('stock-', '').split('-').map(v => v === '999999' ? '' : v);
-                                  setStockMin(min || '');
-                                  setStockMax(max || '');
-                                } else {
-                                  setStockMin('');
-                                  setStockMax('');
-                                }
-
-                                updateUrlParams();
-                                fetchProductsWithFilters();
-                              }}
-                              className="px-4 py-3 rounded-lg border border-slate-200 text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 min-w-[200px]"
-                              size="1"
-                            >
-                              <option value="" disabled>Filtros</option>
-                              {categoryFilterOptions.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
+                          {/* Filtros de Estoque */}
+                          <div className="flex items-center gap-2">
+                            <div className="relative">
+                              <FiPackage className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                              <select
+                                value={categoryFilters.find(f => f.type === 'stock')?.value || ''}
+                                onChange={(e) => {
+                                  const newFilters = categoryFilters.filter(f => f.type !== 'stock');
+                                  if (e.target.value) {
+                                    const stockFilter = categoryFilterOptions.find(f => f.value === e.target.value);
+                                    if (stockFilter) {
+                                      newFilters.push(stockFilter);
+                                      const [min, max] = stockFilter.value.replace('stock-', '').split('-').map(v => v === '999999' ? '' : v);
+                                      setStockMin(min || '');
+                                      setStockMax(max || '');
+                                    }
+                                  } else {
+                                    setStockMin('');
+                                    setStockMax('');
+                                  }
+                                  setCategoryFilters(newFilters);
+                                  updateUrlParams();
+                                  fetchProductsWithFilters();
+                                }}
+                                className="pl-10 pr-3 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                              >
+                                <option value="">Estoque</option>
+                                {categoryFilterOptions.filter(f => f.type === 'stock').map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
 
                           {/* Ordenação */}
-                          <select
-                            value={sortBy}
-                            onChange={(e) => setSortBy(e.target.value)}
-                            className="px-4 py-3 rounded-lg border border-slate-200 text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
-                          >
-                            <option value="relevance">Relevância</option>
-                            <option value="price-low">Menor preço</option>
-                            <option value="price-high">Maior preço</option>
-                            <option value="rating">Melhor avaliado</option>
-                            <option value="sales">Mais vendidos</option>
-                          </select>
+                          <div className="relative">
+                            <FiFilter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <select
+                              value={sortBy}
+                              onChange={(e) => setSortBy(e.target.value)}
+                              className="pl-10 pr-3 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                            >
+                              <option value="relevance">Relevância</option>
+                              <option value="price-low">Menor preço</option>
+                              <option value="price-high">Maior preço</option>
+                              <option value="rating">Melhor avaliado</option>
+                              <option value="sales">Mais vendidos</option>
+                            </select>
+                          </div>
                         </div>
                       </div>
 
                       {/* Tags de filtros aplicados */}
                       {(categoryFilters.length > 0 || categorySearchQuery.trim()) && (
                         <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-slate-100">
+                          <span className="text-sm text-slate-600 font-medium">Filtros ativos:</span>
                           {categorySearchQuery.trim() && (
                             <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
-                              Busca: "{categorySearchQuery}"
+                              <FiSearch className="w-3 h-3" /> "{categorySearchQuery}"
                               <button
-                                onClick={() => setCategorySearchQuery('')}
+                                onClick={() => {
+                                  setCategorySearchQuery('');
+                                  updateUrlParams();
+                                  fetchProductsWithFilters();
+                                }}
                                 className="ml-1 hover:bg-blue-200 rounded-full p-0.5"
                               >
                                 <FaTimes className="w-3 h-3" />
@@ -763,25 +929,29 @@ function ExplorePage() {
                           {categoryFilters.map((filter) => (
                             <span
                               key={filter.value}
-                              className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 text-slate-700 text-sm rounded-full"
+                              className={`inline-flex items-center gap-1 px-3 py-1 text-sm rounded-full ${
+                                filter.type === 'price' ? 'bg-green-100 text-green-800' :
+                                filter.type === 'rating' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-slate-100 text-slate-700'
+                              }`}
                             >
-                              {filter.label}
+                              {filter.type === 'price' ? <FiTag className="w-3 h-3" /> : 
+                               filter.type === 'rating' ? <FaStar className="w-3 h-3" /> : 
+                               <FiPackage className="w-3 h-3" />} {filter.label}
                               <button
                                 onClick={() => removeCategoryFilter(filter.value)}
-                                className="ml-1 hover:bg-slate-200 rounded-full p-0.5"
+                                className="ml-1 hover:bg-white/50 rounded-full p-0.5"
                               >
                                 <FaTimes className="w-3 h-3" />
                               </button>
                             </span>
                           ))}
-                          {(categoryFilters.length > 0 || categorySearchQuery.trim()) && (
-                            <button
-                              onClick={clearCategoryFilters}
-                              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                            >
-                              Limpar todos
-                            </button>
-                          )}
+                          <button
+                            onClick={clearCategoryFilters}
+                            className="inline-flex items-center gap-1 text-sm text-red-600 hover:text-red-700 font-medium px-2 py-1 hover:bg-red-50 rounded"
+                          >
+                            <FaTimes className="w-3 h-3" /> Limpar todos
+                          </button>
                         </div>
                       )}
                     </div>
@@ -798,7 +968,12 @@ function ExplorePage() {
                         {filteredProducts.map((product) => (
                           <div key={product.id} className="group bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition flex flex-col h-full">
                             <Link to={`/produto/${product.id}`} className="relative aspect-square overflow-hidden">
-                              <LazyImage src={product.image} alt={product.name} className="w-full h-full group-hover:scale-105 transition-transform duration-300" fallback="/placeholder-image.svg" />
+                              <LazyImage 
+                                src={product.image || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?q=80&w=400&auto=format&fit=crop'} 
+                                alt={product.name} 
+                                className="w-full h-full group-hover:scale-105 transition-transform duration-300" 
+                                fallback="https://images.unsplash.com/photo-1560472354-b33ff0c44a43?q=80&w=400&auto=format&fit=crop" 
+                              />
 
                               {/* Badges */}
                               <div className="absolute top-2 left-2 flex flex-col gap-1">
@@ -860,7 +1035,7 @@ function ExplorePage() {
 
                               <div className="flex items-center justify-between mb-2 flex-shrink-0">
                                 {renderStars(product.rating)}
-                                <span className="text-[10px] text-slate-500">({product.sales.toLocaleString('pt-BR')})</span>
+                                <span className="text-[10px] text-slate-500">({product.reviewCount || 0})</span>
                               </div>
 
                               <div className="mt-auto">

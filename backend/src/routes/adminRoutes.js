@@ -8,6 +8,7 @@ import {
 } from '../controllers/pedidoController.js';
 import {
   obterDashboardStats,
+  listarVendedores,
   listarEmpresas,
   atualizarStatusEmpresa,
   listarClientes,
@@ -42,6 +43,9 @@ router.get('/dashboard', obterDashboardStats);
 router.get('/pedidos', listarPedidosAdmin);
 router.get('/pedidos/:id', buscarPedidoAdmin);
 router.put('/pedidos/:id/status', atualizarStatusPedidoAdmin);
+
+// Vendedores
+router.get('/vendedores', listarVendedores);
 
 // Empresas/Vendedores
 router.get('/empresas', listarEmpresas);

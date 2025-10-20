@@ -171,29 +171,54 @@ function VendorSellersPage() {
                           </div>
                           <div>
                             <div className="text-sm font-medium text-slate-900">
-                              {seller.name}
+                              {seller.name || 'Nome não informado'}
                             </div>
                             <div className="text-sm text-slate-500">
-                              ID: {seller.id}
+                              ID: {seller.id || 'N/A'}
                             </div>
+                            {seller.joinDate && (
+                              <div className="text-xs text-slate-400">
+                                Desde: {formatDate(seller.joinDate)}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-slate-900 flex items-center gap-1">
                           <FaEnvelope className="text-slate-400" />
-                          {seller.email}
+                          {seller.email || 'Email não informado'}
                         </div>
-                        <div className="text-sm text-slate-500 flex items-center gap-1">
-                          <FaPhone className="text-slate-400" />
-                          {seller.phone}
-                        </div>
+                        {seller.phone && (
+                          <div className="text-sm text-slate-500 flex items-center gap-1">
+                            <FaPhone className="text-slate-400" />
+                            {seller.phone}
+                          </div>
+                        )}
+                        {seller.whatsapp && (
+                          <div className="text-sm text-slate-500 flex items-center gap-1">
+                            <FaPhone className="text-green-500" />
+                            WhatsApp: {seller.whatsapp}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-slate-900 flex items-start gap-1">
-                          <FaMapMarkerAlt className="text-slate-400 mt-0.5" />
-                          <span>{seller.address}</span>
-                        </div>
+                        {seller.address ? (
+                          <div className="text-sm text-slate-900 flex items-start gap-1">
+                            <FaMapMarkerAlt className="text-slate-400 mt-0.5" />
+                            <span>{seller.address}</span>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-slate-500 flex items-start gap-1">
+                            <FaMapMarkerAlt className="text-slate-400 mt-0.5" />
+                            <span>Endereço não informado</span>
+                          </div>
+                        )}
+                        {seller.city && seller.state && (
+                          <div className="text-xs text-slate-500">
+                            {seller.city} - {seller.state}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(seller.status)}`}>

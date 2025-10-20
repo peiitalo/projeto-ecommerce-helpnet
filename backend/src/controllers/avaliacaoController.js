@@ -12,7 +12,7 @@ export const listarPorProduto = async (req, res) => {
       include: {
         cliente: {
           select: {
-            Nome: true
+            NomeCompleto: true
           }
         }
       }
@@ -71,7 +71,7 @@ export const avaliar = async (req, res) => {
     try {
       const cliente = await prisma.cliente.findUnique({ 
         where: { ClienteID: userId },
-        select: { Nome: true }
+        select: { NomeCompleto: true }
       });
       
       if (produto.vendedor && produto.vendedor.Email) {
@@ -79,7 +79,7 @@ export const avaliar = async (req, res) => {
           produto.vendedor.Email,
           produto.vendedor.Nome,
           produto.Nome,
-          cliente?.Nome || 'Cliente',
+          cliente?.NomeCompleto || 'Cliente',
           notaInt,
           comentario
         );

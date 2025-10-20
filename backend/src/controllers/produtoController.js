@@ -87,6 +87,7 @@ export const listarProdutos = async (req, res) => {
           categoria: { select: { Nome: true } },
           vendedor: { select: { VendedorID: true, Nome: true } },
           empresa: { select: { EmpresaID: true, Nome: true } },
+          avaliacoes: { select: { Nota: true } },
           criadoEm: true,
         },
         orderBy: { criadoEm: "desc" },
@@ -144,14 +145,43 @@ export const buscarProdutoPorId = async (req, res) => {
         empresa: {
           select: {
             EmpresaID: true,
-            Nome: true
+            Nome: true,
+            Documento: true,
+            Email: true,
+            Telefone: true
           }
         },
         vendedor: {
           select: {
             VendedorID: true,
             Nome: true,
-            Email: true
+            Email: true,
+            empresa: {
+              select: {
+                Nome: true,
+                Documento: true,
+                Email: true,
+                Telefone: true
+              }
+            },
+            enderecosVendedor: {
+              select: {
+                Nome: true,
+                CEP: true,
+                Cidade: true,
+                UF: true,
+                Bairro: true,
+                Numero: true,
+                Complemento: true,
+                TipoEndereco: true
+              },
+              take: 1
+            }
+          }
+        },
+        avaliacoes: {
+          select: {
+            Nota: true
           }
         }
       },
@@ -160,6 +190,111 @@ export const buscarProdutoPorId = async (req, res) => {
     if (!produto) {
       logger.warn('produto_nao_encontrado', { id });
       return res.status(404).json({ erro: "Produto não encontrado" });
+    }
+
+    // Buscar dados do cliente associado ao vendedor
+    if (produto.vendedor?.Email) {
+      const cliente = await prisma.cliente.findUnique({
+        where: { Email: produto.vendedor.Email },
+        select: {
+          TelefoneCelular: true,
+          TelefoneFixo: true,
+          Whatsapp: true,
+          CPF_CNPJ: true,
+          RazaoSocial: true,
+          enderecos: {
+            select: {
+              Nome: true,
+              CEP: true,
+              Cidade: true,
+              UF: true,
+              Bairro: true,
+              Numero: true,
+              Complemento: true
+            },
+            take: 1
+          }
+        }
+      });
+      
+      if (cliente) {
+        produto.vendedor.telefone = cliente.TelefoneCelular || cliente.TelefoneFixo;
+        produto.vendedor.whatsapp = cliente.Whatsapp;
+        produto.vendedor.cpfCnpj = cliente.CPF_CNPJ;
+        produto.vendedor.razaoSocial = cliente.RazaoSocial;
+        if (cliente.enderecos?.[0]) {
+          const endereco = cliente.enderecos[0];
+          produto.vendedor.endereco = {
+            rua: endereco.Nome,
+            cidade: endereco.Cidade,
+            estado: endereco.UF,
+            cep: endereco.CEP,
+            bairro: endereco.Bairro,
+            numero: endereco.Numero,
+            complemento: endereco.Complemento
+          };
+        }
+      }
+    }
+
+    // Calcular avaliação média
+    if (produto.avaliacoes && produto.avaliacoes.length > 0) {
+      const somaNotas = produto.avaliacoes.reduce((acc, av) => acc + av.Nota, 0);
+      produto.rating = somaNotas / produto.avaliacoes.length;
+      produto.reviewCount = produto.avaliacoes.length;
+    } else {
+      produto.rating = 0;
+      produto.reviewCount = 0;
+    }
+    delete produto.avaliacoes;
+
+    // Buscar dados adicionais do cliente associado ao vendedor para completar informações
+    if (produto.vendedor?.Email) {
+      try {
+        const clienteVendedor = await prisma.cliente.findUnique({
+          where: { Email: produto.vendedor.Email },
+          select: {
+            TelefoneCelular: true,
+            TelefoneFixo: true,
+            Whatsapp: true,
+            CPF_CNPJ: true,
+            RazaoSocial: true,
+            enderecos: {
+              select: {
+                Nome: true,
+                CEP: true,
+                Cidade: true,
+                UF: true,
+                Bairro: true,
+                Numero: true,
+                Complemento: true
+              },
+              take: 1
+            }
+          }
+        });
+        
+        if (clienteVendedor) {
+          produto.vendedor.telefone = clienteVendedor.TelefoneCelular || clienteVendedor.TelefoneFixo;
+          produto.vendedor.whatsapp = clienteVendedor.Whatsapp;
+          produto.vendedor.cpfCnpj = clienteVendedor.CPF_CNPJ;
+          produto.vendedor.razaoSocial = clienteVendedor.RazaoSocial;
+          if (clienteVendedor.enderecos?.[0]) {
+            const endereco = clienteVendedor.enderecos[0];
+            produto.vendedor.endereco = {
+              rua: endereco.Nome,
+              cidade: endereco.Cidade,
+              estado: endereco.UF,
+              cep: endereco.CEP,
+              bairro: endereco.Bairro,
+              numero: endereco.Numero,
+              complemento: endereco.Complemento
+            };
+          }
+        }
+      } catch (clienteError) {
+        logger.warn('erro_buscar_cliente_vendedor', { vendedorEmail: produto.vendedor.Email, error: clienteError.message });
+      }
     }
 
     logger.info('buscar_produto_ok', { id });

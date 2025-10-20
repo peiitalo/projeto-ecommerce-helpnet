@@ -115,22 +115,44 @@ export default function CartPage() {
     }, 0);
   }, [selectedItems, items]);
 
-  // Total incluindo frete
+  // Aplicar desconto apenas uma vez
+  const discountAmount = useMemo(() => {
+    return selectedCoupons.reduce((acc, code) => {
+      const coupon = availableCoupons.find(c => c.code === code);
+      return acc + (coupon ? subtotal * coupon.discount : 0);
+    }, 0);
+  }, [selectedCoupons, subtotal, availableCoupons]);
+
+  // Total incluindo frete e desconto
   const total = useMemo(() => {
-    let totalValue = subtotal;
+    let totalValue = subtotal - discountAmount;
     if (shippingInfo && shippingInfo.frete > 0) {
       totalValue += shippingInfo.frete;
     }
-    return totalValue;
-  }, [subtotal, shippingInfo]);
+    return Math.max(0, totalValue);
+  }, [subtotal, discountAmount, shippingInfo]);
 
   const handleFinalizePurchase = () => {
     if (selectedItems.length === 0) return;
+    
+    setIsFinalizing(true);
     try {
-      // Opcional: persistir seleção para uso no checkout
-      sessionStorage.setItem('helpnet_checkout_selected', JSON.stringify(selectedItems));
-    } catch {}
-    navigate('/checkout');
+      // Persistir dados do checkout
+      const checkoutData = {
+        selectedItems,
+        subtotal,
+        discountAmount,
+        selectedCoupons,
+        shippingInfo,
+        selectedAddressId
+      };
+      sessionStorage.setItem('helpnet_checkout_data', JSON.stringify(checkoutData));
+      navigate('/checkout');
+    } catch (error) {
+      console.error('Erro ao finalizar compra:', error);
+    } finally {
+      setIsFinalizing(false);
+    }
   };
 
   return (
@@ -312,9 +334,25 @@ export default function CartPage() {
 
             {/* Método de Pagamento removido: a seleção e distribuição ocorrerá no checkout */}
 
-            {/* Total */}
-            <div className="mt-4 pt-4 border-t border-slate-200">
-              <div className="flex justify-between items-center">
+            {/* Resumo */}
+            <div className="mt-4 pt-4 border-t border-slate-200 space-y-2">
+              <div className="flex justify-between">
+                <span className="text-slate-600">Subtotal</span>
+                <span>{formatPrice(subtotal)}</span>
+              </div>
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-green-600">
+                  <span>Desconto</span>
+                  <span>-{formatPrice(discountAmount)}</span>
+                </div>
+              )}
+              {shippingInfo && shippingInfo.frete > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Frete</span>
+                  <span>{formatPrice(shippingInfo.frete)}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center pt-2 border-t">
                 <span className="text-lg font-semibold text-slate-900">Total</span>
                 <span className="text-lg font-bold text-blue-700">
                   {formatPrice(total)}

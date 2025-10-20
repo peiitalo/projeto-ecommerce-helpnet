@@ -576,7 +576,16 @@ export const listarPedidosCliente = async (req, res) => {
                   SKU: true,
                   vendedor: {
                     select: {
-                      Nome: true
+                      VendedorID: true,
+                      Nome: true,
+                      Email: true,
+                      empresa: {
+                        select: {
+                          Nome: true,
+                          Telefone: true,
+                          Email: true
+                        }
+                      }
                     }
                   }
                 }
@@ -658,7 +667,21 @@ export const buscarPedidoPorId = async (req, res) => {
                 ProdutoID: true,
                 Nome: true,
                 Imagens: true,
-                SKU: true
+                SKU: true,
+                vendedor: {
+                  select: {
+                    VendedorID: true,
+                    Nome: true,
+                    Email: true,
+                    empresa: {
+                      select: {
+                        Nome: true,
+                        Telefone: true,
+                        Email: true
+                      }
+                    }
+                  }
+                }
               }
             }
           }
@@ -1026,7 +1049,16 @@ export const listarPedidosAdmin = async (req, res) => {
                   SKU: true,
                   vendedor: {
                     select: {
-                      Nome: true
+                      VendedorID: true,
+                      Nome: true,
+                      Email: true,
+                      empresa: {
+                        select: {
+                          Nome: true,
+                          Telefone: true,
+                          Email: true
+                        }
+                      }
                     }
                   }
                 }
@@ -1228,7 +1260,16 @@ export const buscarPedidoAdmin = async (req, res) => {
                 SKU: true,
                 vendedor: {
                   select: {
-                    Nome: true
+                    VendedorID: true,
+                    Nome: true,
+                    Email: true,
+                    empresa: {
+                      select: {
+                        Nome: true,
+                        Telefone: true,
+                        Email: true
+                      }
+                    }
                   }
                 }
               }

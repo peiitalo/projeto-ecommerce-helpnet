@@ -188,6 +188,15 @@ function MeusCuponsPage() {
             </Link>
           ))}
         </nav>
+        <div className="p-4 border-t border-slate-200">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 border border-red-200"
+          >
+            <FaSignOutAlt />
+            <span className="text-sm font-medium">Sair da conta</span>
+          </button>
+        </div>
       </div>
 
       {/* Sidebar Desktop (fixa e sempre aberta) */}
@@ -218,6 +227,15 @@ function MeusCuponsPage() {
             </Link>
           ))}
         </nav>
+        <div className="p-4 border-t border-slate-200">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 border border-red-200"
+          >
+            <FaSignOutAlt />
+            <span className="text-sm font-medium">Sair da conta</span>
+          </button>
+        </div>
       </aside>
 
       {/* Conteúdo Principal */}
