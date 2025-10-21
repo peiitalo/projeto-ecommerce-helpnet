@@ -8,6 +8,29 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Registrar helpers customizados do Handlebars
+handlebars.registerHelper('range', function(n) {
+  const result = [];
+  for (let i = 0; i < n; i++) {
+    result.push(i);
+  }
+  return result;
+});
+
+handlebars.registerHelper('gte', function(a, b) {
+  return a >= b;
+});
+
+handlebars.registerHelper('formatDate', function(date, format) {
+  if (!date) return '';
+  const d = new Date(date);
+  return d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+});
+
+handlebars.registerHelper('now', function() {
+  return new Date();
+});
+
 // Configurar SendGrid
 sgMail.setApiKey(process.env.SENDGRID_API_KEY || 'your-sendgrid-api-key');
 
@@ -333,6 +356,85 @@ export const enviarNotificacaoAvaliacao = async (vendedorEmail, vendedorNome, pr
   }
 };
 
+// === FUNÇÕES PARA NOVOS TEMPLATES REDESENHADOS ===
+
+// Email de suporte (interno - para equipe)
+export const sendContactSupportEmail = async (contactData) => {
+  try {
+    const { compiledTemplate, compiledBase } = loadTemplate('contato-suporte');
+    
+    const bodyContent = compiledTemplate({
+      nome: contactData.nome,
+      email: contactData.email,
+      telefone: contactData.telefone,
+      assunto: contactData.assunto,
+      mensagem: contactData.mensagem
+    });
+
+    const htmlContent = compiledBase({
+      title: 'Nova Mensagem de Contato Recebida',
+      body: bodyContent,
+      showUnsubscribe: false
+    });
+
+    // Email interno para a equipe de suporte
+    const supportEmail = process.env.SUPPORT_EMAIL || 'suporte@helpnet.com';
+    return await sendEmail(supportEmail, `Nova Mensagem de Contato: ${contactData.assunto}`, htmlContent);
+  } catch (error) {
+    console.error('Erro ao enviar email de suporte:', error);
+    throw error;
+  }
+};
+
+// Email de confirmação de contato (para cliente)
+export const sendContactConfirmationEmail = async (contactData) => {
+  try {
+    const { compiledTemplate, compiledBase } = loadTemplate('contato-confirmacao');
+    
+    const bodyContent = compiledTemplate({
+      nome: contactData.nome,
+      assunto: contactData.assunto
+    });
+
+    const htmlContent = compiledBase({
+      title: 'Recebemos sua mensagem!',
+      body: bodyContent,
+      showUnsubscribe: false
+    });
+
+    return await sendEmail(contactData.email, 'Recebemos sua mensagem! - HelpNet', htmlContent);
+  } catch (error) {
+    console.error('Erro ao enviar email de confirmação de contato:', error);
+    throw error;
+  }
+};
+
+// Email de confirmação de avaliação recebida (para cliente)
+export const sendReviewReceivedEmail = async (reviewData) => {
+  try {
+    const { compiledTemplate, compiledBase } = loadTemplate('avaliacao-recebida');
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    
+    const bodyContent = compiledTemplate({
+      nome: reviewData.nome,
+      estrelas: reviewData.estrelas,
+      comentario: reviewData.comentario,
+      frontendUrl
+    });
+
+    const htmlContent = compiledBase({
+      title: 'Obrigado pela sua avaliação!',
+      body: bodyContent,
+      showUnsubscribe: false
+    });
+
+    return await sendEmail(reviewData.email, 'Obrigado pela sua avaliação! - HelpNet', htmlContent);
+  } catch (error) {
+    console.error('Erro ao enviar email de confirmação de avaliação:', error);
+    throw error;
+  }
+};
+
 export default {
   sendWelcomeEmail,
   sendOrderConfirmationEmail,
@@ -340,5 +442,8 @@ export default {
   sendVendorNewSaleEmail,
   sendVendorLowStockEmail,
   enviarEmailResetSenha,
-  enviarNotificacaoAvaliacao
+  enviarNotificacaoAvaliacao,
+  sendContactSupportEmail,
+  sendContactConfirmationEmail,
+  sendReviewReceivedEmail
 };

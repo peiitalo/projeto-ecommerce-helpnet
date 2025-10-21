@@ -1,31 +1,64 @@
-<p>Olá, {{clienteNome}}!</p>
+<div style="text-align: center; margin-bottom: 30px;">
+  <div style="font-size: 48px; margin-bottom: 15px;">
+    {{#if isDelivered}}✅{{else}}📦{{/if}}
+  </div>
+</div>
 
-<p>Atualização sobre seu pedido #{{pedidoId}}:</p>
+<h1>Atualização do seu pedido</h1>
+
+<p>Olá, <strong>{{clienteNome}}</strong>!</p>
+
+<p>Temos uma atualização importante sobre seu pedido. Confira os detalhes abaixo:</p>
 
 <div class="order-details">
-  <p><strong>Status:</strong> {{status}}</p>
+  <h3>📋 Detalhes do Pedido</h3>
+  <p><strong>Pedido:</strong> #{{pedidoId}}</p>
+  <p><strong>Status Atual:</strong> <span style="color: #1E90FF; font-weight: 600;">{{status}}</span></p>
+  
   {{#if codigoRastreio}}
   <p><strong>Código de Rastreio:</strong> {{codigoRastreio}}</p>
   {{/if}}
+  
   {{#if previsaoEntrega}}
   <p><strong>Previsão de Entrega:</strong> {{previsaoEntrega}}</p>
   {{/if}}
+  
   {{#if local}}
-  <p><strong>Localização:</strong> {{local}}</p>
+  <p><strong>Localização Atual:</strong> {{local}}</p>
   {{/if}}
-  <p><strong>Data da Atualização:</strong> {{dataAtualizacao}}</p>
+  
+  <p><strong>Última Atualização:</strong> {{dataAtualizacao}}</p>
 </div>
 
 {{#if showTrackingButton}}
-<div style="text-align: center; margin: 30px 0;">
-  <a href="{{frontendUrl}}/entregas/{{pedidoId}}" class="button">Acompanhar Entrega</a>
+<div style="text-align: center; margin: 40px 0;">
+  <a href="{{frontendUrl}}/entregas/{{pedidoId}}" class="button">RASTREAR PEDIDO</a>
 </div>
 {{/if}}
 
 {{#if isDelivered}}
-<p>Seu pedido foi entregue com sucesso! Esperamos que tenha gostado dos produtos.</p>
-<p>Conte-nos sua experiência avaliando os produtos em seu pedido.</p>
+<div class="summary-box" style="background-color: #e8f5e8; border-color: #4caf50;">
+  <h3 style="color: #2e7d32;">🎉 Pedido Entregue com Sucesso!</h3>
+  <p>Seu pedido foi entregue com sucesso! Esperamos que tenha gostado dos produtos.</p>
+  <p><strong>O que fazer agora:</strong></p>
+  <ul style="margin: 10px 0; padding-left: 20px;">
+    <li>Confira se todos os itens estão corretos</li>
+    <li>Avalie os produtos e vendedores</li>
+    <li>Compartilhe sua experiência conosco</li>
+  </ul>
+</div>
+
+<div style="text-align: center; margin: 30px 0;">
+  <a href="{{frontendUrl}}/meus-pedidos/{{pedidoId}}/avaliar" class="button" style="background-color: #4caf50;">AVALIAR PRODUTOS</a>
+</div>
+{{else}}
+<div class="summary-box">
+  <h3>📱 Acompanhe seu pedido</h3>
+  <p>Mantenha-se atualizado sobre o status do seu pedido através do nosso sistema de rastreamento em tempo real.</p>
+  <p>Você receberá notificações automáticas a cada mudança de status.</p>
+</div>
 {{/if}}
 
-<p>Atenciosamente,<br>
-Equipe HelpNet</p>
+<p>Se tiver alguma dúvida sobre sua entrega, nossa equipe de suporte está disponível 24/7 para ajudá-lo.</p>
+
+<p><strong>Equipe HelpNet</strong></p>

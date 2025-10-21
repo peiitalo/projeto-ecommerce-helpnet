@@ -1,40 +1,74 @@
-<p>Olá, {{vendedorNome}}!</p>
-
-<p>Você recebeu uma nova venda no HelpNet!</p>
-
-<div class="order-details">
-  <p><strong>Pedido #{{pedidoId}}</strong></p>
-  <p><strong>Data:</strong> {{dataPedido}}</p>
-  <p><strong>Valor Total Recebido:</strong> R$ {{valorTotal}}</p>
+<div style="text-align: center; margin-bottom: 30px;">
+  <div style="font-size: 48px; margin-bottom: 15px;">💰</div>
 </div>
 
-<h3>Produtos Vendidos</h3>
+<h1>Nova venda realizada!</h1>
+
+<p>Olá, <strong>{{vendedorNome}}</strong>!</p>
+
+<p>Parabéns! Você acabou de receber uma nova venda no HelpNet! 🎉</p>
+
+<div class="order-details">
+  <h3>📋 Detalhes da Venda</h3>
+  <p><strong>Pedido:</strong> #{{pedidoId}}</p>
+  <p><strong>Data da Venda:</strong> {{dataPedido}}</p>
+  <p><strong>Valor Total Recebido:</strong> <span style="color: #4caf50; font-weight: 600; font-size: 18px;">R$ {{valorTotal}}</span></p>
+</div>
+
+<h2>🛍️ Produtos Vendidos</h2>
+
 <table class="product-table">
   <thead>
     <tr>
       <th>Produto</th>
-      <th>Quantidade</th>
-      <th>Preço Unitário</th>
-      <th>Total</th>
+      <th style="text-align: center;">Qtd</th>
+      <th style="text-align: right;">Preço Unit.</th>
+      <th style="text-align: right;">Total</th>
     </tr>
   </thead>
   <tbody>
     {{#each produtos}}
     <tr>
-      <td>{{nome}}</td>
-      <td>{{quantidade}}</td>
-      <td>R$ {{precoUnitario}}</td>
-      <td>R$ {{subtotal}}</td>
+      <td>
+        <strong>{{nome}}</strong>
+        {{#if imagem}}
+        <br><small style="color: #666;">📷 Com imagem</small>
+        {{/if}}
+      </td>
+      <td style="text-align: center;">{{quantidade}}</td>
+      <td style="text-align: right;">R$ {{precoUnitario}}</td>
+      <td style="text-align: right;"><strong>R$ {{subtotal}}</strong></td>
     </tr>
     {{/each}}
   </tbody>
+  <tfoot>
+    <tr class="total-row">
+      <td colspan="3"><strong>Total da Venda:</strong></td>
+      <td style="text-align: right;"><strong>R$ {{valorTotal}}</strong></td>
+    </tr>
+  </tfoot>
 </table>
 
-<div style="text-align: center; margin: 30px 0;">
-  <a href="{{frontendUrl}}/vendedor/pedidos" class="button">Ver Pedidos</a>
+<div style="text-align: center; margin: 40px 0;">
+  <a href="{{frontendUrl}}/vendedor/pedidos" class="button">VER DETALHES DA VENDA</a>
 </div>
 
-<p>Prepare os produtos para envio o mais breve possível.</p>
+<div class="summary-box">
+  <h3>📦 Próximos Passos</h3>
+  <p><strong>1.</strong> Prepare os produtos para envio</p>
+  <p><strong>2.</strong> Embale com cuidado e segurança</p>
+  <p><strong>3.</strong> Atualize o status do pedido quando enviar</p>
+  <p><strong>4.</strong> Forneça o código de rastreamento</p>
+</div>
 
-<p>Atenciosamente,<br>
-Equipe HelpNet</p>
+<div class="summary-box" style="background-color: #fff3cd; border-color: #ffc107;">
+  <h3 style="color: #856404;">⏰ Prazo de Envio</h3>
+  <p style="color: #856404;">Lembre-se: você tem até <strong>2 dias úteis</strong> para enviar os produtos após a confirmação do pagamento.</p>
+</div>
+
+<p>Continue oferecendo produtos de qualidade e um excelente atendimento. Isso ajuda a construir sua reputação e aumentar suas vendas!</p>
+
+<p>Se precisar de ajuda, nossa equipe de suporte para vendedores está sempre disponível.</p>
+
+<p><strong>Equipe HelpNet</strong><br>
+<em>Seu sucesso é o nosso sucesso! 🚀</em></p>

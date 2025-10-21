@@ -1,20 +1,60 @@
-<p>Olá, {{vendedorNome}}!</p>
+<div style="text-align: center; margin-bottom: 30px;">
+  <div style="font-size: 48px; margin-bottom: 15px;">⚠️</div>
+</div>
 
-<p><strong>Alerta de Estoque Baixo</strong></p>
+<h1>Alerta: Estoque baixo</h1>
 
-<p>O produto abaixo está com estoque baixo e precisa ser reabastecido:</p>
+<p>Olá, <strong>{{vendedorNome}}</strong>!</p>
+
+<p>Este é um alerta importante sobre o estoque de um dos seus produtos na HelpNet.</p>
+
+<div class="summary-box" style="background-color: #fff3cd; border-color: #ffc107;">
+  <h3 style="color: #856404;">📉 Produto com Estoque Baixo</h3>
+  <p style="color: #856404;"><strong>{{produtoNome}}</strong> precisa ser reabastecido urgentemente!</p>
+</div>
 
 <div class="order-details">
+  <h3>📊 Informações do Estoque</h3>
   <p><strong>Produto:</strong> {{produtoNome}}</p>
-  <p><strong>Estoque Atual:</strong> {{estoqueAtual}} unidades</p>
+  <p><strong>Estoque Atual:</strong> <span style="color: #dc3545; font-weight: 600;">{{estoqueAtual}} unidades</span></p>
   <p><strong>Vendas Recentes:</strong> {{vendasRecentes}} unidades</p>
+  <p><strong>Status:</strong> <span style="color: #dc3545; font-weight: 600;">⚠️ CRÍTICO</span></p>
 </div>
 
-<p>Recomendamos reabastecer o estoque o mais breve possível para evitar interrupções nas vendas.</p>
-
-<div style="text-align: center; margin: 30px 0;">
-  <a href="{{frontendUrl}}/vendedor/produtos" class="button">Gerenciar Produtos</a>
+<div class="summary-box" style="background-color: #f8d7da; border-color: #dc3545;">
+  <h3 style="color: #721c24;">🚨 Ação Necessária</h3>
+  <p style="color: #721c24;">Recomendamos reabastecer o estoque <strong>imediatamente</strong> para evitar:</p>
+  <ul style="margin: 10px 0; padding-left: 20px; color: #721c24;">
+    <li>Perda de vendas potenciais</li>
+    <li>Redução na visibilidade do produto</li>
+    <li>Impacto negativo no ranking de vendas</li>
+    <li>Decepção dos clientes interessados</li>
+  </ul>
 </div>
 
-<p>Atenciosamente,<br>
-Equipe HelpNet</p>
+<div style="text-align: center; margin: 40px 0;">
+  <a href="{{frontendUrl}}/vendedor/produtos" class="button">REPOR ESTOQUE</a>
+</div>
+
+<div class="summary-box">
+  <h3>💡 Dicas para Gestão de Estoque</h3>
+  <p><strong>1.</strong> Configure alertas automáticos quando o estoque atingir 10 unidades</p>
+  <p><strong>2.</strong> Monitore as vendas semanalmente para prever a demanda</p>
+  <p><strong>3.</strong> Mantenha sempre um estoque de segurança</p>
+  <p><strong>4.</strong> Considere aumentar o estoque de produtos populares</p>
+</div>
+
+<h2>📈 Análise de Vendas</h2>
+<p>Com base no histórico de vendas recentes (<strong>{{vendasRecentes}} unidades</strong>), este produto tem uma boa demanda. Reabastecer rapidamente pode garantir que você não perca oportunidades de venda.</p>
+
+<div class="summary-box" style="background-color: #d1ecf1; border-color: #1E90FF;">
+  <h3 style="color: #0c5460;">🎯 Sugestão de Reposição</h3>
+  <p style="color: #0c5460;">Baseado no padrão de vendas, sugerimos repor com pelo menos <strong>50 unidades</strong> para garantir disponibilidade por mais tempo.</p>
+</div>
+
+<p>Lembre-se: produtos sempre disponíveis têm melhor posicionamento nos resultados de busca e geram mais confiança nos compradores.</p>
+
+<p>Se precisar de ajuda para gerenciar seu estoque, nossa equipe de suporte está disponível para orientá-lo.</p>
+
+<p><strong>Equipe HelpNet</strong><br>
+<em>Ajudando você a vender mais! 📊</em></p>
