@@ -10,6 +10,13 @@ const router = express.Router();
 
 // Rota para upload de múltiplas imagens
 router.post('/images', authMiddleware, (req, res) => {
+  // Log da requisição para debug
+  logger.info('uploadRoutes: Iniciando upload de imagens', {
+    userId: req.user?.id,
+    userRole: req.user?.role,
+    contentType: req.headers['content-type']
+  });
+
   // Usar multer como middleware
   upload.array('images', 10)(req, res, async (err) => {
     if (err) {
@@ -41,6 +48,12 @@ router.post('/images', authMiddleware, (req, res) => {
       }
 
       // Outros erros do multer
+      logger.error('uploadRoutes: Erro genérico do multer', {
+        error: err.message,
+        code: err.code,
+        field: err.field,
+        stack: err.stack
+      });
       return res.status(400).json({
         error: err.message || 'Erro no processamento do arquivo'
       });
@@ -57,8 +70,16 @@ router.post('/images', authMiddleware, (req, res) => {
         userId: req.user?.id
       });
 
-      // Retornar URLs das imagens do Cloudinary
-      const imageUrls = req.files.map(file => file.path);
+      // Retornar URLs das imagens (Cloudinary ou local)
+      const imageUrls = req.files.map(file => {
+        if (file.path) {
+          // Cloudinary - retorna a URL direta
+          return file.path;
+        } else {
+          // Armazenamento local - constrói a URL relativa
+          return `/uploads/products/${file.filename}`;
+        }
+      });
 
       // Log de auditoria para uploads
       logger.info('AUDIT_UPLOAD_SUCCESS', {

@@ -67,6 +67,10 @@ export function CartProvider({ children }) {
           id: item.produto.ProdutoID,
           name: item.produto.Nome,
           price: item.produto.Preco,
+          originalPrice: item.produto.PrecoOriginal || item.produto.Preco,
+          discount: item.produto.Desconto || 0,
+          freeShipping: item.produto.FreteGratis || false,
+          deliveryTime: item.produto.PrazoEntrega || null,
           image: getFullImageUrl(item.produto.Imagens?.[0]) || null,
           sku: item.produto.SKU,
           estoque: item.produto.Estoque,
@@ -105,6 +109,10 @@ export function CartProvider({ children }) {
               id: product.id,
               name: product.name,
               price: Number(product.price) || 0,
+              originalPrice: Number(product.originalPrice || product.price) || 0,
+              discount: product.discount || 0,
+              freeShipping: product.freeShipping || false,
+              deliveryTime: product.deliveryTime || null,
               image: product.image || null,
               sku: product.sku || '',
               estoque: product.estoque ?? 0,
@@ -130,6 +138,10 @@ export function CartProvider({ children }) {
             id: product.id,
             name: product.name,
             price: Number(product.price) || 0,
+            originalPrice: Number(product.originalPrice || product.price) || 0,
+            discount: product.discount || 0,
+            freeShipping: product.freeShipping || false,
+            deliveryTime: product.deliveryTime || null,
             image: product.image || null,
             sku: product.sku || '',
             estoque: product.estoque ?? 0,
@@ -202,10 +214,30 @@ export function CartProvider({ children }) {
 
     // Usar produtoIds fornecidos ou todos os itens do carrinho
     const idsParaCalculo = produtoIds || items.map(item => item.id);
+    const itemsParaCalculo = items.filter(item => idsParaCalculo.includes(item.id));
 
     if (idsParaCalculo.length === 0) {
       setFreightOptions([]);
       setSelectedFreight(null);
+      return;
+    }
+
+    // Verificar se todos os produtos têm frete grátis
+    const todosFreteGratis = itemsParaCalculo.every(item => item.freeShipping);
+    
+    if (todosFreteGratis) {
+      const freteGratisOption = {
+        id: 'frete-gratis',
+        nome: 'Frete Grátis',
+        transportadora: 'HelpNet',
+        valor: 0,
+        prazo: '3-5 dias úteis',
+        descricao: 'Todos os produtos selecionados têm frete grátis',
+        ativo: true
+      };
+      setFreightOptions([freteGratisOption]);
+      setSelectedFreight(freteGratisOption);
+      setFreightLoading(false);
       return;
     }
 
