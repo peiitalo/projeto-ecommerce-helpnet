@@ -14,6 +14,7 @@ export default function CartPage() {
   const [selectedItems, setSelectedItems] = useState([]);
   const [coupon, setCoupon] = useState('');
   const [selectedCoupons, setSelectedCoupons] = useState([]);
+  const [availableCoupons, setAvailableCoupons] = useState([]);
 
   // Estados para cálculo de frete
   const [shippingInfo, setShippingInfo] = useState(null);
@@ -25,11 +26,6 @@ export default function CartPage() {
   // Estados para endereços
   const [addresses, setAddresses] = useState([]);
   const [loadingAddresses, setLoadingAddresses] = useState(false);
-
-  const availableCoupons = [
-    { code: 'PROMO10', discount: 0.1 },
-    { code: 'FRETEGRATIS', discount: 0 }, // exemplo: frete grátis
-  ];
 
   // Buscar endereços do cliente
   useEffect(() => {
@@ -52,7 +48,19 @@ export default function CartPage() {
     };
 
     fetchAddresses();
+    loadAvailableCoupons();
   }, [user]);
+
+  // Carregar cupons disponíveis
+  const loadAvailableCoupons = () => {
+    // Simular cupons disponíveis - em produção viria da API
+    const mockCoupons = [
+      { code: 'DESCONTO10', discount: 10, type: 'percentage', minValue: 50 },
+      { code: 'FRETEGRATIS', discount: 0, type: 'free_shipping', minValue: 100 },
+      { code: 'PRIMEIRA15', discount: 15, type: 'percentage', minValue: 0 }
+    ];
+    setAvailableCoupons(mockCoupons);
+  };
 
   const formatPrice = (n) =>
     n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -115,12 +123,27 @@ export default function CartPage() {
     }, 0);
   }, [selectedItems, items]);
 
-  // Aplicar desconto apenas uma vez
+  // Aplicar desconto dos cupons selecionados
   const discountAmount = useMemo(() => {
     return selectedCoupons.reduce((acc, code) => {
       const coupon = availableCoupons.find(c => c.code === code);
-      return acc + (coupon ? subtotal * coupon.discount : 0);
+      if (!coupon || subtotal < coupon.minValue) return acc;
+      
+      if (coupon.type === 'percentage') {
+        return acc + (subtotal * coupon.discount / 100);
+      } else if (coupon.type === 'fixed') {
+        return acc + Math.min(coupon.discount, subtotal);
+      }
+      return acc;
     }, 0);
+  }, [selectedCoupons, subtotal, availableCoupons]);
+
+  // Verificar se tem frete grátis por cupom
+  const hasFreeShippingCoupon = useMemo(() => {
+    return selectedCoupons.some(code => {
+      const coupon = availableCoupons.find(c => c.code === code);
+      return coupon && coupon.type === 'free_shipping' && subtotal >= coupon.minValue;
+    });
   }, [selectedCoupons, subtotal, availableCoupons]);
 
   // Total incluindo frete e desconto
@@ -316,9 +339,17 @@ export default function CartPage() {
                       key={c.code}
                       className="flex justify-between items-center border px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-50"
                     >
-                      <span className="text-slate-900 font-medium">
-                        {c.code} ({c.discount ? `${c.discount * 100}%` : 'Frete grátis'})
-                      </span>
+                      <div>
+                        <span className="text-slate-900 font-medium">
+                          {c.code}
+                        </span>
+                        <div className="text-xs text-slate-500">
+                          {c.type === 'percentage' ? `${c.discount}% OFF` : 
+                           c.type === 'free_shipping' ? 'Frete grátis' : 
+                           `R$ ${c.discount} OFF`}
+                          {c.minValue > 0 && ` - Mín. R$ ${c.minValue}`}
+                        </div>
+                      </div>
                       <input
                         type="checkbox"
                         checked={selectedCoupons.includes(c.code)}
@@ -349,7 +380,15 @@ export default function CartPage() {
               {shippingInfo && shippingInfo.frete > 0 && (
                 <div className="flex justify-between">
                   <span className="text-slate-600">Frete</span>
-                  <span>{formatPrice(shippingInfo.frete)}</span>
+                  <span className={hasFreeShippingCoupon ? 'line-through text-slate-400' : ''}>
+                    {formatPrice(shippingInfo.frete)}
+                  </span>
+                </div>
+              )}
+              {hasFreeShippingCoupon && (
+                <div className="flex justify-between text-green-600">
+                  <span>Frete (cupom)</span>
+                  <span>Grátis</span>
                 </div>
               )}
               <div className="flex justify-between items-center pt-2 border-t">

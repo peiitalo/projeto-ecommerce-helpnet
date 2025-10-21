@@ -57,6 +57,7 @@ function CheckoutPage() {
   const [cardDetails, setCardDetails] = useState({});
   const [installments, setInstallments] = useState({});
   const [cashDiscount, setCashDiscount] = useState(0.05); // 5% de desconto à vista
+  const [discountApplied, setDiscountApplied] = useState({}); // Controla se desconto foi aplicado por método
 
   const { items, count, clear, freight, freightOptions, selectedFreight, setSelectedFreight, calculateFreight, freightLoading, freightError, selectedAddress, setSelectedAddress, total, subtotal } = useCart();
   const { user } = useAuth();
@@ -76,7 +77,6 @@ function CheckoutPage() {
     { label: 'Explore', to: '/explorer', icon: <FiSearch className="text-slate-500" /> },
     { label: 'Pedidos', to: '/meus-pedidos', icon: <FiPackage className="text-slate-500" /> },
     { label: 'Histórico', to: '/historico', icon: <FiClock className="text-slate-500" /> },
-    { label: 'Categorias', to: '/categorias', icon: <FiTag className="text-slate-500" /> },
     { label: 'Meus Cupons', to: '/cupons', icon: <FiCreditCardIcon className="text-slate-500" /> },
     { label: 'Endereços', to: '/enderecos', icon: <FiMapPin className="text-slate-500" /> },
     { label: 'Suporte', to: '/suporte', icon: <FiHelpCircle className="text-slate-500" /> },
@@ -95,8 +95,12 @@ function CheckoutPage() {
   // Ler itens selecionados do sessionStorage
   const getSelectedItems = () => {
     try {
-      const selected = sessionStorage.getItem('helpnet_checkout_selected');
-      return selected ? JSON.parse(selected) : items.map(item => item.id);
+      const checkoutData = sessionStorage.getItem('helpnet_checkout_data');
+      if (checkoutData) {
+        const parsed = JSON.parse(checkoutData);
+        return parsed.selectedItems || [];
+      }
+      return items.map(item => item.id);
     } catch {
       return items.map(item => item.id);
     }
@@ -253,11 +257,23 @@ function CheckoutPage() {
   // Aplicar desconto à vista
   const applyCashDiscount = (methodId) => {
     const method = paymentMethods.find(m => m.id === methodId);
-    if (!method) return;
+    if (!method || discountApplied[methodId]) return;
 
     const cashPrice = calculateCashPrice(method.amount);
     updatePaymentAmount(methodId, cashPrice.final);
+    setDiscountApplied(prev => ({ ...prev, [methodId]: true }));
     showSuccess(`Desconto de ${cashPrice.discountPercent}% aplicado! Preço à vista: R$ ${cashPrice.final.toFixed(2)}`);
+  };
+
+  // Remover desconto à vista
+  const removeCashDiscount = (methodId) => {
+    const method = paymentMethods.find(m => m.id === methodId);
+    if (!method || !discountApplied[methodId]) return;
+
+    const originalAmount = method.amount / (1 - cashDiscount);
+    updatePaymentAmount(methodId, originalAmount);
+    setDiscountApplied(prev => ({ ...prev, [methodId]: false }));
+    showSuccess(`Desconto removido! Valor original: R$ ${originalAmount.toFixed(2)}`);
   };
 
   // Adicionar método de pagamento
@@ -300,6 +316,13 @@ function CheckoutPage() {
       const newCardDetails = { ...prev };
       delete newCardDetails[id];
       return newCardDetails;
+    });
+
+    // Limpar estado do desconto aplicado
+    setDiscountApplied(prev => {
+      const newDiscountApplied = { ...prev };
+      delete newDiscountApplied[id];
+      return newDiscountApplied;
     });
   };
 
@@ -430,55 +453,19 @@ function CheckoutPage() {
       const response = await clienteService.criarPedido(dadosPedido);
       console.log('[DEBUG] Resposta da API:', response);
 
-      // Pagamento simulado - sempre aprovado
-      if (response.data.paymentStatus === 'pago') {
-        console.log('[DEBUG] Pagamento simulado aprovado, mostrando comprovante');
-
-        // Gerar dados do comprovante com dados fictícios
-        const receipt = {
-          orderId: `PED-${response.data.pedidoId}`,
-          date: new Date().toLocaleString('pt-BR'),
-          items: selectedItems,
-          address: selectedAddress,
-          paymentMethods: metodosComValor,
-          subtotal: orderData.subtotal,
-          frete: orderData.frete,
-          total: orderData.total,
-          clientName: user?.nome || 'Cliente',
-          paymentData: response.data.paymentData // Dados fictícios do pagamento
-        };
-
-        setReceiptData(receipt);
-        setOrderComplete(true);
-
-        // Limpar apenas os produtos comprados do carrinho
-        const purchasedItemIds = selectedItems.map(item => item.id);
-        clear(purchasedItemIds);
-
-        showSuccess('Pedido realizado e pago com sucesso!');
-        return;
-      }
-
-      // Fallback para outros casos (não deve acontecer com simulação)
-      console.log('[DEBUG] Fallback: gerando comprovante sem processamento de pagamento');
-      const receipt = {
-        orderId: `PED-${response.data.pedidoId}`,
-        date: new Date().toLocaleString('pt-BR'),
-        items: selectedItems,
-        address: selectedAddress,
-        paymentMethods: metodosComValor,
-        subtotal: orderData.subtotal,
-        frete: orderData.frete,
-        total: orderData.total,
-        clientName: user?.nome || 'Cliente'
-      };
-
-      setReceiptData(receipt);
-      setOrderComplete(true);
-
+      // Redirecionar para tela de pagamento
+      console.log('[DEBUG] Pedido criado, redirecionando para pagamento');
+      
       // Limpar apenas os produtos comprados do carrinho
       const purchasedItemIds = selectedItems.map(item => item.id);
       clear(purchasedItemIds);
+      
+      showSuccess('Pedido criado! Redirecionando para pagamento...');
+      
+      // Redirecionar para tela de pagamento com ID do pedido
+      setTimeout(() => {
+        navigate(`/checkout/pagamento/${response.data.pedidoId}`);
+      }, 1500);
 
     } catch (error) {
       console.error('Erro ao finalizar pedido:', error);
@@ -798,7 +785,7 @@ function CheckoutPage() {
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                   <h2 className="text-xl font-semibold text-slate-900 mb-4">Itens do Pedido</h2>
                   <div className="space-y-4">
-                    {orderData?.items?.map((item) => (
+                    {(orderData?.items?.length > 0 ? orderData.items : items.filter(item => getSelectedItems().includes(item.id))).map((item) => (
                       <div key={item.id} className="flex items-center gap-4 p-4 border border-slate-200 rounded-lg">
                         <img
                           src={item.image || '/placeholder-image.png'}
@@ -818,6 +805,11 @@ function CheckoutPage() {
                         </div>
                       </div>
                     ))}
+                    {(!orderData?.items || orderData.items.length === 0) && items.filter(item => getSelectedItems().includes(item.id)).length === 0 && (
+                      <div className="text-center py-8">
+                        <p className="text-slate-600">Nenhum item selecionado para checkout.</p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1062,56 +1054,7 @@ function CheckoutPage() {
                             )}
                           </div>
 
-                          {/* Detalhes do cartão para cartão de crédito */}
-                          {method.type === 'cartao' && method.amount > 0 && (
-                            <div className="space-y-3 p-3 bg-slate-50 rounded-lg">
-                              <h4 className="text-sm font-medium text-slate-900">Dados do Cartão</h4>
-                              <div className="grid grid-cols-1 gap-3">
-                                <div>
-                                  <label className="block text-xs font-medium text-slate-700 mb-1">Número do Cartão</label>
-                                  <MaskedInput
-                                    mask="9999 9999 9999 9999"
-                                    replacement={{9: /\d/}}
-                                    value={getCardDetails(method.id).number}
-                                    onChange={(e) => updateCardDetails(method.id, 'number', e.target.value)}
-                                    placeholder="1234 5678 9012 3456"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-slate-700 mb-1">Nome no Cartão</label>
-                                  <input
-                                    type="text"
-                                    value={getCardDetails(method.id).name}
-                                    onChange={(e) => updateCardDetails(method.id, 'name', e.target.value.toUpperCase())}
-                                    placeholder="NOME COMPLETO"
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
-                                  />
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div>
-                                    <label className="block text-xs font-medium text-slate-700 mb-1">Validade</label>
-                                    <MaskedInput
-                                      mask="99/99"
-                                      replacement={{9: /\d/}}
-                                      value={getCardDetails(method.id).expiry}
-                                      onChange={(e) => updateCardDetails(method.id, 'expiry', e.target.value)}
-                                      placeholder="MM/YY"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-slate-700 mb-1">CVV</label>
-                                    <MaskedInput
-                                      mask="999"
-                                      replacement={{9: /\d/}}
-                                      value={getCardDetails(method.id).cvv}
-                                      onChange={(e) => updateCardDetails(method.id, 'cvv', e.target.value)}
-                                      placeholder="123"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
+
 
                           {/* Opções de parcelas e preço à vista */}
                           {method.amount > 0 && (
@@ -1128,12 +1071,21 @@ function CheckoutPage() {
                                   <p className="text-lg font-bold text-green-800">
                                     R$ {calculateCashPrice(method.amount).final.toFixed(2)}
                                   </p>
-                                  <button
-                                    onClick={() => applyCashDiscount(method.id)}
-                                    className="text-xs text-green-600 hover:text-green-800 underline"
-                                  >
-                                    Aplicar desconto
-                                  </button>
+                                  {!discountApplied[method.id] ? (
+                                    <button
+                                      onClick={() => applyCashDiscount(method.id)}
+                                      className="text-xs text-green-600 hover:text-green-800 underline"
+                                    >
+                                      Aplicar desconto
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => removeCashDiscount(method.id)}
+                                      className="text-xs text-red-600 hover:text-red-800 underline"
+                                    >
+                                      Remover desconto
+                                    </button>
+                                  )}
                                 </div>
                               </div>
 

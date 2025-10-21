@@ -13,6 +13,7 @@ import LoadingSkeleton from '../../components/LoadingSkeleton';
 import ProductCarousel from '../../components/ProductCarousel';
 import { buildImageUrl, buildImageUrls, getFirstValidImage } from '../../utils/imageUtils';
 import { useNotifications } from '../../hooks/useNotifications';
+import { useCounters } from '../../context/CountersContext';
 import {
   FaShoppingCart,
   FaUser,
@@ -66,8 +67,7 @@ function Home() {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const { showSuccess, showError, showWarning } = useNotifications();
-  const [savedCount, setSavedCount] = useState(0);
-  const [notifCount] = useState(3);
+  const { favoritesCount, notificationsCount } = useCounters();
   const [favorites, setFavorites] = useState([]);
   const [favoritesLoading, setFavoritesLoading] = useState(true);
   const [favoriteLoading, setFavoriteLoading] = useState(null);
@@ -222,7 +222,6 @@ function Home() {
     const cachedFavorites = apiCache.get(cacheKey);
     if (cachedFavorites) {
       setFavorites(cachedFavorites);
-      setSavedCount(cachedFavorites.length);
       setFavoritesLoading(false);
       log.info('home_favorites_cache_hit', { total: cachedFavorites.length });
       return;
@@ -233,12 +232,10 @@ function Home() {
       const response = await favoritoService.listar();
       const favoritesData = response.favoritos || [];
       setFavorites(favoritesData);
-      setSavedCount(favoritesData.length);
       apiCache.set(cacheKey, favoritesData, 2 * 60 * 1000);
     } catch (error) {
       log.error('home_favorites_fetch_error', { error: error.message });
       setFavorites([]);
-      setSavedCount(0);
     } finally {
       setFavoritesLoading(false);
     }
@@ -251,146 +248,6 @@ function Home() {
   const clearAllFilters = () => {
     setSelectedFilters([]);
     setQuery('');
-  };
-
-  const filteredProducts = useMemo(() => {
-    let filtered = products;
-
-    if (debouncedQuery.trim()) {
-      const q = debouncedQuery.trim().toLowerCase();
-      filtered = filtered.filter(p =>
-        p.name.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q)
-      );
-    }
-
-    selectedFilters.forEach(filter => {
-      switch (filter.type) {
-        case 'category':
-          filtered = filtered.filter(p => p.category === filter.value);
-          break;
-        case 'price':
-          if (filter.value === 'price-100') {
-            filtered = filtered.filter(p => p.price <= 100);
-          } else if (filter.value === 'price-100-500') {
-            filtered = filtered.filter(p => p.price > 100 && p.price <= 500);
-          } else if (filter.value === 'price-500-1000') {
-            filtered = filtered.filter(p => p.price > 500 && p.price <= 1000);
-          } else if (filter.value === 'price-1000+') {
-            filtered = filtered.filter(p => p.price > 1000);
-          }
-          break;
-        case 'rating':
-          if (filter.value === 'rating-4+') {
-            filtered = filtered.filter(p => p.rating >= 4);
-          } else if (filter.value === 'rating-4.5+') {
-            filtered = filtered.filter(p => p.rating >= 4.5);
-          }
-          break;
-        case 'shipping':
-          if (filter.value === 'free-shipping') {
-            filtered = filtered.filter(p => p.freeShipping);
-          }
-          break;
-        case 'discount':
-          if (filter.value === 'with-discount') {
-            filtered = filtered.filter(p => p.discount > 0);
-          }
-          break;
-      }
-    });
-
-    let result = filtered;
-    if (['price-low','price-high','rating','sales'].includes(sortBy)) {
-      result = [...filtered];
-      switch (sortBy) {
-        case 'price-low':
-          result.sort((a, b) => a.price - b.price);
-          break;
-        case 'price-high':
-          result.sort((a, b) => b.price - a.price);
-          break;
-        case 'rating':
-          result.sort((a, b) => b.rating - a.rating);
-          break;
-        case 'sales':
-          result.sort((a, b) => b.sales - a.sales);
-          break;
-      }
-    }
-
-    return result;
-  }, [products, debouncedQuery, selectedFilters, sortBy]);
-
-  const paginatedProducts = useMemo(() => {
-    const startIndex = (currentPage - 1) * productsPerPage;
-    return filteredProducts.slice(startIndex, startIndex + productsPerPage);
-  }, [filteredProducts, currentPage, productsPerPage]);
-
-  const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
-
-  const renderStars = (rating) => {
-    const stars = [];
-    const full = Math.floor(rating);
-    const hasHalf = rating - full >= 0.25 && rating - full < 0.75;
-    const empty = 5 - full - (hasHalf ? 1 : 0);
-    for (let i = 0; i < full; i++) stars.push(<FaStar key={`f-${i}`} className="text-yellow-400" />);
-    if (hasHalf) stars.push(<FaStarHalfAlt key="h" className="text-yellow-400" />);
-    for (let i = 0; i < empty; i++) stars.push(<FaRegStar key={`e-${i}`} className="text-yellow-400" />);
-    return <div className="flex items-center gap-1 text-xs">{stars}</div>;
-  };
-
-  const formatPrice = (n) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-  const handleAddToCart = (product) => {
-    addItem(product, 1);
-    showSuccess(`${product.name} adicionado ao carrinho!`);
-  };
-
-  const handleRemoveFromCart = (productId) => {
-    removeItem(productId);
-    showWarning('Produto removido do carrinho');
-  };
-
-  const isInCart = (productId) => items.some(item => item.id === productId);
-  const isFavorited = (productId) => favorites.some(fav => fav.produto?.ProdutoID === productId);
-
-  const handleToggleFavorite = async (productId) => {
-    if (favoriteLoading === productId) return;
-
-    setFavoriteLoading(productId);
-    try {
-      if (isFavorited(productId)) {
-        await favoritoService.remover(productId);
-        setFavorites(prev => prev.filter(fav => fav.produto?.ProdutoID !== productId));
-        setSavedCount(prev => prev - 1);
-        apiCache.delete('home_favorites');
-        showSuccess('Produto removido dos favoritos');
-      } else {
-        await favoritoService.adicionar(productId);
-        // Atualizar estado imediatamente ao invés de recarregar
-        const product = products.find(p => p.id === productId);
-        if (product) {
-          const newFavorite = {
-            produto: {
-              ProdutoID: productId,
-              Nome: product.name
-            }
-          };
-          setFavorites(prev => [...prev, newFavorite]);
-          setSavedCount(prev => prev + 1);
-        }
-        apiCache.delete('home_favorites');
-        showSuccess('Produto adicionado aos favoritos');
-      }
-    } catch (error) {
-      log.error('home_toggle_favorite_error', { productId, error: error.message });
-      showError('Erro ao alterar favorito');
-      // Reverter estado em caso de erro
-      await carregarFavoritos();
-    } finally {
-      setFavoriteLoading(null);
-    }
   };
 
   const handleLogout = () => {
@@ -485,17 +342,17 @@ function Home() {
               <div className="flex items-center gap-2 sm:gap-3">
                 <Link to="/favoritos" className="relative p-2 rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50">
                   <FaHeart />
-                  {savedCount > 0 && (
+                  {favoritesCount > 0 && (
                     <span className="absolute -top-1 -right-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-600 text-white">
-                      {savedCount}
+                      {favoritesCount}
                     </span>
                   )}
                 </Link>
                 <Link to="/notificacoes" className="relative p-2 rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50">
                   <FaBell />
-                  {notifCount > 0 && (
+                  {notificationsCount > 0 && (
                     <span className="absolute -top-1 -right-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-600 text-white">
-                      {notifCount}
+                      {notificationsCount}
                     </span>
                   )}
                 </Link>
@@ -595,7 +452,7 @@ function Home() {
                 loading={loading}
                 favorites={favorites}
                 favoriteLoading={favoriteLoading}
-                onToggleFavorite={handleToggleFavorite}
+                onToggleFavorite={() => {}}
                 setProductModalId={setProductModalId}
                 setShowProductModal={setShowProductModal}
               />
@@ -605,7 +462,7 @@ function Home() {
                 loading={loading}
                 favorites={favorites}
                 favoriteLoading={favoriteLoading}
-                onToggleFavorite={handleToggleFavorite}
+                onToggleFavorite={() => {}}
                 setProductModalId={setProductModalId}
                 setShowProductModal={setShowProductModal}
               />
@@ -615,7 +472,7 @@ function Home() {
                 loading={loading}
                 favorites={favorites}
                 favoriteLoading={favoriteLoading}
-                onToggleFavorite={handleToggleFavorite}
+                onToggleFavorite={() => {}}
                 setProductModalId={setProductModalId}
                 setShowProductModal={setShowProductModal}
               />

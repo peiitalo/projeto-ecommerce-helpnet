@@ -39,6 +39,7 @@ export function CartProvider({ children }) {
   const [selectedAddress, setSelectedAddress] = useState(null);
   const [freightLoading, setFreightLoading] = useState(false);
   const [freightError, setFreightError] = useState(null);
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
 
   // Persiste mudanças
   useEffect(() => {
@@ -236,7 +237,23 @@ export function CartProvider({ children }) {
   const count = useMemo(() => items.length, [items]); // Conta itens únicos
   const subtotal = useMemo(() => items.reduce((sum, i) => sum + (i.price * (i.quantity || 0)), 0), [items]);
   const freight = useMemo(() => selectedFreight || { valor: 0, prazo: '', nome: '' }, [selectedFreight]);
-  const total = useMemo(() => subtotal + freight.valor, [subtotal, freight.valor]);
+  
+  // Calcular desconto do cupom
+  const couponDiscount = useMemo(() => {
+    if (!appliedCoupon || subtotal < (appliedCoupon.minValue || 0)) return 0;
+    
+    if (appliedCoupon.type === 'percentage') {
+      return (subtotal * appliedCoupon.discount) / 100;
+    } else if (appliedCoupon.type === 'fixed') {
+      return Math.min(appliedCoupon.discount, subtotal);
+    }
+    return 0;
+  }, [appliedCoupon, subtotal]);
+  
+  const total = useMemo(() => {
+    const freightCost = appliedCoupon?.type === 'free_shipping' ? 0 : freight.valor;
+    return Math.max(0, subtotal - couponDiscount + freightCost);
+  }, [subtotal, couponDiscount, freight.valor, appliedCoupon]);
 
   const value = {
     items,
@@ -256,6 +273,10 @@ export function CartProvider({ children }) {
     calculateFreight,
     freightLoading,
     freightError,
+    appliedCoupon,
+    couponDiscount,
+    applyCoupon: setAppliedCoupon,
+    removeCoupon: () => setAppliedCoupon(null),
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useCounters } from '../../context/CountersContext';
+import { useCart } from '../../context/CartContext';
 import { useNotifications } from '../../hooks/useNotifications';
 import {
   FaUser,
@@ -38,7 +40,10 @@ function MeusCuponsPage() {
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [generating, setGenerating] = useState(false);
   const { user, logout } = useAuth();
+  const { favoritesCount, notificationsCount, cartCount } = useCounters();
+  const { applyCoupon } = useCart();
   const { showSuccess, showError } = useNotifications();
+  const navigate = useNavigate();
 
   // Logo configuration
   const logoConfig = {
@@ -270,12 +275,21 @@ function MeusCuponsPage() {
               <div className="flex items-center gap-2 sm:gap-3">
                 <Link to="/favoritos" className="relative p-2 rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50">
                   <FaHeart />
+                  {favoritesCount > 0 && (
+                    <span className="absolute -top-1 -right-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-600 text-white">{favoritesCount}</span>
+                  )}
                 </Link>
                 <Link to="/notificacoes" className="relative p-2 rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50">
                   <FaBell />
+                  {notificationsCount > 0 && (
+                    <span className="absolute -top-1 -right-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-600 text-white">{notificationsCount}</span>
+                  )}
                 </Link>
                 <Link to="/carrinho" className="relative p-2 rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50">
                   <FaShoppingCart />
+                  {cartCount > 0 && (
+                    <span className="absolute -top-1 -right-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-600 text-white">{cartCount}</span>
+                  )}
                 </Link>
                 <Link to="/perfil" className="p-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100">
                   <FaUser />
@@ -386,13 +400,32 @@ function MeusCuponsPage() {
                           {coupon.code}
                         </span>
                         {!coupon.used && !isExpired(coupon.validUntil) && (
-                          <button
-                            onClick={() => copyToClipboard(coupon.code)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="Copiar código"
-                          >
-                            <FaCopy />
-                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => copyToClipboard(coupon.code)}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Copiar código"
+                            >
+                              <FaCopy />
+                            </button>
+                            <button
+                              onClick={() => {
+                                const couponData = {
+                                  code: coupon.code,
+                                  discount: coupon.discount,
+                                  type: coupon.type,
+                                  minValue: coupon.minValue || 0
+                                };
+                                applyCoupon(couponData);
+                                showSuccess('Cupom aplicado! Redirecionando para o carrinho...');
+                                setTimeout(() => navigate('/carrinho'), 1500);
+                              }}
+                              className="px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                              title="Usar no carrinho"
+                            >
+                              Usar
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>

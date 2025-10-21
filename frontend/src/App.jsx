@@ -31,6 +31,7 @@ const PaymentSimulator = lazy(() => import('./pages/clients/PaymentSimulator'));
 const PaymentCheckout = lazy(() => import('./pages/clients/PaymentCheckout'));
 const SuportePage = lazy(() => import('./pages/clients/SuportePage'));
 const MeusCuponsPage = lazy(() => import('./pages/clients/MeusCuponsPage'));
+const ClientConfiguracoesPage = lazy(() => import('./pages/clients/ConfiguracoesPage'));
 const ProductsManagement = lazy(() => import('./pages/vendor/ProductsManagement'));
 const ProductForm = lazy(() => import('./pages/vendor/ProductForm'));
 const VendorDashboard = lazy(() => import('./pages/vendor/VendorDashboard'));
@@ -68,9 +69,11 @@ function App() {
             <Route path="/explorer/:category?" element={<ExplorePage />} />
             <Route path="/enderecos" element={<AddressPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />
+            <Route path="/checkout/pagamento/:id" element={<PaymentCheckout />} />
             <Route path="/meus-pedidos" element={<OrdersPage />} />
             <Route path="/historico" element={<HistoryPage />} />
             <Route path="/cupons" element={<MeusCuponsPage />} />
+            <Route path="/configuracoes" element={<ClientConfiguracoesPage />} />
             <Route path="/dashboard" element={<Dashboard />} />
             {/* demais rotas do cliente */}
           </Route>
@@ -102,11 +105,10 @@ function App() {
 
           {/* Demais páginas placeholder */}
           <Route path="/pedidos" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">Pedidos - Em desenvolvimento</h1></div>} />
-          {/* Fluxo de pagamento simulado realista */}
-          <Route path="/checkout/pagamento/:id" element={<PaymentCheckout />} />
+
           {/* Simulador de Pagamento (dev/sandbox) */}
           <Route path="/pedido/simulado/:id" element={<PaymentSimulator />} />
-          <Route path="/configuracoes" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">Configurações - Em desenvolvimento</h1></div>} />
+
           <Route path="/contato" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">Contato - Em desenvolvimento</h1></div>} />
           <Route path="/ajuda" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">Ajuda - Em desenvolvimento</h1></div>} />
           <Route path="/faq" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">FAQ - Em desenvolvimento</h1></div>} />

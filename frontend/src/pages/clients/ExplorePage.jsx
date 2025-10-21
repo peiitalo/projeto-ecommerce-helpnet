@@ -82,7 +82,6 @@ function ExplorePage() {
     { label: 'Explore', to: '/explorer', icon: <FiSearch className="text-slate-500" /> },
     { label: 'Pedidos', to: '/meus-pedidos', icon: <FiPackage className="text-slate-500" /> },
     { label: 'Histórico', to: '/historico', icon: <FiClock className="text-slate-500" /> },
-    { label: 'Categorias', to: '/categorias', icon: <FiTag className="text-slate-500" /> },
     { label: 'Meus Cupons', to: '/cupons', icon: <FiCreditCard className="text-slate-500" /> },
     { label: 'Endereços', to: '/enderecos', icon: <FiMapPin className="text-slate-500" /> },
     { label: 'Suporte', to: '/suporte', icon: <FiHelpCircle className="text-slate-500" /> },
