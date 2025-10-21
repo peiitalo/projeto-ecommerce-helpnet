@@ -149,42 +149,45 @@ function ProductsManagement() {
   });
 
   const ProductCard = ({ product }) => (
-    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200 hover:scale-105">
       <div className="aspect-square bg-gray-100 relative">
         <LazyImage
           src={product.image}
           alt={product.name}
-          className="w-full h-full"
+          className="w-full h-full object-cover"
           fallback="/placeholder-image.svg"
         />
         {product.stock < 10 && (
-          <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded">
+          <div className="absolute top-3 right-3 bg-red-500 text-white text-xs px-2 py-1 rounded-full shadow-sm">
             Estoque Baixo
           </div>
         )}
       </div>
-      <div className="p-4">
-        <h3 className="font-medium text-gray-900 mb-1 truncate">{product.name}</h3>
-        <p className="text-sm text-gray-600 mb-2">SKU: {product.sku}</p>
-        <p className="text-lg font-bold text-blue-600 mb-2">
-          R$ {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-        </p>
-        <p className="text-sm text-gray-600 mb-3">
-          Estoque: <span className={product.stock < 10 ? 'text-red-600 font-medium' : 'text-green-600'}>{product.stock}</span>
-        </p>
-        <div className="flex space-x-2">
+      <div className="p-6">
+        <div className="text-center mb-4">
+          <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 min-h-[3rem]">{product.name}</h3>
+          <p className="text-sm text-gray-500 mb-2">SKU: {product.sku}</p>
+          <p className="text-2xl font-bold text-blue-600 mb-2">
+            R$ {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </p>
+          <p className="text-sm text-gray-600">
+            Estoque: <span className={product.stock < 10 ? 'text-red-600 font-semibold' : 'text-green-600 font-semibold'}>{product.stock} unidades</span>
+          </p>
+        </div>
+        <div className="flex flex-col space-y-2">
           <Link
             to={`/vendedor/produtos/${product.id}/editar`}
-            className="flex-1 bg-blue-600 text-white text-sm px-3 py-2 rounded hover:bg-blue-700 transition-colors text-center"
+            className="bg-blue-600 text-white text-sm px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors text-center font-medium"
           >
-            Editar
+            Editar Produto
           </Link>
           <button
             onClick={() => handleViewProduct(product.id)}
-            className="p-2 text-gray-600 hover:text-blue-600 border border-gray-200 rounded hover:bg-gray-50 transition-colors"
+            className="flex items-center justify-center gap-2 text-gray-600 hover:text-blue-600 border border-gray-200 rounded-lg py-2 px-4 hover:bg-gray-50 transition-colors"
             title="Ver detalhes"
           >
             <FaEye className="w-4 h-4" />
+            Ver Detalhes
           </button>
         </div>
       </div>
@@ -335,7 +338,7 @@ function ProductsManagement() {
             </div>
 
             {viewMode === 'grid' ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {filteredProducts.map((product) => (
                   <ProductCard key={product.id} product={product} />
                 ))}

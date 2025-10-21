@@ -139,9 +139,32 @@ const ProductDetailsModal = ({ productId, isOpen, onClose }) => {
                     R$ {product.Preco?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </p>
                   {product.PrecoOriginal && product.PrecoOriginal > product.Preco && (
-                    <p className="text-sm text-gray-400 line-through">
-                      R$ {product.PrecoOriginal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-400 line-through">
+                        R$ {product.PrecoOriginal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                      {product.Desconto > 0 && (
+                        <p className="text-sm text-green-600 font-medium">
+                          {product.Desconto}% de desconto
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Frete Grátis */}
+                  {product.FreteGratis && (
+                    <div className="mt-2 inline-flex items-center px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                      🚚 Frete Grátis
+                    </div>
+                  )}
+                  
+                  {/* Prazo de Entrega */}
+                  {product.PrazoEntrega && (
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-600">
+                        📅 Prazo de entrega: <span className="font-medium">{product.PrazoEntrega}</span>
+                      </p>
+                    </div>
                   )}
                 </div>
 

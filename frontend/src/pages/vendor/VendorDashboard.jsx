@@ -137,16 +137,16 @@ function VendorDashboard() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {statCards.map((stat, index) => (
-            <div key={index} className={`${stat.bgColor} ${stat.borderColor} border rounded-lg p-6`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">{stat.title}</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
-                </div>
-                <div className="text-2xl">
+            <div key={index} className={`${stat.bgColor} ${stat.borderColor} border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow`}>
+              <div className="flex flex-col items-center text-center space-y-4">
+                <div className="text-4xl">
                   {stat.icon}
+                </div>
+                <div>
+                  <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+                  <p className="text-sm font-medium text-gray-600 mt-1">{stat.title}</p>
                 </div>
               </div>
             </div>
@@ -156,19 +156,19 @@ function VendorDashboard() {
         {/* Quick Actions */}
         <div className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Ações Rápidas</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {quickActions.map((action, index) => (
               <Link
                 key={index}
                 to={action.to}
-                className={`${action.bgColor} ${action.hoverColor} border border-gray-200 rounded-lg p-4 transition-colors block`}
+                className={`${action.bgColor} ${action.hoverColor} border border-gray-200 rounded-xl p-6 transition-all duration-200 block shadow-sm hover:shadow-md hover:scale-105`}
               >
-                <div className="flex items-center space-x-3">
-                  <div className="text-xl">
+                <div className="flex flex-col items-center text-center space-y-4">
+                  <div className="text-3xl">
                     {action.icon}
                   </div>
                   <div>
-                    <h3 className="font-medium text-gray-900">{action.title}</h3>
+                    <h3 className="font-semibold text-gray-900 text-lg">{action.title}</h3>
                     <p className="text-sm text-gray-600">{action.description}</p>
                   </div>
                 </div>

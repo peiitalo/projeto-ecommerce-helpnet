@@ -43,6 +43,7 @@ function ProductForm() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
+  const [calculatingDelivery, setCalculatingDelivery] = useState(false);
 
   useEffect(() => {
     loadCategories();
@@ -156,6 +157,47 @@ function ProductForm() {
     // Limpar o input para permitir seleção dos mesmos arquivos novamente
     e.target.value = '';
   };
+
+  // Função para calcular prazo de entrega baseado no CEP
+  const calculateDeliveryTime = (cepOrigem = '01000000', cepDestino = '20000000') => {
+    // Simulação de cálculo de prazo baseado na distância entre CEPs
+    const origem = parseInt(cepOrigem.substring(0, 2));
+    const destino = parseInt(cepDestino.substring(0, 2));
+    const diferenca = Math.abs(origem - destino);
+    
+    let diasBase = 3; // Dias base para entrega
+    
+    if (diferenca === 0) {
+      diasBase = 1; // Mesma região
+    } else if (diferenca <= 5) {
+      diasBase = 2; // Regiões próximas
+    } else if (diferenca <= 15) {
+      diasBase = 3; // Regiões distantes
+    } else {
+      diasBase = 5; // Regiões muito distantes
+    }
+    
+    const diasMaximos = diasBase + 2;
+    return `${diasBase}-${diasMaximos} dias úteis`;
+  };
+
+  // Função para atualizar prazo de entrega automaticamente
+  const updateDeliveryTime = () => {
+    if (!formData.prazoEntrega) {
+      const prazoCalculado = calculateDeliveryTime();
+      setFormData(prev => ({
+        ...prev,
+        prazoEntrega: prazoCalculado
+      }));
+    }
+  };
+
+  // Atualizar prazo de entrega quando o formulário é carregado
+  useEffect(() => {
+    if (!isEditing) {
+      updateDeliveryTime();
+    }
+  }, [isEditing]);
 
   const removeImage = async (index) => {
     const imageUrl = formData.imagens[index];
@@ -565,14 +607,28 @@ function ProductForm() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Prazo de Entrega
                 </label>
-                <input
-                  type="text"
-                  name="prazoEntrega"
-                  value={formData.prazoEntrega}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Ex: 5-10 dias úteis"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    name="prazoEntrega"
+                    value={formData.prazoEntrega}
+                    onChange={handleInputChange}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Ex: 5-10 dias úteis"
+                  />
+                  <button
+                    type="button"
+                    onClick={updateDeliveryTime}
+                    disabled={calculatingDelivery}
+                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 text-sm"
+                    title="Recalcular prazo baseado na localização"
+                  >
+                    {calculatingDelivery ? '...' : '📅'}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Prazo calculado automaticamente baseado na distância média de entrega
+                </p>
               </div>
             </div>
           </div>

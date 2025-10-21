@@ -107,16 +107,16 @@ function Dashboard() {
           </section>
 
           {/* KPIs */}
-          <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             {kpis.map((kpi, index) => (
-              <div key={index} className="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
-                <div className="flex items-center">
-                  <div className={`${kpi.cor} p-3 rounded-lg text-white mr-4`}>
-                    {kpi.icone}
+              <div key={index} className="bg-white rounded-xl shadow-sm p-6 border border-slate-200 hover:shadow-md transition-shadow">
+                <div className="flex flex-col items-center text-center space-y-4">
+                  <div className={`${kpi.cor} p-4 rounded-xl text-white`}>
+                    <div className="text-3xl">{kpi.icone}</div>
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-slate-900">{kpi.valor}</p>
-                    <p className="text-slate-600 text-sm">{kpi.titulo}</p>
+                    <p className="text-3xl font-bold text-slate-900">{kpi.valor}</p>
+                    <p className="text-slate-600 text-sm mt-1">{kpi.titulo}</p>
                   </div>
                 </div>
               </div>
@@ -124,37 +124,37 @@ function Dashboard() {
           </section>
 
           {/* Métricas de Produtos (dados reais) */}
-          <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
-              <div className="flex items-center">
-                <div className="bg-blue-700 p-3 rounded-lg text-white mr-4">
-                  <FiBox />
+          <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-200 hover:shadow-md transition-shadow">
+              <div className="flex flex-col items-center text-center space-y-4">
+                <div className="bg-blue-700 p-4 rounded-xl text-white">
+                  <FiBox className="text-3xl" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-slate-900">{productsTotal !== null ? productsTotal : '—'}</p>
-                  <p className="text-slate-600 text-sm">Produtos (Total)</p>
+                  <p className="text-3xl font-bold text-slate-900">{productsTotal !== null ? productsTotal : '—'}</p>
+                  <p className="text-slate-600 text-sm mt-1">Produtos (Total)</p>
                 </div>
               </div>
             </div>
-            <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
-              <div className="flex items-center">
-                <div className="bg-green-600 p-3 rounded-lg text-white mr-4">
-                  <FiBox />
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-200 hover:shadow-md transition-shadow">
+              <div className="flex flex-col items-center text-center space-y-4">
+                <div className="bg-green-600 p-4 rounded-xl text-white">
+                  <FiBox className="text-3xl" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-slate-900">{productsActive !== null ? productsActive : '—'}</p>
-                  <p className="text-slate-600 text-sm">Produtos Ativos</p>
+                  <p className="text-3xl font-bold text-slate-900">{productsActive !== null ? productsActive : '—'}</p>
+                  <p className="text-slate-600 text-sm mt-1">Produtos Ativos</p>
                 </div>
               </div>
             </div>
-            <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
-              <div className="flex items-center">
-                <div className="bg-yellow-600 p-3 rounded-lg text-white mr-4">
-                  <FiBox />
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-200 hover:shadow-md transition-shadow lg:col-span-2">
+              <div className="flex flex-col items-center text-center space-y-4">
+                <div className="bg-yellow-600 p-4 rounded-xl text-white">
+                  <FiBox className="text-3xl" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-slate-900">{productsNoStock !== null ? productsNoStock : '—'}</p>
-                  <p className="text-slate-600 text-sm">Sem Estoque</p>
+                  <p className="text-3xl font-bold text-slate-900">{productsNoStock !== null ? productsNoStock : '—'}</p>
+                  <p className="text-slate-600 text-sm mt-1">Sem Estoque</p>
                 </div>
               </div>
             </div>
@@ -209,27 +209,27 @@ function Dashboard() {
                   <h3 className="text-base font-semibold text-slate-900">Ações rápidas</h3>
                 </div>
                 <div className="p-6">
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <Link
                       to="/admin/produtos/novo"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-blue-50 transition-colors group border border-transparent hover:border-blue-200"
+                      className="flex flex-col items-center text-center space-y-3 p-4 rounded-xl hover:bg-blue-50 transition-all duration-200 group border border-transparent hover:border-blue-200 hover:shadow-sm"
                     >
-                      <FiPlus className="text-slate-400 group-hover:text-blue-700" />
-                      <span className="text-slate-700 group-hover:text-slate-900">Adicionar Produto</span>
+                      <FiPlus className="text-2xl text-slate-400 group-hover:text-blue-700" />
+                      <span className="text-slate-700 group-hover:text-slate-900 font-medium">Adicionar Produto</span>
                     </Link>
                     <Link
                       to="/admin/clientes/novo"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-blue-50 transition-colors group border border-transparent hover:border-blue-200"
+                      className="flex flex-col items-center text-center space-y-3 p-4 rounded-xl hover:bg-blue-50 transition-all duration-200 group border border-transparent hover:border-blue-200 hover:shadow-sm"
                     >
-                      <FaUser className="text-slate-400 group-hover:text-blue-700" />
-                      <span className="text-slate-700 group-hover:text-slate-900">Adicionar Usuário</span>
+                      <FaUser className="text-2xl text-slate-400 group-hover:text-blue-700" />
+                      <span className="text-slate-700 group-hover:text-slate-900 font-medium">Adicionar Usuário</span>
                     </Link>
                     <Link
                       to="/admin/vendedores/novo"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-blue-50 transition-colors group border border-transparent hover:border-blue-200"
+                      className="flex flex-col items-center text-center space-y-3 p-4 rounded-xl hover:bg-blue-50 transition-all duration-200 group border border-transparent hover:border-blue-200 hover:shadow-sm"
                     >
-                      <FiBriefcase className="text-slate-400 group-hover:text-blue-700" />
-                      <span className="text-slate-700 group-hover:text-slate-900">Adicionar Vendedor</span>
+                      <FiBriefcase className="text-2xl text-slate-400 group-hover:text-blue-700" />
+                      <span className="text-slate-700 group-hover:text-slate-900 font-medium">Adicionar Vendedor</span>
                     </Link>
                   </div>
                 </div>

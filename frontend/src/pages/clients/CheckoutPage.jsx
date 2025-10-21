@@ -800,8 +800,21 @@ function CheckoutPage() {
                           <p className="text-sm text-slate-600">Quantidade: {item.quantity}</p>
                         </div>
                         <div className="text-right">
-                          <p className="font-semibold text-slate-900">{formatPrice(item.price * item.quantity)}</p>
-                          <p className="text-sm text-slate-600">{formatPrice(item.price)} cada</p>
+                          {item.discount > 0 ? (
+                            <div>
+                              <p className="font-semibold text-green-600">{formatPrice(item.price * item.quantity)}</p>
+                              <p className="text-sm text-slate-400 line-through">{formatPrice(item.originalPrice * item.quantity)}</p>
+                              <p className="text-xs text-green-600">{item.discount}% OFF</p>
+                            </div>
+                          ) : (
+                            <div>
+                              <p className="font-semibold text-slate-900">{formatPrice(item.price * item.quantity)}</p>
+                              <p className="text-sm text-slate-600">{formatPrice(item.price)} cada</p>
+                            </div>
+                          )}
+                          {item.freeShipping && (
+                            <p className="text-xs text-blue-600 font-medium">Frete Grátis</p>
+                          )}
                         </div>
                       </div>
                     ))}
