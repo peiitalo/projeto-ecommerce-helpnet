@@ -302,33 +302,19 @@ const sendEmail = async (to, subject, htmlContent) => {
 // Email de boas-vindas
 export const sendWelcomeEmail = async (userData) => {
   try {
-    // Try React Email first, fallback to Handlebars
-    let htmlContent;
+    const { compiledTemplate, compiledBase } = loadTemplate('welcome');
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-    try {
-      // Import React Email component dynamically
-      const { WelcomeEmail, renderEmail } = await import('../../../packages/emails/dist/index.js');
-      const component = WelcomeEmail({
-        recipientName: userData.nome,
-        recipientEmail: userData.email,
-        frontendUrl
-      });
-      htmlContent = await renderEmail(component);
-    } catch (reactEmailError) {
-      console.warn('React Email failed, falling back to Handlebars:', reactEmailError.message);
-      // Fallback to Handlebars
-      const { compiledTemplate, compiledBase } = loadTemplate('welcome');
-      const bodyContent = compiledTemplate({
-        nome: userData.nome,
-        frontendUrl
-      });
-      htmlContent = compiledBase({
-        title: 'Bem-vindo ao HelpNet!',
-        body: bodyContent,
-        showUnsubscribe: false
-      });
-    }
+    const bodyContent = compiledTemplate({
+      nome: userData.nome,
+      frontendUrl
+    });
+
+    const htmlContent = compiledBase({
+      title: 'Bem-vindo ao HelpNet!',
+      body: bodyContent,
+      showUnsubscribe: false
+    });
 
     return await sendEmail(userData.email, 'Bem-vindo ao HelpNet! Sua conta foi criada com sucesso.', htmlContent);
   } catch (error) {
@@ -340,49 +326,27 @@ export const sendWelcomeEmail = async (userData) => {
 // Confirmação de pedido
 export const sendOrderConfirmationEmail = async (orderData) => {
   try {
-    // Try React Email first, fallback to Handlebars
-    let htmlContent;
+    const { compiledTemplate, compiledBase } = loadTemplate('order-confirmation');
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-    try {
-      // Import React Email component dynamically
-      const { OrderConfirmationEmail, renderEmail } = await import('../../../packages/emails/dist/index.js');
-      const component = OrderConfirmationEmail({
-        recipientName: orderData.clienteNome,
-        recipientEmail: orderData.email,
-        frontendUrl,
-        orderId: orderData.pedidoId,
-        orderDate: orderData.dataPedido,
-        paymentMethod: orderData.metodoPagamento,
-        shippingAddress: orderData.enderecoEntrega,
-        products: orderData.produtos,
-        subtotal: orderData.subtotal,
-        shipping: orderData.frete,
-        total: orderData.total,
-      });
-      htmlContent = await renderEmail(component);
-    } catch (reactEmailError) {
-      console.warn('React Email failed, falling back to Handlebars:', reactEmailError.message);
-      // Fallback to Handlebars
-      const { compiledTemplate, compiledBase } = loadTemplate('order-confirmation');
-      const bodyContent = compiledTemplate({
-        clienteNome: orderData.clienteNome,
-        pedidoId: orderData.pedidoId,
-        dataPedido: orderData.dataPedido,
-        metodoPagamento: orderData.metodoPagamento,
-        enderecoEntrega: orderData.enderecoEntrega,
-        produtos: orderData.produtos,
-        subtotal: orderData.subtotal,
-        frete: orderData.frete,
-        total: orderData.total,
-        frontendUrl
-      });
-      htmlContent = compiledBase({
-        title: `Confirmação de Pedido #${orderData.pedidoId}`,
-        body: bodyContent,
-        showUnsubscribe: false
-      });
-    }
+    const bodyContent = compiledTemplate({
+      clienteNome: orderData.clienteNome,
+      pedidoId: orderData.pedidoId,
+      dataPedido: orderData.dataPedido,
+      metodoPagamento: orderData.metodoPagamento,
+      enderecoEntrega: orderData.enderecoEntrega,
+      produtos: orderData.produtos,
+      subtotal: orderData.subtotal,
+      frete: orderData.frete,
+      total: orderData.total,
+      frontendUrl
+    });
+
+    const htmlContent = compiledBase({
+      title: `Confirmação de Pedido #${orderData.pedidoId}`,
+      body: bodyContent,
+      showUnsubscribe: false
+    });
 
     return await sendEmail(orderData.email, `Confirmação de Pedido #${orderData.pedidoId} – Obrigado pela compra!`, htmlContent);
   } catch (error) {
@@ -394,49 +358,27 @@ export const sendOrderConfirmationEmail = async (orderData) => {
 // Status de entrega
 export const sendDeliveryStatusEmail = async (deliveryData) => {
   try {
-    // Try React Email first, fallback to Handlebars
-    let htmlContent;
+    const { compiledTemplate, compiledBase } = loadTemplate('delivery-status');
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-    try {
-      // Import React Email component dynamically
-      const { DeliveryStatusEmail, renderEmail } = await import('../../../packages/emails/dist/index.js');
-      const component = DeliveryStatusEmail({
-        recipientName: deliveryData.clienteNome,
-        recipientEmail: deliveryData.email,
-        frontendUrl,
-        orderId: deliveryData.pedidoId,
-        status: deliveryData.status,
-        trackingCode: deliveryData.codigoRastreio,
-        estimatedDelivery: deliveryData.previsaoEntrega,
-        deliveryLocation: deliveryData.local,
-        statusUpdateDate: deliveryData.dataAtualizacao,
-        showTrackingButton: deliveryData.showTrackingButton,
-        isDelivered: deliveryData.isDelivered,
-      });
-      htmlContent = await renderEmail(component);
-    } catch (reactEmailError) {
-      console.warn('React Email failed, falling back to Handlebars:', reactEmailError.message);
-      // Fallback to Handlebars
-      const { compiledTemplate, compiledBase } = loadTemplate('delivery-status');
-      const bodyContent = compiledTemplate({
-        clienteNome: deliveryData.clienteNome,
-        pedidoId: deliveryData.pedidoId,
-        status: deliveryData.status,
-        codigoRastreio: deliveryData.codigoRastreio,
-        previsaoEntrega: deliveryData.previsaoEntrega,
-        local: deliveryData.local,
-        dataAtualizacao: deliveryData.dataAtualizacao,
-        showTrackingButton: deliveryData.showTrackingButton,
-        isDelivered: deliveryData.isDelivered,
-        frontendUrl
-      });
-      htmlContent = compiledBase({
-        title: `Atualização no seu pedido #${deliveryData.pedidoId}`,
-        body: bodyContent,
-        showUnsubscribe: false
-      });
-    }
+    const bodyContent = compiledTemplate({
+      clienteNome: deliveryData.clienteNome,
+      pedidoId: deliveryData.pedidoId,
+      status: deliveryData.status,
+      codigoRastreio: deliveryData.codigoRastreio,
+      previsaoEntrega: deliveryData.previsaoEntrega,
+      local: deliveryData.local,
+      dataAtualizacao: deliveryData.dataAtualizacao,
+      showTrackingButton: deliveryData.showTrackingButton,
+      isDelivered: deliveryData.isDelivered,
+      frontendUrl
+    });
+
+    const htmlContent = compiledBase({
+      title: `Atualização no seu pedido #${deliveryData.pedidoId}`,
+      body: bodyContent,
+      showUnsubscribe: false
+    });
 
     return await sendEmail(deliveryData.email, `Atualização no seu pedido #${deliveryData.pedidoId}`, htmlContent);
   } catch (error) {
@@ -450,42 +392,23 @@ export const sendDeliveryStatusEmail = async (deliveryData) => {
 // Nova venda
 export const sendVendorNewSaleEmail = async (saleData) => {
   try {
-    // Try React Email first, fallback to Handlebars
-    let htmlContent;
+    const { compiledTemplate, compiledBase } = loadTemplate('vendor-new-sale');
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-    try {
-      // Import React Email component dynamically
-      const { NewSaleEmail, renderEmail } = await import('../../../packages/emails/dist/index.js');
-      const component = NewSaleEmail({
-        recipientName: saleData.vendedorNome,
-        recipientEmail: saleData.email,
-        frontendUrl,
-        vendorName: saleData.vendedorNome,
-        orderId: saleData.pedidoId,
-        orderDate: saleData.dataPedido,
-        products: saleData.produtos,
-        totalValue: saleData.valorTotal,
-      });
-      htmlContent = await renderEmail(component);
-    } catch (reactEmailError) {
-      console.warn('React Email failed, falling back to Handlebars:', reactEmailError.message);
-      // Fallback to Handlebars
-      const { compiledTemplate, compiledBase } = loadTemplate('vendor-new-sale');
-      const bodyContent = compiledTemplate({
-        vendedorNome: saleData.vendedorNome,
-        pedidoId: saleData.pedidoId,
-        dataPedido: saleData.dataPedido,
-        produtos: saleData.produtos,
-        valorTotal: saleData.valorTotal,
-        frontendUrl
-      });
-      htmlContent = compiledBase({
-        title: 'Nova venda recebida!',
-        body: bodyContent,
-        showUnsubscribe: false
-      });
-    }
+    const bodyContent = compiledTemplate({
+      vendedorNome: saleData.vendedorNome,
+      pedidoId: saleData.pedidoId,
+      dataPedido: saleData.dataPedido,
+      produtos: saleData.produtos,
+      valorTotal: saleData.valorTotal,
+      frontendUrl
+    });
+
+    const htmlContent = compiledBase({
+      title: 'Nova venda recebida!',
+      body: bodyContent,
+      showUnsubscribe: false
+    });
 
     return await sendEmail(saleData.email, `Nova venda! Pedido #${saleData.pedidoId} processado.`, htmlContent);
   } catch (error) {
@@ -497,40 +420,22 @@ export const sendVendorNewSaleEmail = async (saleData) => {
 // Estoque baixo
 export const sendVendorLowStockEmail = async (stockData) => {
   try {
-    // Try React Email first, fallback to Handlebars
-    let htmlContent;
+    const { compiledTemplate, compiledBase } = loadTemplate('vendor-low-stock');
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-    try {
-      // Import React Email component dynamically
-      const { LowStockEmail, renderEmail } = await import('../../../packages/emails/dist/index.js');
-      const component = LowStockEmail({
-        recipientName: stockData.vendedorNome,
-        recipientEmail: stockData.email,
-        frontendUrl,
-        vendorName: stockData.vendedorNome,
-        productName: stockData.produtoNome,
-        currentStock: stockData.estoqueAtual,
-        recentSales: stockData.vendasRecentes,
-      });
-      htmlContent = await renderEmail(component);
-    } catch (reactEmailError) {
-      console.warn('React Email failed, falling back to Handlebars:', reactEmailError.message);
-      // Fallback to Handlebars
-      const { compiledTemplate, compiledBase } = loadTemplate('vendor-low-stock');
-      const bodyContent = compiledTemplate({
-        vendedorNome: stockData.vendedorNome,
-        produtoNome: stockData.produtoNome,
-        estoqueAtual: stockData.estoqueAtual,
-        vendasRecentes: stockData.vendasRecentes,
-        frontendUrl
-      });
-      htmlContent = compiledBase({
-        title: 'Alerta: Estoque baixo',
-        body: bodyContent,
-        showUnsubscribe: false
-      });
-    }
+    const bodyContent = compiledTemplate({
+      vendedorNome: stockData.vendedorNome,
+      produtoNome: stockData.produtoNome,
+      estoqueAtual: stockData.estoqueAtual,
+      vendasRecentes: stockData.vendasRecentes,
+      frontendUrl
+    });
+
+    const htmlContent = compiledBase({
+      title: 'Alerta: Estoque baixo',
+      body: bodyContent,
+      showUnsubscribe: false
+    });
 
     return await sendEmail(stockData.email, `Alerta: Estoque baixo no produto ${stockData.produtoNome}`, htmlContent);
   } catch (error) {
@@ -544,43 +449,24 @@ export const sendVendorLowStockEmail = async (stockData) => {
 // Função para enviar email de pedido pago
 export const sendOrderPaidEmail = async (orderData) => {
   try {
-    // Try React Email first, fallback to Handlebars
-    let htmlContent;
+    const { compiledTemplate, compiledBase } = loadTemplate('order-paid');
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-    try {
-      // Import React Email component dynamically
-      const { OrderPaidEmail, renderEmail } = await import('../../../packages/emails/dist/index.js');
-      const component = OrderPaidEmail({
-        recipientName: orderData.clienteNome,
-        recipientEmail: orderData.email,
-        frontendUrl,
-        orderId: orderData.pedidoId,
-        paymentDate: orderData.dataPagamento,
-        paymentMethod: orderData.metodoPagamento,
-        products: orderData.produtos,
-        total: orderData.total,
-      });
-      htmlContent = await renderEmail(component);
-    } catch (reactEmailError) {
-      console.warn('React Email failed, falling back to Handlebars:', reactEmailError.message);
-      // Fallback to Handlebars
-      const { compiledTemplate, compiledBase } = loadTemplate('order-paid');
-      const bodyContent = compiledTemplate({
-        clienteNome: orderData.clienteNome,
-        pedidoId: orderData.pedidoId,
-        dataPagamento: orderData.dataPagamento,
-        metodoPagamento: orderData.metodoPagamento,
-        produtos: orderData.produtos,
-        total: orderData.total,
-        frontendUrl
-      });
-      htmlContent = compiledBase({
-        title: `Pagamento Aprovado - Pedido #${orderData.pedidoId}`,
-        body: bodyContent,
-        showUnsubscribe: false
-      });
-    }
+    const bodyContent = compiledTemplate({
+      clienteNome: orderData.clienteNome,
+      pedidoId: orderData.pedidoId,
+      dataPagamento: orderData.dataPagamento,
+      metodoPagamento: orderData.metodoPagamento,
+      produtos: orderData.produtos,
+      total: orderData.total,
+      frontendUrl
+    });
+
+    const htmlContent = compiledBase({
+      title: `Pagamento Aprovado - Pedido #${orderData.pedidoId}`,
+      body: bodyContent,
+      showUnsubscribe: false
+    });
 
     return await sendEmail(orderData.email, `Pagamento Aprovado - Pedido #${orderData.pedidoId}`, htmlContent);
   } catch (error) {
@@ -592,51 +478,28 @@ export const sendOrderPaidEmail = async (orderData) => {
 // Função para enviar email de pedido enviado
 export const sendOrderShippedEmail = async (orderData) => {
   try {
-    // Try React Email first, fallback to Handlebars
-    let htmlContent;
+    const { compiledTemplate, compiledBase } = loadTemplate('order-shipped');
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-    try {
-      // Import React Email component dynamically
-      const { OrderShippedEmail, renderEmail } = await import('../../../packages/emails/dist/index.js');
-      const component = OrderShippedEmail({
-        recipientName: orderData.clienteNome,
-        recipientEmail: orderData.email,
-        frontendUrl,
-        orderId: orderData.pedidoId,
-        shippingDate: orderData.dataEnvio,
-        trackingCode: orderData.codigoRastreio,
-        carrier: orderData.transportadora,
-        estimatedDelivery: orderData.previsaoEntrega,
-        status: orderData.statusAtual,
-        products: orderData.produtos,
-        shippingAddress: orderData.enderecoEntrega,
-        total: orderData.total,
-      });
-      htmlContent = await renderEmail(component);
-    } catch (reactEmailError) {
-      console.warn('React Email failed, falling back to Handlebars:', reactEmailError.message);
-      // Fallback to Handlebars
-      const { compiledTemplate, compiledBase } = loadTemplate('order-shipped');
-      const bodyContent = compiledTemplate({
-        clienteNome: orderData.clienteNome,
-        pedidoId: orderData.pedidoId,
-        dataEnvio: orderData.dataEnvio,
-        codigoRastreio: orderData.codigoRastreio,
-        transportadora: orderData.transportadora,
-        previsaoEntrega: orderData.previsaoEntrega,
-        statusAtual: orderData.statusAtual,
-        produtos: orderData.produtos,
-        enderecoEntrega: orderData.enderecoEntrega,
-        total: orderData.total,
-        frontendUrl
-      });
-      htmlContent = compiledBase({
-        title: `Pedido Enviado - Pedido #${orderData.pedidoId}`,
-        body: bodyContent,
-        showUnsubscribe: false
-      });
-    }
+    const bodyContent = compiledTemplate({
+      clienteNome: orderData.clienteNome,
+      pedidoId: orderData.pedidoId,
+      dataEnvio: orderData.dataEnvio,
+      codigoRastreio: orderData.codigoRastreio,
+      transportadora: orderData.transportadora,
+      previsaoEntrega: orderData.previsaoEntrega,
+      statusAtual: orderData.statusAtual,
+      produtos: orderData.produtos,
+      enderecoEntrega: orderData.enderecoEntrega,
+      total: orderData.total,
+      frontendUrl
+    });
+
+    const htmlContent = compiledBase({
+      title: `Pedido Enviado - Pedido #${orderData.pedidoId}`,
+      body: bodyContent,
+      showUnsubscribe: false
+    });
 
     return await sendEmail(orderData.email, `Seu pedido #${orderData.pedidoId} foi enviado`, htmlContent);
   } catch (error) {
@@ -648,43 +511,24 @@ export const sendOrderShippedEmail = async (orderData) => {
 // Função para enviar email de pedido entregue
 export const sendOrderDeliveredEmail = async (orderData) => {
   try {
-    // Try React Email first, fallback to Handlebars
-    let htmlContent;
+    const { compiledTemplate, compiledBase } = loadTemplate('order-delivered');
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-    try {
-      // Import React Email component dynamically
-      const { OrderDeliveredEmail, renderEmail } = await import('../../../packages/emails/dist/index.js');
-      const component = OrderDeliveredEmail({
-        recipientName: orderData.clienteNome,
-        recipientEmail: orderData.email,
-        frontendUrl,
-        orderId: orderData.pedidoId,
-        deliveryDate: orderData.dataEntrega,
-        receivedBy: orderData.recebidoPor,
-        products: orderData.produtos,
-        total: orderData.total,
-      });
-      htmlContent = await renderEmail(component);
-    } catch (reactEmailError) {
-      console.warn('React Email failed, falling back to Handlebars:', reactEmailError.message);
-      // Fallback to Handlebars
-      const { compiledTemplate, compiledBase } = loadTemplate('order-delivered');
-      const bodyContent = compiledTemplate({
-        clienteNome: orderData.clienteNome,
-        pedidoId: orderData.pedidoId,
-        dataEntrega: orderData.dataEntrega,
-        recebidoPor: orderData.recebidoPor,
-        produtos: orderData.produtos,
-        total: orderData.total,
-        frontendUrl
-      });
-      htmlContent = compiledBase({
-        title: `Pedido Entregue - Pedido #${orderData.pedidoId}`,
-        body: bodyContent,
-        showUnsubscribe: false
-      });
-    }
+    const bodyContent = compiledTemplate({
+      clienteNome: orderData.clienteNome,
+      pedidoId: orderData.pedidoId,
+      dataEntrega: orderData.dataEntrega,
+      recebidoPor: orderData.recebidoPor,
+      produtos: orderData.produtos,
+      total: orderData.total,
+      frontendUrl
+    });
+
+    const htmlContent = compiledBase({
+      title: `Pedido Entregue - Pedido #${orderData.pedidoId}`,
+      body: bodyContent,
+      showUnsubscribe: false
+    });
 
     return await sendEmail(orderData.email, `Seu pedido #${orderData.pedidoId} foi entregue`, htmlContent);
   } catch (error) {
@@ -695,56 +539,34 @@ export const sendOrderDeliveredEmail = async (orderData) => {
 
 // Função para enviar email de reset de senha
 export const enviarEmailResetSenha = async (email, resetToken) => {
-  try {
-    // Try React Email first, fallback to inline HTML
-    let htmlContent;
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    const resetUrl = `${frontendUrl}/esqueci-senha`;
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const resetPageUrl = `${frontendUrl}/esqueci-senha`;
 
-    try {
-      // Import React Email component dynamically
-      const { PasswordResetEmail, renderEmail } = await import('../../../packages/emails/dist/index.js');
-      const component = PasswordResetEmail({
-        recipientName: '',
-        recipientEmail: email,
-        frontendUrl,
-        resetToken,
-        resetUrl,
-      });
-      htmlContent = await renderEmail(component);
-    } catch (reactEmailError) {
-      console.warn('React Email failed, falling back to inline HTML:', reactEmailError.message);
-      // Fallback to inline HTML
-      htmlContent = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h2 style="color: #2563eb;">Redefinição de Senha</h2>
-          <p>Olá,</p>
-          <p>Recebemos uma solicitação para redefinir sua senha no HelpNet.</p>
-          <p>Para redefinir sua senha, acesse a página de redefinição e use o token abaixo:</p>
-          <div style="text-align: center; margin: 20px 0;">
-            <a href="${resetUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block;">Ir para Redefinição de Senha</a>
-          </div>
-          <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2563eb;">
-            <h3 style="color: #1e293b; margin-top: 0;">Seu Token de Reset:</h3>
-            <p style="font-size: 18px; font-weight: bold; color: #2563eb; word-break: break-all;">${resetToken}</p>
-            <p style="color: #64748b; margin-bottom: 0;"><strong>Informações importantes:</strong></p>
-            <ul style="color: #64748b;">
-              <li>Este token é válido por 1 hora</li>
-              <li>Use-o na página de redefinição de senha</li>
-              <li>Após expirar, solicite um novo token</li>
-            </ul>
-          </div>
-          <p>Se você não solicitou esta redefinição, ignore este email.</p>
-          <p>Atenciosamente,<br>Equipe HelpNet</p>
-        </div>
-      `;
-    }
+  const htmlContent = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <h2 style="color: #2563eb;">Redefinição de Senha</h2>
+      <p>Olá,</p>
+      <p>Recebemos uma solicitação para redefinir sua senha no HelpNet.</p>
+      <p>Para redefinir sua senha, acesse a página de redefinição e use o token abaixo:</p>
+      <div style="text-align: center; margin: 20px 0;">
+        <a href="${resetPageUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block;">Ir para Redefinição de Senha</a>
+      </div>
+      <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2563eb;">
+        <h3 style="color: #1e293b; margin-top: 0;">Seu Token de Reset:</h3>
+        <p style="font-size: 18px; font-weight: bold; color: #2563eb; word-break: break-all;">${resetToken}</p>
+        <p style="color: #64748b; margin-bottom: 0;"><strong>Informações importantes:</strong></p>
+        <ul style="color: #64748b;">
+          <li>Este token é válido por 1 hora</li>
+          <li>Use-o na página de redefinição de senha</li>
+          <li>Após expirar, solicite um novo token</li>
+        </ul>
+      </div>
+      <p>Se você não solicitou esta redefinição, ignore este email.</p>
+      <p>Atenciosamente,<br>Equipe HelpNet</p>
+    </div>
+  `;
 
-    return await sendEmail(email, 'Redefinição de Senha - HelpNet', htmlContent);
-  } catch (error) {
-    console.error('Erro ao enviar email de reset de senha:', error);
-    throw error;
-  }
+  return await sendEmail(email, 'Redefinição de Senha - HelpNet', htmlContent);
 };
 
 // Função para enviar notificação de nova avaliação
@@ -782,6 +604,85 @@ export const enviarNotificacaoAvaliacao = async (vendedorEmail, vendedorNome, pr
   }
 };
 
+// === FUNÇÕES PARA NOVOS TEMPLATES REDESENHADOS ===
+
+// Email de suporte (interno - para equipe)
+export const sendContactSupportEmail = async (contactData) => {
+  try {
+    const { compiledTemplate, compiledBase } = loadTemplate('contato-suporte');
+    
+    const bodyContent = compiledTemplate({
+      nome: contactData.nome,
+      email: contactData.email,
+      telefone: contactData.telefone,
+      assunto: contactData.assunto,
+      mensagem: contactData.mensagem
+    });
+
+    const htmlContent = compiledBase({
+      title: 'Nova Mensagem de Contato Recebida',
+      body: bodyContent,
+      showUnsubscribe: false
+    });
+
+    // Email interno para a equipe de suporte
+    const supportEmail = process.env.SUPPORT_EMAIL || 'suporte@helpnet.com';
+    return await sendEmail(supportEmail, `Nova Mensagem de Contato: ${contactData.assunto}`, htmlContent);
+  } catch (error) {
+    console.error('Erro ao enviar email de suporte:', error);
+    throw error;
+  }
+};
+
+// Email de confirmação de contato (para cliente)
+export const sendContactConfirmationEmail = async (contactData) => {
+  try {
+    const { compiledTemplate, compiledBase } = loadTemplate('contato-confirmacao');
+    
+    const bodyContent = compiledTemplate({
+      nome: contactData.nome,
+      assunto: contactData.assunto
+    });
+
+    const htmlContent = compiledBase({
+      title: 'Recebemos sua mensagem!',
+      body: bodyContent,
+      showUnsubscribe: false
+    });
+
+    return await sendEmail(contactData.email, 'Recebemos sua mensagem! - HelpNet', htmlContent);
+  } catch (error) {
+    console.error('Erro ao enviar email de confirmação de contato:', error);
+    throw error;
+  }
+};
+
+// Email de confirmação de avaliação recebida (para cliente)
+export const sendReviewReceivedEmail = async (reviewData) => {
+  try {
+    const { compiledTemplate, compiledBase } = loadTemplate('avaliacao-recebida');
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    
+    const bodyContent = compiledTemplate({
+      nome: reviewData.nome,
+      estrelas: reviewData.estrelas,
+      comentario: reviewData.comentario,
+      frontendUrl
+    });
+
+    const htmlContent = compiledBase({
+      title: 'Obrigado pela sua avaliação!',
+      body: bodyContent,
+      showUnsubscribe: false
+    });
+
+    return await sendEmail(reviewData.email, 'Obrigado pela sua avaliação! - HelpNet', htmlContent);
+  } catch (error) {
+    console.error('Erro ao enviar email de confirmação de avaliação:', error);
+    throw error;
+  }
+};
+
 export default {
   sendWelcomeEmail,
   sendOrderConfirmationEmail,
@@ -792,5 +693,8 @@ export default {
   sendVendorNewSaleEmail,
   sendVendorLowStockEmail,
   enviarEmailResetSenha,
-  enviarNotificacaoAvaliacao
+  enviarNotificacaoAvaliacao,
+  sendContactSupportEmail,
+  sendContactConfirmationEmail,
+  sendReviewReceivedEmail
 };
