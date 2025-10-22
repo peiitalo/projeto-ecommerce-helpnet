@@ -10,6 +10,7 @@
     "create-clients": "node src/scripts/createSampleClients.js",
     "create-products": "node src/scripts/createSampleProducts.js",
     "create-payment-methods": "node src/scripts/createPaymentMethods.js",
+    "build:css": "npx tailwindcss -i ./src/styles/email.css -o ./src/styles/email-compiled.css",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
@@ -20,6 +21,8 @@
   "dependencies": {
     "@prisma/client": "^6.15.0",
     "@sendgrid/mail": "^8.1.6",
+    "@tailwindcss/postcss": "^4.1.15",
+    "autoprefixer": "^10.4.21",
     "axios": "^1.12.2",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.2",
@@ -37,6 +40,7 @@
     "multer-storage-cloudinary": "^4.0.0",
     "nodemailer": "^7.0.6",
     "nodemon": "^3.1.10",
+    "postcss": "^8.5.6",
     "react-icons": "^5.5.0",
     "react-input-mask": "^3.0.0-alpha.2",
     "remove-accents": "^0.5.0",
@@ -48,6 +52,7 @@
     "eslint-config-prettier": "^9.1.0",
     "globals": "^16.3.0",
     "prettier": "^3.3.3",
-    "prisma": "^6.15.0"
+    "prisma": "^6.15.0",
+    "tailwindcss": "^3.4.18"
   }
 }

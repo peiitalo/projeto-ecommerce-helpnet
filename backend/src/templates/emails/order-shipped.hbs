@@ -119,6 +119,51 @@
     line-height: 1.2 !important;
   }
 
+  /* Shipping info */
+  .shipping-info {
+    background: linear-gradient(135deg, #DBEAFE 0%, #EFF6FF 100%) !important;
+    border: 1px solid #BFDBFE !important;
+    border-radius: 12px !important;
+    padding: 24px !important;
+    margin: 24px 0 !important;
+    text-align: center !important;
+  }
+
+  .shipping-info h3 {
+    margin: 0 0 16px 0 !important;
+    font-size: 20px !important;
+    font-weight: 600 !important;
+    color: #1E3A8A !important;
+  }
+
+  /* Tracking info */
+  .tracking-info {
+    background: linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 100%) !important;
+    border: 1px solid #BAE6FD !important;
+    border-radius: 12px !important;
+    padding: 24px !important;
+    margin: 24px 0 !important;
+  }
+
+  .tracking-info h3 {
+    margin: 0 0 16px 0 !important;
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    color: #0C4A6E !important;
+  }
+
+  .tracking-info p {
+    margin: 10px 0 !important;
+    font-size: 15px !important;
+    color: #64748B !important;
+    line-height: 1.6 !important;
+  }
+
+  .tracking-info strong {
+    color: #0C4A6E !important;
+    font-weight: 600 !important;
+  }
+
   /* Order details */
   .order-details {
     background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%) !important;
@@ -219,26 +264,41 @@
 
 <!-- Hero Section -->
 <div style="text-align: center; padding: 30px 20px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 12px; margin-bottom: 30px;">
-  <div style="font-size: 48px; margin: 0 0 20px 0; display: block;">📦</div>
-  <h1 style="font-size: 28px; font-weight: 700; color: #2c3e50; margin: 0 0 15px 0; line-height: 1.2;">Pedido Confirmado!</h1>
-  <p style="font-size: 16px; color: #666666; margin: 0; font-style: italic;">Seu pedido foi recebido e está sendo processado.</p>
+  <div style="font-size: 48px; margin: 0 0 20px 0; display: block;">🚚</div>
+  <h1 style="font-size: 28px; font-weight: 700; color: #2c3e50; margin: 0 0 15px 0; line-height: 1.2;">Seu Pedido Está a Caminho!</h1>
+  <p style="font-size: 16px; color: #666666; margin: 0; font-style: italic;">Os produtos foram despachados e estão sendo entregues.</p>
+</div>
+
+<!-- Shipping Info -->
+<div style="background: linear-gradient(135deg, #DBEAFE 0%, #EFF6FF 100%); border: 1px solid #BFDBFE; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
+  <div style="font-size: 48px; margin-bottom: 16px;">📦</div>
+  <h3 style="margin: 0 0 16px 0; font-size: 20px; font-weight: 600; color: #1E3A8A;">Pedido Enviado</h3>
+  <p style="margin: 0; font-size: 16px; color: #1E3A8A; line-height: 1.6;">Seu pedido foi preparado e enviado para entrega. Acompanhe o rastreamento abaixo.</p>
 </div>
 
 <!-- Status Bar -->
-{{> statusBar currentStatus=1 statusLabels=(array "Pedido Confirmado" "Pagamento Aprovado" "A Caminho" "Entregue")}}
+{{> statusBar currentStatus=3 statusLabels=(array "Pedido Confirmado" "Pagamento Aprovado" "A Caminho" "Entregue")}}
+
+<!-- Tracking Info -->
+<div style="background: linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 100%); border: 1px solid #BAE6FD; border-radius: 12px; padding: 24px; margin: 24px 0;">
+  <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #0C4A6E;">Informações de Rastreamento</h3>
+  <p style="margin: 10px 0; font-size: 15px; color: #64748B; line-height: 1.6;"><strong style="color: #0C4A6E; font-weight: 600;">Código de Rastreamento:</strong> {{codigoRastreio}}</p>
+  <p style="margin: 10px 0; font-size: 15px; color: #64748B; line-height: 1.6;"><strong style="color: #0C4A6E; font-weight: 600;">Transportadora:</strong> {{transportadora}}</p>
+  <p style="margin: 10px 0; font-size: 15px; color: #64748B; line-height: 1.6;"><strong style="color: #0C4A6E; font-weight: 600;">Previsão de Entrega:</strong> {{previsaoEntrega}}</p>
+  <p style="margin: 10px 0; font-size: 15px; color: #64748B; line-height: 1.6;"><strong style="color: #0C4A6E; font-weight: 600;">Status Atual:</strong> {{statusAtual}}</p>
+</div>
 
 <!-- Order Details -->
 <div style="background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%); border: 1px solid #E2E8F0; border-radius: 12px; padding: 24px; margin: 24px 0;">
-  <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #1E293B;">Detalhes do Pedido</h3>
+  <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #1E293B;">Detalhes da Remessa</h3>
   <p style="margin: 10px 0; font-size: 15px; color: #64748B; line-height: 1.6;"><strong style="color: #1E293B; font-weight: 600;">Número do Pedido:</strong> #{{pedidoId}}</p>
-  <p style="margin: 10px 0; font-size: 15px; color: #64748B; line-height: 1.6;"><strong style="color: #1E293B; font-weight: 600;">Data do Pedido:</strong> {{dataPedido}}</p>
-  <p style="margin: 10px 0; font-size: 15px; color: #64748B; line-height: 1.6;"><strong style="color: #1E293B; font-weight: 600;">Método de Pagamento:</strong> {{metodoPagamento}}</p>
-  <p style="margin: 10px 0; font-size: 15px; color: #64748B; line-height: 1.6;"><strong style="color: #1E293B; font-weight: 600;">Total:</strong> <span style="font-weight: 700; color: #e53e3e;">R$ {{total}}</span></p>
+  <p style="margin: 10px 0; font-size: 15px; color: #64748B; line-height: 1.6;"><strong style="color: #1E293B; font-weight: 600;">Data de Envio:</strong> {{dataEnvio}}</p>
+  <p style="margin: 10px 0; font-size: 15px; color: #64748B; line-height: 1.6;"><strong style="color: #1E293B; font-weight: 600;">Valor do Pedido:</strong> <span style="font-weight: 700; color: #059669;">R$ {{total}}</span></p>
 </div>
 
 <!-- Products Section -->
 <div style="margin: 30px 0;">
-  <h2 style="font-size: 20px; font-weight: 700; color: #2c3e50; margin: 0 0 20px 0; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 3px solid #1E90FF; padding-bottom: 10px;">Produtos do Pedido</h2>
+  <h2 style="font-size: 20px; font-weight: 700; color: #2c3e50; margin: 0 0 20px 0; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 3px solid #1E90FF; padding-bottom: 10px;">Produtos Enviados</h2>
 
   {{#each produtos}}
     {{> productItem produto=.}}
@@ -261,35 +321,17 @@
   </p>
 </div>
 
-<!-- Order Summary -->
-<div style="background-color: #ffffff; border: 2px solid #e9ecef; border-radius: 8px; overflow: hidden; margin: 20px 0;">
-  <table style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td style="padding: 12px 20px; border-bottom: 1px solid #f1f3f4; font-size: 15px; font-weight: 600; color: #34495e; text-align: right;">Subtotal:</td>
-      <td style="padding: 12px 20px; border-bottom: 1px solid #f1f3f4; font-size: 15px; font-weight: 600; color: #2c3e50; text-align: right; width: 120px;">R$ {{subtotal}}</td>
-    </tr>
-    <tr>
-      <td style="padding: 12px 20px; border-bottom: 1px solid #f1f3f4; font-size: 15px; font-weight: 600; color: #34495e; text-align: right;">Frete:</td>
-      <td style="padding: 12px 20px; border-bottom: 1px solid #f1f3f4; font-size: 15px; font-weight: 600; color: #2c3e50; text-align: right; width: 120px;">R$ {{frete}}</td>
-    </tr>
-    <tr style="background-color: #fff5f5; border-top: 2px solid #e53e3e;">
-      <td style="padding: 12px 20px; font-size: 18px; font-weight: 700; color: #e53e3e; text-align: right;">Total do Pedido:</td>
-      <td style="padding: 12px 20px; font-size: 18px; font-weight: 700; color: #e53e3e; text-align: right; width: 120px;">R$ {{total}}</td>
-    </tr>
-  </table>
-</div>
-
 <!-- Message -->
 <p style="margin: 30px 0 20px 0; font-size: 16px; line-height: 1.6; color: #555555;">
-  Olá <strong style="color: #1E293B; font-weight: 600;">{{clienteNome}}</strong>! Obrigado por sua compra na HelpNet. Seu pedido foi confirmado e estamos processando-o com todo cuidado.
+  Olá <strong style="color: #1E293B; font-weight: 600;">{{clienteNome}}</strong>! Seu pedido foi enviado e está a caminho da sua casa.
 </p>
 
 <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #666666;">
-  Você receberá atualizações sobre o status do seu pedido por email. Em caso de dúvidas, nossa equipe está sempre disponível para ajudar.
+  Use o código de rastreamento acima para acompanhar a entrega em tempo real. Você receberá uma notificação quando o pedido for entregue.
 </p>
 
 <div style="text-align: center; margin: 40px 0;">
-  <a href="{{frontendUrl}}/pedidos/{{pedidoId}}" style="display: inline-block; background: linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%); color: #FFFFFF; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 24px 0; box-shadow: 0 4px 14px 0 rgba(79, 70, 229, 0.25); min-height: 44px; line-height: 1.2;">ACOMPANHAR PEDIDO</a>
+  <a href="{{frontendUrl}}/rastreamento/{{codigoRastreio}}" style="display: inline-block; background: linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%); color: #FFFFFF; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 24px 0; box-shadow: 0 4px 14px 0 rgba(79, 70, 229, 0.25); min-height: 44px; line-height: 1.2;">RASTREAR ENTREGA</a>
 </div>
 
 <p style="margin: 20px 0 0 0; font-size: 16px; font-weight: 600; color: #2c3e50;">

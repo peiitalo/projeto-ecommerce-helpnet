@@ -1,0 +1,24 @@
+{{!-- Product Item Component --}}
+{{!-- Parameters: produto (object with nome, imagem, preco, quantidade) --}}
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="width: 100%; margin-bottom: 16px; background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; overflow: hidden;">
+  <tr>
+    <td style="padding: 16px;">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="width: 100%;">
+        <tr>
+          <td style="width: 80px; vertical-align: top;">
+            {{#if produto.imagem}}
+              <img src="{{produto.imagem}}" alt="{{produto.nome}}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 6px; border: 1px solid #E2E8F0;">
+            {{else}}
+              <div style="width: 60px; height: 60px; background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 24px;">📦</div>
+            {{/if}}
+          </td>
+          <td style="padding-left: 16px; vertical-align: top;">
+            <div style="font-size: 16px; font-weight: 600; color: #1E293B; margin-bottom: 4px; line-height: 1.4;">{{produto.nome}}</div>
+            <div style="font-size: 14px; color: #64748B; margin-bottom: 8px;">Quantidade: <span style="background-color: #4F46E5; color: #FFFFFF; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600;">{{produto.quantidade}}</span></div>
+            <div style="font-size: 16px; font-weight: 600; color: #1E293B;">R$ {{produto.preco}}</div>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
