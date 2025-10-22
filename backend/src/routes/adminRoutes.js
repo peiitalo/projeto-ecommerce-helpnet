@@ -44,8 +44,8 @@ router.get('/pedidos', listarPedidosAdmin);
 router.get('/pedidos/:id', buscarPedidoAdmin);
 router.put('/pedidos/:id/status', atualizarStatusPedidoAdmin);
 
-// Vendedores
-router.get('/vendedores', listarVendedores);
+// Vendedores 
+router.get('/vendedores', adminController.listarVendedores);
 
 // Empresas/Vendedores
 router.get('/empresas', listarEmpresas);

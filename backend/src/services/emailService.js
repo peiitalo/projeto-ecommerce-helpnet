@@ -8,6 +8,183 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Carregar CSS inline para emails
+const inlineCSS = `
+  *, ::before, ::after {
+    --tw-border-spacing-x: 0;
+    --tw-border-spacing-y: 0;
+    --tw-translate-x: 0;
+    --tw-translate-y: 0;
+    --tw-rotate: 0;
+    --tw-skew-x: 0;
+    --tw-skew-y: 0;
+    --tw-scale-x: 1;
+    --tw-scale-y: 1;
+    --tw-pan-x: ;
+    --tw-pan-y: ;
+    --tw-pinch-zoom: ;
+    --tw-scroll-snap-strictness: proximity;
+    --tw-gradient-from-position: ;
+    --tw-gradient-via-position: ;
+    --tw-gradient-to-position: ;
+    --tw-ordinal: ;
+    --tw-slashed-zero: ;
+    --tw-numeric-figure: ;
+    --tw-numeric-spacing: ;
+    --tw-numeric-fraction: ;
+    --tw-ring-inset: ;
+    --tw-ring-offset-width: 0px;
+    --tw-ring-offset-color: #fff;
+    --tw-ring-color: rgb(59 130 246 / 0.5);
+    --tw-ring-offset-shadow: 0 0 #0000;
+    --tw-ring-shadow: 0 0 #0000;
+    --tw-shadow: 0 0 #0000;
+    --tw-shadow-colored: 0 0 #0000;
+    --tw-blur: ;
+    --tw-brightness: ;
+    --tw-contrast: ;
+    --tw-grayscale: ;
+    --tw-hue-rotate: ;
+    --tw-invert: ;
+    --tw-saturate: ;
+    --tw-sepia: ;
+    --tw-drop-shadow: ;
+    --tw-backdrop-blur: ;
+    --tw-backdrop-brightness: ;
+    --tw-backdrop-contrast: ;
+    --tw-backdrop-grayscale: ;
+    --tw-backdrop-hue-rotate: ;
+    --tw-backdrop-invert: ;
+    --tw-backdrop-opacity: ;
+    --tw-backdrop-saturate: ;
+    --tw-backdrop-sepia: ;
+    --tw-contain-size: ;
+    --tw-contain-layout: ;
+    --tw-contain-paint: ;
+    --tw-contain-style: ;
+  }
+
+  .collapse {
+    visibility: collapse
+  }
+
+  .absolute {
+    position: absolute
+  }
+
+  .relative {
+    position: relative
+  }
+
+  .block {
+    display: block
+  }
+
+  .inline-block {
+    display: inline-block
+  }
+
+  .flex {
+    display: flex
+  }
+
+  .table {
+    display: table
+  }
+
+  .hidden {
+    display: none
+  }
+
+  .flex-shrink {
+    flex-shrink: 1
+  }
+
+  .border-collapse {
+    border-collapse: collapse
+  }
+
+  .transform {
+    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))
+  }
+
+  .border {
+    border-width: 1px
+  }
+
+  .uppercase {
+    text-transform: uppercase
+  }
+
+  .italic {
+    font-style: italic
+  }
+
+  .underline {
+    text-decoration-line: underline
+  }
+
+  .antialiased {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale
+  }
+
+  .outline {
+    outline-style: solid
+  }
+
+  .blur {
+    --tw-blur: blur(8px);
+    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)
+  }
+
+  .grayscale {
+    --tw-grayscale: grayscale(100%);
+    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)
+  }
+
+  .backdrop-filter {
+    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)
+  }
+
+  .transition {
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms
+  }
+`;
+
+// Registrar helpers customizados do Handlebars
+handlebars.registerHelper('range', function(n) {
+  const result = [];
+  for (let i = 0; i < n; i++) {
+    result.push(i);
+  }
+  return result;
+});
+
+handlebars.registerHelper('gte', function(a, b) {
+  return a >= b;
+});
+
+handlebars.registerHelper('eq', function(a, b) {
+  return a === b;
+});
+
+// Registrar partials
+handlebars.registerPartial('statusBar', fs.readFileSync(path.join(__dirname, '../templates/emails/partials/status-bar.hbs'), 'utf8'));
+handlebars.registerPartial('productItem', fs.readFileSync(path.join(__dirname, '../templates/emails/partials/product-item.hbs'), 'utf8'));
+
+handlebars.registerHelper('formatDate', function(date, format) {
+  if (!date) return '';
+  const d = new Date(date);
+  return d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+});
+
+handlebars.registerHelper('now', function() {
+  return new Date();
+});
+
 // Configurar SendGrid
 sgMail.setApiKey(process.env.SENDGRID_API_KEY || 'your-sendgrid-api-key');
 
@@ -40,7 +217,10 @@ const loadTemplate = (templateName) => {
 
   try {
     const templateContent = fs.readFileSync(templatePath, 'utf8');
-    const baseTemplate = fs.readFileSync(baseTemplatePath, 'utf8');
+    let baseTemplate = fs.readFileSync(baseTemplatePath, 'utf8');
+
+    // Injetar CSS inline no template base
+    baseTemplate = baseTemplate.replace('</style>', `${inlineCSS}\n    </style>`);
 
     const compiledTemplate = handlebars.compile(templateContent);
     const compiledBase = handlebars.compile(baseTemplate);
@@ -266,6 +446,97 @@ export const sendVendorLowStockEmail = async (stockData) => {
 
 // === LEGACY FUNCTIONS ===
 
+// Função para enviar email de pedido pago
+export const sendOrderPaidEmail = async (orderData) => {
+  try {
+    const { compiledTemplate, compiledBase } = loadTemplate('order-paid');
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+    const bodyContent = compiledTemplate({
+      clienteNome: orderData.clienteNome,
+      pedidoId: orderData.pedidoId,
+      dataPagamento: orderData.dataPagamento,
+      metodoPagamento: orderData.metodoPagamento,
+      produtos: orderData.produtos,
+      total: orderData.total,
+      frontendUrl
+    });
+
+    const htmlContent = compiledBase({
+      title: `Pagamento Aprovado - Pedido #${orderData.pedidoId}`,
+      body: bodyContent,
+      showUnsubscribe: false
+    });
+
+    return await sendEmail(orderData.email, `Pagamento Aprovado - Pedido #${orderData.pedidoId}`, htmlContent);
+  } catch (error) {
+    console.error('Erro ao enviar email de pagamento aprovado:', error);
+    throw error;
+  }
+};
+
+// Função para enviar email de pedido enviado
+export const sendOrderShippedEmail = async (orderData) => {
+  try {
+    const { compiledTemplate, compiledBase } = loadTemplate('order-shipped');
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+    const bodyContent = compiledTemplate({
+      clienteNome: orderData.clienteNome,
+      pedidoId: orderData.pedidoId,
+      dataEnvio: orderData.dataEnvio,
+      codigoRastreio: orderData.codigoRastreio,
+      transportadora: orderData.transportadora,
+      previsaoEntrega: orderData.previsaoEntrega,
+      statusAtual: orderData.statusAtual,
+      produtos: orderData.produtos,
+      enderecoEntrega: orderData.enderecoEntrega,
+      total: orderData.total,
+      frontendUrl
+    });
+
+    const htmlContent = compiledBase({
+      title: `Pedido Enviado - Pedido #${orderData.pedidoId}`,
+      body: bodyContent,
+      showUnsubscribe: false
+    });
+
+    return await sendEmail(orderData.email, `Seu pedido #${orderData.pedidoId} foi enviado`, htmlContent);
+  } catch (error) {
+    console.error('Erro ao enviar email de pedido enviado:', error);
+    throw error;
+  }
+};
+
+// Função para enviar email de pedido entregue
+export const sendOrderDeliveredEmail = async (orderData) => {
+  try {
+    const { compiledTemplate, compiledBase } = loadTemplate('order-delivered');
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+    const bodyContent = compiledTemplate({
+      clienteNome: orderData.clienteNome,
+      pedidoId: orderData.pedidoId,
+      dataEntrega: orderData.dataEntrega,
+      recebidoPor: orderData.recebidoPor,
+      produtos: orderData.produtos,
+      total: orderData.total,
+      frontendUrl
+    });
+
+    const htmlContent = compiledBase({
+      title: `Pedido Entregue - Pedido #${orderData.pedidoId}`,
+      body: bodyContent,
+      showUnsubscribe: false
+    });
+
+    return await sendEmail(orderData.email, `Seu pedido #${orderData.pedidoId} foi entregue`, htmlContent);
+  } catch (error) {
+    console.error('Erro ao enviar email de pedido entregue:', error);
+    throw error;
+  }
+};
+
 // Função para enviar email de reset de senha
 export const enviarEmailResetSenha = async (email, resetToken) => {
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -336,6 +607,9 @@ export const enviarNotificacaoAvaliacao = async (vendedorEmail, vendedorNome, pr
 export default {
   sendWelcomeEmail,
   sendOrderConfirmationEmail,
+  sendOrderPaidEmail,
+  sendOrderShippedEmail,
+  sendOrderDeliveredEmail,
   sendDeliveryStatusEmail,
   sendVendorNewSaleEmail,
   sendVendorLowStockEmail,

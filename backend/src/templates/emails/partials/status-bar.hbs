@@ -1,0 +1,96 @@
+{{!-- Status Progress Bar Component --}}
+{{!-- Parameters: currentStatus (1-4), statusLabels (array) --}}
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="width: 100%; margin: 30px 0; background-color: #F8FAFC; border-radius: 12px; padding: 24px;">
+  <tr>
+    <td>
+      <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: #1E293B; text-align: center;">Status do Pedido</h3>
+
+      {{!-- Progress Line --}}
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="width: 100%; margin-bottom: 20px;">
+        <tr>
+          <td style="text-align: center;">
+            <div style="position: relative; height: 4px; background-color: #E2E8F0; border-radius: 2px; margin: 0 20px;">
+              {{#if (gte currentStatus 1)}}
+                <div style="position: absolute; top: 0; left: 0; height: 4px; width: 25%; background: linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%); border-radius: 2px;"></div>
+              {{/if}}
+              {{#if (gte currentStatus 2)}}
+                <div style="position: absolute; top: 0; left: 25%; height: 4px; width: 25%; background: linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%); border-radius: 2px;"></div>
+              {{/if}}
+              {{#if (gte currentStatus 3)}}
+                <div style="position: absolute; top: 0; left: 50%; height: 4px; width: 25%; background: linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%); border-radius: 2px;"></div>
+              {{/if}}
+              {{#if (gte currentStatus 4)}}
+                <div style="position: absolute; top: 0; left: 75%; height: 4px; width: 25%; background: linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%); border-radius: 2px;"></div>
+              {{/if}}
+            </div>
+          </td>
+        </tr>
+      </table>
+
+      {{!-- Status Dots --}}
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="width: 100%;">
+        <tr>
+          <td style="width: 25%; text-align: center; vertical-align: top;">
+            <div style="width: 40px; height: 40px; border-radius: 50%; {{#if (gte currentStatus 1)}}background: linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%);{{else}}background-color: #CBD5E1;{{/if}} margin: 0 auto 8px auto; display: flex; align-items: center; justify-content: center; box-shadow: {{#if (gte currentStatus 1)}}0 4px 14px 0 rgba(79, 70, 229, 0.25){{else}}0 2px 4px rgba(0,0,0,0.1){{/if}};">
+              {{#if (gte currentStatus 1)}}
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M5 13L9 17L19 7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              {{else}}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9 5L16 12L9 19" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              {{/if}}
+            </div>
+            <div style="font-size: 12px; {{#if (gte currentStatus 1)}}color: #4F46E5; font-weight: 600;{{else}}color: #64748B;{{/if}} line-height: 1.4;">{{statusLabels.[0]}}</div>
+          </td>
+
+          <td style="width: 25%; text-align: center; vertical-align: top;">
+            <div style="width: 40px; height: 40px; border-radius: 50%; {{#if (gte currentStatus 2)}}background: linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%);{{else}}background-color: #CBD5E1;{{/if}} margin: 0 auto 8px auto; display: flex; align-items: center; justify-content: center; box-shadow: {{#if (gte currentStatus 2)}}0 4px 14px 0 rgba(79, 70, 229, 0.25){{else}}0 2px 4px rgba(0,0,0,0.1){{/if}};">
+              {{#if (gte currentStatus 2)}}
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M5 13L9 17L19 7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              {{else}}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M3 10H21M7 15H17M11 3V21" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              {{/if}}
+            </div>
+            <div style="font-size: 12px; {{#if (gte currentStatus 2)}}color: #4F46E5; font-weight: 600;{{else}}color: #64748B;{{/if}} line-height: 1.4;">{{statusLabels.[1]}}</div>
+          </td>
+
+          <td style="width: 25%; text-align: center; vertical-align: top;">
+            <div style="width: 40px; height: 40px; border-radius: 50%; {{#if (gte currentStatus 3)}}background: linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%);{{else}}background-color: #CBD5E1;{{/if}} margin: 0 auto 8px auto; display: flex; align-items: center; justify-content: center; box-shadow: {{#if (gte currentStatus 3)}}0 4px 14px 0 rgba(79, 70, 229, 0.25){{else}}0 2px 4px rgba(0,0,0,0.1){{/if}};">
+              {{#if (gte currentStatus 3)}}
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M5 13L9 17L19 7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              {{else}}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V7M3 7L10.5 12L21 7M3 7L3 5C3 3.89543 3.89543 3 5 3H19C20.1046 3 21 3.89543 21 5V7" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              {{/if}}
+            </div>
+            <div style="font-size: 12px; {{#if (gte currentStatus 3)}}color: #4F46E5; font-weight: 600;{{else}}color: #64748B;{{/if}} line-height: 1.4;">{{statusLabels.[2]}}</div>
+          </td>
+
+          <td style="width: 25%; text-align: center; vertical-align: top;">
+            <div style="width: 40px; height: 40px; border-radius: 50%; {{#if (gte currentStatus 4)}}background: linear-gradient(135deg, #10B981 0%, #059669 100%);{{else}}background-color: #CBD5E1;{{/if}} margin: 0 auto 8px auto; display: flex; align-items: center; justify-content: center; box-shadow: {{#if (gte currentStatus 4)}}0 4px 14px 0 rgba(16, 185, 129, 0.25){{else}}0 2px 4px rgba(0,0,0,0.1){{/if}};">
+              {{#if (gte currentStatus 4)}}
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M5 13L9 17L19 7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              {{else}}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              {{/if}}
+            </div>
+            <div style="font-size: 12px; {{#if (gte currentStatus 4)}}color: #10B981; font-weight: 600;{{else}}color: #64748B;{{/if}} line-height: 1.4;">{{statusLabels.[3]}}</div>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
