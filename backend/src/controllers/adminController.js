@@ -2,51 +2,6 @@
 import prisma from "../config/prisma.js";
 import { logger } from '../utils/logger.js';
 
-export const login = async (req, res) => {
-  try {
-    const { email, senha } = req.body;
-
-    // Buscar admin pelo email
-    const admin = await prisma.admin.findUnique({
-      where: { Email: email }
-    });
-
-    if (!admin) {
-      return res.status(401).json({
-        success: false,
-        errors: ["Credenciais inválidas"]
-      });
-    }
-
-    // Verificar senha (assumindo que a senha está armazenada em texto simples - para produção, use hashing)
-    if (admin.Senha !== senha) {
-      return res.status(401).json({
-        success: false,
-        errors: ["Credenciais inválidas"]
-      });
-    }
-
-    // Gerar token JWT (implemente a função generateJWT conforme sua lógica de autenticação)
-    const token = generateJWT({ id: admin.AdminID, role: 'admin' });
-
-    res.json({
-      success: true,
-      message: "Login realizado com sucesso",
-      token
-    });
-  } catch (error) {
-    logger.error('admin_login_error', {
-      error: error.message,
-      stack: error.stack,
-      body: req.body
-    });
-    res.status(500).json({
-      success: false,
-      errors: ["Erro interno do servidor"]
-    });
-  } 
-};
-
 const logControllerError = (operation, error, req) => {
   logger.error(`admin_controller_${operation}_error`, {
     error: error.message,

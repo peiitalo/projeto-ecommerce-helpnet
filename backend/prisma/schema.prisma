@@ -19,6 +19,11 @@ enum PedidoStatusPagamento {
   EXPIRADO
 }
 
+enum TipoDesconto {
+  PERCENTUAL
+  VALOR_FIXO
+}
+
 model Administrador {
   AdminID     Int      @id @default(autoincrement())
   Nome        String
@@ -70,6 +75,7 @@ model Cliente {
   Notificacao        Notificacao[]
   clientesVendedor   ClienteVendedor[]
   resetTokens        PasswordResetToken[]
+  cuponsCliente      CupomCliente[]
 
   @@index([Email])
   @@index([DataCadastro])
@@ -262,6 +268,7 @@ model Vendedor {
   notificacoes Notificacao[]
   clientesVendedor ClienteVendedor[]
   enderecosVendedor EnderecoVendedor[]
+  cupons       Cupom[]
 
   @@index([EmpresaID])
   @@index([Ativo])
@@ -407,4 +414,46 @@ model PasswordResetToken {
   @@index([Token])
   @@index([ExpiresAt])
   @@map("PasswordResetToken")
+}
+
+model Cupom {
+  CupomID       Int           @id @default(autoincrement())
+  Codigo        String        @unique
+  Descricao     String?
+  TipoDesconto  TipoDesconto
+  ValorDesconto Float
+  ValorMinimo   Float?        @default(0)
+  LimiteUso     Int?
+  UsosAtuais    Int           @default(0)
+  DataExpiracao DateTime?
+  Ativo         Boolean       @default(true)
+  VendedorID    Int
+  CriadoEm      DateTime      @default(now())
+
+  vendedor      Vendedor      @relation(fields: [VendedorID], references: [VendedorID])
+  cuponsCliente CupomCliente[]
+
+  @@index([VendedorID])
+  @@index([Ativo])
+  @@index([DataExpiracao])
+  @@map("Cupom")
+}
+
+model CupomCliente {
+  CupomClienteID Int      @id @default(autoincrement())
+  CupomID        Int
+  ClienteID      Int
+  Usado          Boolean   @default(false)
+  DataUso        DateTime?
+  PedidoID       Int?
+
+  cupom    Cupom   @relation(fields: [CupomID], references: [CupomID])
+  cliente  Cliente @relation(fields: [ClienteID], references: [ClienteID])
+  pedido   Pedido? @relation(fields: [PedidoID], references: [PedidoID])
+
+  @@unique([CupomID, ClienteID])
+  @@index([CupomID])
+  @@index([ClienteID])
+  @@index([PedidoID])
+  @@map("CupomCliente")
 }

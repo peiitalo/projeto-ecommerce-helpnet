@@ -102,7 +102,6 @@ function ProductPage() {
   // Função para calcular promoção baseada no endereço (mock)
   const calcularPromocao = (cep) => {
     if (!cep) return null;
-    if (cep.startsWith('01')) return 'Frete Grátis para São Paulo!';
     if (cep.startsWith('2')) return '10% OFF no frete para Sudeste!';
     return null;
   };

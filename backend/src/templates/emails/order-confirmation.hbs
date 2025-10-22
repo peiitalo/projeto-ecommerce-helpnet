@@ -1,401 +1,55 @@
-<style type="text/css">
-  /* Estilos específicos para confirmação de pedido */
-  .order-hero {
-    text-align: center !important;
-    padding: 30px 20px !important;
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
-    border-radius: 12px !important;
-    margin-bottom: 30px !important;
-  }
-  
-  .order-hero-title {
-    font-size: 28px !important;
-    font-weight: 700 !important;
-    color: #2c3e50 !important;
-    margin: 0 0 15px 0 !important;
-    line-height: 1.2 !important;
-  }
-  
-  .delivery-icon {
-    font-size: 48px !important;
-    margin: 0 0 20px 0 !important;
-    display: block !important;
-  }
-  
-  .track-button {
-    display: inline-block !important;
-    background-color: #1E90FF !important;
-    color: #ffffff !important;
-    padding: 16px 32px !important;
-    text-decoration: none !important;
-    border-radius: 8px !important;
-    font-weight: 700 !important;
-    font-size: 14px !important;
-    letter-spacing: 0.5px !important;
-    text-transform: uppercase !important;
-    margin: 20px 0 15px 0 !important;
-    border: none !important;
-    cursor: pointer !important;
-    box-shadow: 0 2px 8px rgba(30, 144, 255, 0.3) !important;
-  }
-  
-  .track-button:hover {
-    background-color: #1c7ed6 !important;
-    box-shadow: 0 4px 12px rgba(30, 144, 255, 0.4) !important;
-  }
-  
-  .track-info {
-    font-size: 14px !important;
-    color: #666666 !important;
-    margin: 0 !important;
-    font-style: italic !important;
-  }
-  
-  .two-column-layout {
-    width: 100% !important;
-    margin: 30px 0 !important;
-  }
-  
-  .column {
-    width: 48% !important;
-    vertical-align: top !important;
-    padding: 0 1% !important;
-  }
-  
-  .section-box {
-    background-color: #f8f9fa !important;
-    border: 1px solid #e9ecef !important;
-    border-radius: 8px !important;
-    padding: 20px !important;
-    margin-bottom: 20px !important;
-  }
-  
-  .section-title {
-    font-size: 16px !important;
-    font-weight: 700 !important;
-    color: #2c3e50 !important;
-    margin: 0 0 15px 0 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.5px !important;
-    border-bottom: 2px solid #1E90FF !important;
-    padding-bottom: 8px !important;
-  }
-  
-  .info-item {
-    margin: 10px 0 !important;
-    font-size: 14px !important;
-    line-height: 1.5 !important;
-  }
-  
-  .info-label {
-    font-weight: 600 !important;
-    color: #34495e !important;
-    display: inline-block !important;
-    min-width: 120px !important;
-  }
-  
-  .info-value {
-    color: #555555 !important;
-  }
-  
-  .products-section {
-    margin: 30px 0 !important;
-  }
-  
-  .products-title {
-    font-size: 20px !important;
-    font-weight: 700 !important;
-    color: #2c3e50 !important;
-    margin: 0 0 20px 0 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.5px !important;
-    border-bottom: 3px solid #1E90FF !important;
-    padding-bottom: 10px !important;
-  }
-  
-  .products-table {
-    width: 100% !important;
-    border-collapse: collapse !important;
-    background-color: #ffffff !important;
-    border-radius: 8px !important;
-    overflow: hidden !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
-    margin-bottom: 20px !important;
-  }
-  
-  .products-table th {
-    background-color: #2c3e50 !important;
-    color: #ffffff !important;
-    padding: 15px 12px !important;
-    text-align: left !important;
-    font-weight: 600 !important;
-    font-size: 14px !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.3px !important;
-  }
-  
-  .products-table td {
-    padding: 15px 12px !important;
-    border-bottom: 1px solid #f1f3f4 !important;
-    color: #555555 !important;
-    font-size: 14px !important;
-    vertical-align: middle !important;
-  }
-  
-  .products-table tr:last-child td {
-    border-bottom: none !important;
-  }
-  
-  .product-image {
-    width: 60px !important;
-    height: 60px !important;
-    object-fit: cover !important;
-    border-radius: 6px !important;
-    border: 1px solid #e9ecef !important;
-  }
-  
-  .product-name {
-    font-weight: 600 !important;
-    color: #2c3e50 !important;
-    line-height: 1.4 !important;
-  }
-  
-  .quantity-badge {
-    background-color: #1E90FF !important;
-    color: #ffffff !important;
-    padding: 4px 8px !important;
-    border-radius: 12px !important;
-    font-size: 12px !important;
-    font-weight: 600 !important;
-    display: inline-block !important;
-  }
-  
-  .price {
-    font-weight: 600 !important;
-    color: #2c3e50 !important;
-  }
-  
-  .totals-section {
-    background-color: #ffffff !important;
-    border: 2px solid #e9ecef !important;
-    border-radius: 8px !important;
-    overflow: hidden !important;
-    margin: 20px 0 !important;
-  }
-  
-  .totals-table {
-    width: 100% !important;
-    border-collapse: collapse !important;
-  }
-  
-  .totals-table td {
-    padding: 12px 20px !important;
-    border-bottom: 1px solid #f1f3f4 !important;
-    font-size: 15px !important;
-  }
-  
-  .totals-table tr:last-child td {
-    border-bottom: none !important;
-  }
-  
-  .total-label {
-    font-weight: 600 !important;
-    color: #34495e !important;
-    text-align: right !important;
-  }
-  
-  .total-value {
-    font-weight: 600 !important;
-    color: #2c3e50 !important;
-    text-align: right !important;
-    width: 120px !important;
-  }
-  
-  .final-total {
-    background-color: #fff5f5 !important;
-    border-top: 2px solid #e53e3e !important;
-  }
-  
-  .final-total .total-label,
-  .final-total .total-value {
-    font-size: 18px !important;
-    font-weight: 700 !important;
-    color: #e53e3e !important;
-  }
-  
-  /* Responsividade */
-  @media only screen and (max-width: 600px) {
-    .order-hero-title {
-      font-size: 24px !important;
-    }
-    
-    .delivery-icon {
-      font-size: 40px !important;
-    }
-    
-    .track-button {
-      display: block !important;
-      width: 100% !important;
-      box-sizing: border-box !important;
-      padding: 18px 20px !important;
-    }
-    
-    .two-column-layout {
-      display: block !important;
-    }
-    
-    .column {
-      width: 100% !important;
-      display: block !important;
-      padding: 0 !important;
-    }
-    
-    .products-table {
-      font-size: 12px !important;
-    }
-    
-    .products-table th,
-    .products-table td {
-      padding: 10px 8px !important;
-    }
-    
-    .product-image {
-      width: 50px !important;
-      height: 50px !important;
-    }
-    
-    .section-title {
-      font-size: 14px !important;
-    }
-    
-    .products-title {
-      font-size: 18px !important;
-    }
-  }
-</style>
+<p>Olá, {{clienteNome}}!</p>
 
-<!-- Hero Section -->
-<div class="order-hero">
-  <div class="delivery-icon">🚚</div>
-  <h1 class="order-hero-title">Seu pedido está a caminho.</h1>
-  <a href="{{frontendUrl}}/entregas/{{pedidoId}}" class="track-button">RASTREAR SEU PEDIDO</a>
-  <p class="track-info">Aguarde 24 horas para rastrear seu pedido.</p>
+<p>Obrigado por sua compra no HelpNet! Seu pedido foi confirmado e estamos processando-o.</p>
+
+<div class="order-details">
+  <p><strong>Pedido #{{pedidoId}}</strong></p>
+  <p><strong>Data:</strong> {{dataPedido}}</p>
+  <p><strong>Método de Pagamento:</strong> {{metodoPagamento}}</p>
+  <p><strong>Endereço de Entrega:</strong> {{enderecoEntrega}}</p>
 </div>
 
-<!-- Layout de Duas Colunas -->
-<table role="presentation" cellspacing="0" cellpadding="0" border="0" class="two-column-layout">
-  <tr>
-    <!-- Coluna Esquerda - Resumo -->
-    <td class="column">
-      <div class="section-box">
-        <h3 class="section-title">Resumo</h3>
-        <div class="info-item">
-          <span class="info-label">Número do Pedido:</span>
-          <span class="info-value">#{{pedidoId}}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Data do Pedido:</span>
-          <span class="info-value">{{dataPedido}}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Total do Pedido:</span>
-          <span class="info-value" style="font-weight: 700; color: #e53e3e;">R$ {{total}}</span>
-        </div>
-      </div>
-    </td>
-    
-    <!-- Coluna Direita - Endereço -->
-    <td class="column">
-      <div class="section-box">
-        <h3 class="section-title">Endereço de Entrega</h3>
-        <div class="info-item">
-          <span class="info-label">Nome:</span>
-          <span class="info-value">{{clienteNome}}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Endereço:</span>
-          <span class="info-value">
-            {{#if enderecoEntrega.rua}}
-              {{enderecoEntrega.rua}}{{#if enderecoEntrega.numero}}, {{enderecoEntrega.numero}}{{/if}}
-              {{#if enderecoEntrega.bairro}}<br>{{enderecoEntrega.bairro}}{{/if}}
-              {{#if enderecoEntrega.cidade}}<br>{{enderecoEntrega.cidade}}{{/if}}
-              {{#if enderecoEntrega.cep}}<br>CEP: {{enderecoEntrega.cep}}{{/if}}
-            {{else}}
-              {{enderecoEntrega}}
-            {{/if}}
-          </span>
-        </div>
-      </div>
-    </td>
-  </tr>
+<h3>Produtos</h3>
+<table class="product-table">
+  <thead>
+    <tr>
+      <th>Produto</th>
+      <th>Quantidade</th>
+      <th>Preço Unitário</th>
+      <th>Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each produtos}}
+    <tr>
+      <td>{{nome}}</td>
+      <td>{{quantidade}}</td>
+      <td>R$ {{precoUnitario}}</td>
+      <td>R$ {{subtotal}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+  <tfoot>
+    <tr class="total-row">
+      <td colspan="3"><strong>Subtotal</strong></td>
+      <td><strong>R$ {{subtotal}}</strong></td>
+    </tr>
+    <tr class="total-row">
+      <td colspan="3"><strong>Frete</strong></td>
+      <td><strong>R$ {{frete}}</strong></td>
+    </tr>
+    <tr class="total-row">
+      <td colspan="3"><strong>Total</strong></td>
+      <td><strong>R$ {{total}}</strong></td>
+    </tr>
+  </tfoot>
 </table>
 
-<!-- Seção de Produtos -->
-<div class="products-section">
-  <h2 class="products-title">Itens Enviados</h2>
-  
-  <table class="products-table">
-    <thead>
-      <tr>
-        <th style="width: 80px;">Imagem</th>
-        <th>Produto</th>
-        <th style="width: 100px; text-align: center;">Quantidade</th>
-        <th style="width: 120px; text-align: right;">Preço</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{#each produtos}}
-      <tr>
-        <td>
-          {{#if imagem}}
-            <img src="{{imagem}}" alt="{{nome}}" class="product-image">
-          {{else}}
-            <div style="width: 60px; height: 60px; background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 24px;">📦</div>
-          {{/if}}
-        </td>
-        <td>
-          <div class="product-name">{{nome}}</div>
-        </td>
-        <td style="text-align: center;">
-          <span class="quantity-badge">{{quantidade}}</span>
-        </td>
-        <td style="text-align: right;">
-          <span class="price">R$ {{preco}}</span>
-        </td>
-      </tr>
-      {{/each}}
-    </tbody>
-  </table>
+<div style="text-align: center; margin: 30px 0;">
+  <a href="{{frontendUrl}}/entregas/{{pedidoId}}" class="button"><button>Acompanhar Pedido</button></a>
 </div>
 
-<!-- Seção de Totais -->
-<div class="totals-section">
-  <table class="totals-table">
-    <tr>
-      <td class="total-label">Subtotal:</td>
-      <td class="total-value">R$ {{subtotal}}</td>
-    </tr>
-    <tr>
-      <td class="total-label">Frete:</td>
-      <td class="total-value">R$ {{frete}}</td>
-    </tr>
-    <tr class="final-total">
-      <td class="total-label">Total do Pedido:</td>
-      <td class="total-value">R$ {{total}}</td>
-    </tr>
-  </table>
-</div>
+<p>Você receberá atualizações sobre o status do seu pedido por email.</p>
 
-<!-- Mensagem Final -->
-<p style="margin: 30px 0 20px 0; font-size: 16px; line-height: 1.6; color: #555555;">
-  Olá <strong>{{clienteNome}}</strong>! Obrigado por sua compra na HelpNet. Seu pedido foi confirmado e estamos processando-o com todo cuidado.
-</p>
-
-<p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #666666;">
-  Você receberá atualizações sobre o status do seu pedido por email. Em caso de dúvidas, nossa equipe está sempre disponível para ajudar.
-</p>
-
-<p style="margin: 20px 0 0 0; font-size: 16px; font-weight: 600; color: #2c3e50;">
-  Atenciosamente,<br>
-  <span style="color: #1E90FF;">Equipe HelpNet</span>
-</p>
+<p>Atenciosamente,<br>
+Equipe HelpNet</p>

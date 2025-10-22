@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { FaTimes, FaEye, FaSpinner, FaReceipt, FaBox, FaTruck, FaCheck, FaClock, FaMapMarkerAlt, FaShippingFast } from 'react-icons/fa';
+import { FaTimes, FaEye, FaSpinner, FaReceipt, FaBox, FaTruck, FaCheck, FaClock, FaMapMarkerAlt, FaShippingFast, FaPrint } from 'react-icons/fa';
 import { clienteService } from '../services/api';
+import { FiX } from 'react-icons/fi'
 import api from '../services/api';
 import entregaApi from '../services/entregaApi';
 
@@ -68,31 +69,6 @@ const OrderDetailsModal = ({ orderId, isOpen, onClose, isAdmin = false }) => {
     onClose();
   };
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'Entregue':
-        return <FaCheck className="text-green-600" />;
-      case 'Em trânsito':
-        return <FaTruck className="text-blue-600" />;
-      case 'Processando':
-        return <FaClock className="text-yellow-600" />;
-      default:
-        return <FaBox className="text-slate-600" />;
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Entregue':
-        return 'bg-green-100 text-green-800';
-      case 'Em trânsito':
-        return 'bg-blue-100 text-blue-800';
-      case 'Processando':
-        return 'bg-yellow-100 text-yellow-800';
-      default:
-        return 'bg-slate-100 text-slate-800';
-    }
-  };
 
   const formatPrice = (price) => {
     if (price == null || isNaN(price)) {
@@ -111,67 +87,31 @@ const OrderDetailsModal = ({ orderId, isOpen, onClose, isAdmin = false }) => {
     });
   };
 
-  // Map status codes to friendly texts for delivery tracking
-  // Example mapping: 0="Pendente", 1="Aguardando envio", 2="Em trânsito", 3="Entregue"
-  const getDeliveryStatusText = (statusCode) => {
-    const statusMap = {
-      0: 'Pendente',
-      1: 'Aguardando envio',
-      2: 'Em trânsito',
-      3: 'Entregue'
-    };
-    return statusMap[statusCode] || statusCode; // Fallback to original if not mapped
-  };
-
-  // Get appropriate icon for delivery status with color coding
-  const getDeliveryStatusIcon = (statusText) => {
-    switch (statusText) {
-      case 'Pendente':
-        return <FaClock className="text-yellow-600" />; // Yellow for pending
-      case 'Aguardando envio':
-        return <FaBox className="text-blue-600" />; // Blue for awaiting shipment
-      case 'Em trânsito':
-        return <FaTruck className="text-blue-600" />; // Blue for in transit
-      case 'Entregue':
-        return <FaCheck className="text-green-600" />; // Green for delivered
-      default:
-        return <FaShippingFast className="text-slate-600" />; // Default shipping icon
-    }
-  };
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <FaEye className="text-blue-600" />
-              Detalhes do Pedido
-            </h2>
-            <button
-              onClick={handleClose}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Fechar"
-            >
-              <FaTimes className="w-6 h-6" />
-            </button>
-          </div>
-
-          {/* Loading State */}
-          {loading && (
+  if (loading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="p-6">
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
                 <FaSpinner className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-                <p className="text-gray-600">Carregando detalhes do pedido...</p>
+                <p className="text-slate-600">Carregando detalhes do pedido...</p>
               </div>
             </div>
-          )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-          {/* Error State */}
-          {error && (
+  if (error) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="p-6">
             <div className="text-center py-12">
               <p className="text-red-600 mb-4">{error}</p>
               <button
@@ -181,239 +121,266 @@ const OrderDetailsModal = ({ orderId, isOpen, onClose, isAdmin = false }) => {
                 Tentar novamente
               </button>
             </div>
-          )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-          {/* Order Details */}
-          {order && !loading && !error && (
-            <div className="space-y-6">
-              {/* Order Header */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    {getStatusIcon(order.Status)}
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">Pedido #{order.PedidoID}</h3>
-                      <p className="text-sm text-gray-600">{formatDate(order.DataPedido)}</p>
-                    </div>
-                  </div>
-                  <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${getStatusColor(order.Status)}`}>
-                    {order.Status}
-                  </span>
-                </div>
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-blue-600">{formatPrice(order.Total)}</p>
-                  <p className="text-sm text-gray-600">{order.itensPedido?.length || 0} item(s)</p>
-                </div>
-              </div>
+  if (!order) return null;
 
-              {/* Items */}
-              <div>
-                <h4 className="text-lg font-semibold text-gray-900 mb-4">Itens do Pedido</h4>
-                <div className="space-y-3">
-                  {order.itensPedido?.map((item, index) => (
-                    <div key={index} className="bg-white border border-gray-200 rounded-lg p-4">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h5 className="font-medium text-gray-900">{item.produto?.Nome}</h5>
-                          <p className="text-sm text-gray-600">SKU: {item.produto?.SKU}</p>
-                          <p className="text-sm text-gray-600">Quantidade: {item.Quantidade}</p>
+  const formattedOrder = {
+    id: `PED-${order.PedidoID}`,
+    date: order.DataPedido,
+    status: order.Status,
+    total: parseFloat(order.Total),
+    clientName: order.cliente?.Nome || order.Cliente?.Nome || 'Cliente',
+    items: order.itensPedido.map(item => ({
+      name: item.produto.Nome,
+      quantity: item.Quantidade,
+      price: parseFloat(item.PrecoUnitario),
+      seller: item.produto.vendedor ? item.produto.vendedor.Nome : 'N/A',
+      sellerId: item.produto.vendedor?.VendedorID || null,
+      image: item.produto.ImagemPrincipal || '/placeholder-image.png'
+    })),
+    sellers: [...new Set(order.itensPedido.map(item => item.produto.vendedor?.Nome).filter(Boolean))],
+    address: {
+      name: order.Endereco?.Nome || 'Endereço não informado',
+      street: order.Endereco?.Logradouro && order.Endereco?.Numero
+        ? `${order.Endereco.Logradouro}, ${order.Endereco.Numero}`
+        : 'Endereço não informado',
+      city: order.Endereco?.Cidade && order.Endereco?.UF
+        ? `${order.Endereco.Cidade} - ${order.Endereco.UF}`
+        : 'Cidade não informada',
+      cep: order.Endereco?.CEP || 'CEP não informado'
+    },
+    paymentMethod: order.pagamentosPedido?.[0]?.MetodoPagamento?.Nome || 'Método não informado',
+    paymentDetails: order.pagamentosPedido?.map(pagamento => ({
+      method: pagamento.MetodoPagamento?.Nome || 'N/A',
+      amount: parseFloat(pagamento.Valor || 0),
+      installments: pagamento.Parcelas || 1
+    })) || []
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-slate-200">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-slate-900">Comprovante - Pedido {formattedOrder.id}</h2>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  const printWindow = window.open('', '_blank');
+                  const receiptHTML = `
+                    <html>
+                      <head>
+                        <title>Comprovante - Pedido ${formattedOrder.id}</title>
+                        <style>
+                          body { font-family: Arial, sans-serif; margin: 20px; }
+                          .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+                          .info { margin-bottom: 20px; }
+                          .info div { margin-bottom: 10px; }
+                          .items { margin-bottom: 20px; }
+                          .items table { width: 100%; border-collapse: collapse; }
+                          .items th, .items td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                          .total { font-weight: bold; text-align: right; }
+                          .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #666; }
+                        </style>
+                      </head>
+                      <body>
+                        <div class="header">
+                          <h1>HelpNet - Comprovante de Compra</h1>
+                          <h2>Pedido ${formattedOrder.id}</h2>
                         </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-gray-900">
-                            {formatPrice(item.PrecoUnitario * item.Quantidade)}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            {formatPrice(item.PrecoUnitario)} cada
-                          </p>
+
+                        <div class="info">
+                          <div><strong>Data da Compra:</strong> ${formatDate(formattedOrder.date)}</div>
+                          <div><strong>Status do Pedido:</strong> ${formattedOrder.status}</div>
+                          <div><strong>Cliente:</strong> ${formattedOrder.clientName}</div>
+                          <div><strong>Método de Pagamento:</strong> ${formattedOrder.paymentMethod}</div>
                         </div>
-                      </div>
-                    </div>
+
+                        <div class="items">
+                          <h3>Produtos Comprados</h3>
+                          <table>
+                            <thead>
+                              <tr>
+                                <th>Produto</th>
+                                <th>Quantidade</th>
+                                <th>Preço Unitário</th>
+                                <th>Total</th>
+                                <th>Vendedor</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              ${formattedOrder.items.map(item => `
+                                <tr>
+                                  <td>${item.name}</td>
+                                  <td>${item.quantity}</td>
+                                  <td>${formatPrice(item.price)}</td>
+                                  <td>${formatPrice(item.price * item.quantity)}</td>
+                                  <td>${item.seller}</td>
+                                </tr>
+                              `).join('')}
+                            </tbody>
+                          </table>
+                          <div class="total">
+                            <strong>Valor Total: ${formatPrice(formattedOrder.total)}</strong>
+                          </div>
+                        </div>
+
+                        <div class="info">
+                          <h3>Endereço de Entrega</h3>
+                          <div>${formattedOrder.address.name}</div>
+                          <div>${formattedOrder.address.street}</div>
+                          <div>${formattedOrder.address.city}</div>
+                          <div>CEP: ${formattedOrder.address.cep}</div>
+                        </div>
+
+                        <div class="footer">
+                          <p>Este é um comprovante oficial da HelpNet. Data de emissão: ${new Date().toLocaleDateString('pt-BR')}</p>
+                        </div>
+                      </body>
+                    </html>
+                  `;
+
+                  printWindow.document.write(receiptHTML);
+                  printWindow.document.close();
+                  printWindow.print();
+                }}
+                className="flex items-center gap-2 px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200"
+                title="Imprimir comprovante"
+              >
+                <FaPrint />
+                <span className="hidden sm:inline">Imprimir</span>
+              </button>
+              <button
+                onClick={handleClose}
+                className="p-2 rounded-lg text-slate-600 hover:bg-slate-50"
+              >
+                <FiX />
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="p-6 space-y-6">
+          {/* Cabeçalho do comprovante */}
+          <div className="text-center border-b border-slate-200 pb-4">
+            <h3 className="text-lg font-bold text-slate-900">HelpNet</h3>
+            <p className="text-sm text-slate-600">Comprovante de Compra</p>
+            <p className="text-sm font-medium text-slate-900">Pedido {formattedOrder.id}</p>
+          </div>
+
+          {/* Informações do pedido */}
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="font-medium text-slate-900">Data da Compra</p>
+              <p className="text-slate-600">{formatDate(formattedOrder.date)}</p>
+            </div>
+            <div>
+              <p className="font-medium text-slate-900">Status do Pedido</p>
+              <p className="text-slate-600">{formattedOrder.status}</p>
+            </div>
+            <div>
+              <p className="font-medium text-slate-900">Cliente</p>
+              <p className="text-slate-600">{formattedOrder.clientName}</p>
+            </div>
+            <div>
+              <p className="font-medium text-slate-900">Método de Pagamento</p>
+              <p className="text-slate-600">{formattedOrder.paymentMethod}</p>
+            </div>
+          </div>
+
+          {/* Itens */}
+          <div>
+            <h3 className="font-medium text-slate-900 mb-3">Produtos Comprados</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border border-slate-200">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="border border-slate-200 px-3 py-2 text-left">Produto</th>
+                    <th className="border border-slate-200 px-3 py-2 text-center">Qtd</th>
+                    <th className="border border-slate-200 px-3 py-2 text-right">Preço Unit.</th>
+                    <th className="border border-slate-200 px-3 py-2 text-right">Total</th>
+                    <th className="border border-slate-200 px-3 py-2 text-left">Vendedor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {formattedOrder.items.map((item, index) => (
+                    <tr key={index} className="border-b border-slate-200">
+                      <td className="border border-slate-200 px-3 py-2">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={item.image}
+                            alt={item.name}
+                            className="w-10 h-10 object-cover rounded border border-slate-200 flex-shrink-0"
+                            onError={(e) => {
+                              e.target.src = '/placeholder-image.png';
+                            }}
+                          />
+                          <span>{item.name}</span>
+                        </div>
+                      </td>
+                      <td className="border border-slate-200 px-3 py-2 text-center">{item.quantity}</td>
+                      <td className="border border-slate-200 px-3 py-2 text-right">{formatPrice(item.price)}</td>
+                      <td className="border border-slate-200 px-3 py-2 text-right">{formatPrice(item.price * item.quantity)}</td>
+                      <td className="border border-slate-200 px-3 py-2">{item.seller}</td>
+                    </tr>
                   ))}
-                </div>
-              </div>
-
-              {/* Payment and Shipping */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Payment Details */}
-                <div>
-                  <h4 className="text-lg font-semibold text-gray-900 mb-4">Pagamento</h4>
-                  <div className="bg-white border border-gray-200 rounded-lg p-4">
-                    {order.pagamentosPedido?.length > 0 ? (
-                      <div className="space-y-2">
-                        {order.pagamentosPedido.map((pagamento, index) => (
-                          <div key={index}>
-                            <p className="font-medium text-gray-900">
-                              {pagamento.MetodoPagamento?.Nome || 'Método não informado'}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              Valor: {formatPrice(pagamento.ValorPago || 0)}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              Status: {pagamento.StatusPagamento || 'N/A'}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-gray-600">Informações de pagamento não disponíveis</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Shipping Address */}
-                <div>
-                  <h4 className="text-lg font-semibold text-gray-900 mb-4">Endereço de Entrega</h4>
-                  <div className="bg-white border border-gray-200 rounded-lg p-4">
-                    {order.Endereco ? (
-                      <div className="space-y-1">
-                        <p className="font-medium text-gray-900">{order.Endereco.Nome}</p>
-                        <p className="text-gray-700">
-                          {order.Endereco.Nome && order.Endereco.Numero
-                            ? `${order.Endereco.Nome}, ${order.Endereco.Numero}`
-                            : 'Endereço não informado'}
-                        </p>
-                        <p className="text-gray-700">
-                          {order.Endereco.Cidade && order.Endereco.UF
-                            ? `${order.Endereco.Cidade} - ${order.Endereco.UF}`
-                            : 'Cidade não informada'}
-                        </p>
-                        <p className="text-gray-700">CEP: {order.Endereco.CEP || 'Não informado'}</p>
-                        {order.Endereco.Complemento && (
-                          <p className="text-gray-700">Complemento: {order.Endereco.Complemento}</p>
-                        )}
-                        {order.Endereco.Bairro && (
-                          <p className="text-gray-700">Bairro: {order.Endereco.Bairro}</p>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-gray-600">Endereço não disponível</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Delivery Tracking - Only show for client orders */}
-              {!isAdmin && delivery && (
-                <div>
-                  <h4 className="text-lg font-semibold text-gray-900 mb-4">Rastreamento de Entrega</h4>
-                  <div className="bg-white border border-gray-200 rounded-lg p-4">
-                    {delivery.rastreamentos && delivery.rastreamentos.length > 0 ? (
-                      <div className="space-y-4">
-                        {/* Responsive timeline showing delivery status updates with icons and dates */}
-                        <div className="relative">
-                          {delivery.rastreamentos.map((rastreamento, index) => {
-                            // Map status codes to friendly texts if numeric, otherwise use string directly
-                            const statusText = typeof rastreamento.status === 'number'
-                              ? getDeliveryStatusText(rastreamento.status)
-                              : rastreamento.status;
-                            const isLast = index === delivery.rastreamentos.length - 1;
-
-                            return (
-                              <div key={index} className="flex items-start gap-4 pb-4">
-                                {/* Timeline line */}
-                                {!isLast && (
-                                  <div className="absolute left-6 top-10 w-0.5 h-full bg-gray-200"></div>
-                                )}
-
-                                {/* Icon */}
-                                <div className="flex-shrink-0 w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-                                  {getDeliveryStatusIcon(statusText)}
-                                </div>
-
-                                {/* Content */}
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between">
-                                    <h5 className="font-medium text-gray-900">{statusText}</h5>
-                                    <span className="text-sm text-gray-500">
-                                      {formatDate(rastreamento.dataHora)}
-                                    </span>
-                                  </div>
-                                  {rastreamento.local && (
-                                    <p className="text-sm text-gray-600 mt-1">
-                                      <FaMapMarkerAlt className="inline mr-1" />
-                                      {rastreamento.local}
-                                    </p>
-                                  )}
-                                  {rastreamento.observacoes && (
-                                    <p className="text-sm text-gray-600 mt-1">{rastreamento.observacoes}</p>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        {/* Additional delivery information section */}
-                        <div className="border-t border-gray-200 pt-4 mt-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                            {delivery.Transportadora && (
-                              <div>
-                                <span className="font-medium text-gray-900">Transportadora:</span>
-                                <p className="text-gray-600">{delivery.Transportadora}</p>
-                              </div>
-                            )}
-                            {delivery.CodigoRastreio && (
-                              <div>
-                                <span className="font-medium text-gray-900">Código de Rastreio:</span>
-                                <p className="text-gray-600 font-mono">{delivery.CodigoRastreio}</p>
-                              </div>
-                            )}
-                            {delivery.PrevisaoEntrega && (
-                              <div>
-                                <span className="font-medium text-gray-900">Previsão de Entrega:</span>
-                                <p className="text-gray-600">{formatDate(delivery.PrevisaoEntrega)}</p>
-                              </div>
-                            )}
-                            {delivery.DataEntrega && (
-                              <div>
-                                <span className="font-medium text-gray-900">Data de Entrega:</span>
-                                <p className="text-gray-600">{formatDate(delivery.DataEntrega)}</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <FaShippingFast className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                        <p className="text-gray-600">Entrega ainda não foi iniciada</p>
-                        <p className="text-sm text-gray-500 mt-1">O rastreamento aparecerá aqui quando o pedido for enviado</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Order Summary */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="text-lg font-semibold text-gray-900 mb-3">Resumo do Pedido</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Subtotal:</span>
-                    <span className="font-medium">{formatPrice((order.Total || 0) - (order.Frete || 0))}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Frete:</span>
-                    <span className="font-medium">{formatPrice(order.Frete || 0)}</span>
-                  </div>
-                  <div className="border-t border-gray-300 pt-2 flex justify-between">
-                    <span className="font-semibold text-gray-900">Total:</span>
-                    <span className="font-bold text-blue-600">{formatPrice(order.Total || 0)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
-                <button
-                  onClick={handleClose}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Fechar
-                </button>
+                </tbody>
+              </table>
+            </div>
+            <div className="border-t border-slate-200 pt-2 mt-3">
+              <div className="flex justify-between font-bold text-slate-900">
+                <span>Valor Total</span>
+                <span>{formatPrice(formattedOrder.total)}</span>
               </div>
             </div>
-          )}
+          </div>
+
+          {/* Endereço e pagamento */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+            <div>
+              <h3 className="font-medium text-slate-900 mb-2">Endereço de Entrega</h3>
+              <div className="text-slate-600 space-y-1">
+                <p>{formattedOrder.address.name}</p>
+                <p>{formattedOrder.address.street}</p>
+                <p>{formattedOrder.address.city}</p>
+                <p>CEP: {formattedOrder.address.cep}</p>
+              </div>
+            </div>
+            <div>
+              <h3 className="font-medium text-slate-900 mb-2">Método de Pagamento</h3>
+              <div className="text-slate-600 space-y-1">
+                <p>{formattedOrder.paymentMethod}</p>
+                {formattedOrder.paymentDetails.length > 0 && (
+                  <div className="mt-2">
+                    {formattedOrder.paymentDetails.map((payment, index) => (
+                      <p key={index} className="text-xs">
+                        {payment.method}: {formatPrice(payment.amount)}
+                        {payment.installments > 1 && ` (${payment.installments}x)`}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Rodapé */}
+          <div className="text-center text-xs text-slate-500 border-t border-slate-200 pt-4">
+            <p>Este é um comprovante oficial da HelpNet</p>
+            <p>Data de emissão: {new Date().toLocaleDateString('pt-BR')}</p>
+          </div>
+        </div>
+        <div className="p-6 border-t border-slate-200">
+          <button
+            onClick={handleClose}
+            className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
+          >
+            Fechar
+          </button>
         </div>
       </div>
     </div>

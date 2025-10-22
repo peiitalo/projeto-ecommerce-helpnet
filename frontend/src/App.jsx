@@ -42,8 +42,7 @@ const VendorDeliveriesPage = lazy(() => import('./pages/vendor/VendorDeliveriesP
 const VendorDeliveryDetailPage = lazy(() => import('./pages/vendor/VendorDeliveryDetailPage'));
 const RelatorioPage = lazy(() => import('./pages/vendor/RelatorioPage'));
 const VendorCuponsPage = lazy(() => import('./pages/vendor/VendorCuponsPage'));
-
-import AdminLogin from './pages/admin/AdminLogin.jsx';
+import AdminLogin from "./pages/admin/AdminLogin.jsx";
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
 function App() {
