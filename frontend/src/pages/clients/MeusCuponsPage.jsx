@@ -37,8 +37,6 @@ function MeusCuponsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showGenerateModal, setShowGenerateModal] = useState(false);
-  const [generating, setGenerating] = useState(false);
   const { user, logout } = useAuth();
   const { favoritesCount, notificationsCount, cartCount } = useCounters();
   const { applyCoupon } = useCart();
@@ -64,44 +62,101 @@ function MeusCuponsPage() {
     { label: 'Configurações', to: '/configuracoes', icon: <FiSettings className="text-slate-500" /> },
   ];
 
-  // Mock coupons data
+  // Carregar cupons disponíveis e resgatados
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setCoupons([
-        {
-          id: 1,
-          code: 'DESCONTO10',
-          discount: 10,
-          type: 'percentage',
-          description: '10% de desconto em produtos selecionados',
-          validUntil: '2024-12-31',
-          used: false,
-          minValue: 50
-        },
-        {
-          id: 2,
-          code: 'FRETEGRATIS',
-          discount: 0,
-          type: 'free_shipping',
-          description: 'Frete grátis em compras acima de R$ 100',
-          validUntil: '2024-12-15',
-          used: false,
-          minValue: 100
-        },
-        {
-          id: 3,
-          code: 'PRIMEIRA15',
-          discount: 15,
-          type: 'percentage',
-          description: '15% OFF na primeira compra',
-          validUntil: '2024-11-30',
-          used: true,
-          minValue: 0
+    const loadCoupons = async () => {
+      try {
+        // Buscar cupons disponíveis para resgate
+        const availableResponse = await fetch('/api/cupons/disponiveis', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        let availableCoupons = [];
+        if (availableResponse.ok) {
+          const data = await availableResponse.json();
+          if (data.success) {
+            availableCoupons = data.data.map(cupomCliente => ({
+              id: cupomCliente.CupomClienteID,
+              code: cupomCliente.cupom.Codigo,
+              discount: cupomCliente.cupom.ValorDesconto,
+              type: cupomCliente.cupom.TipoDesconto === 'PERCENTUAL' ? 'percentage' :
+                    cupomCliente.cupom.TipoDesconto === 'FRETE_GRATIS' ? 'free_shipping' : 'fixed',
+              description: cupomCliente.cupom.Descricao,
+              validUntil: cupomCliente.DataExpiracaoCliente || cupomCliente.cupom.DataExpiracao,
+              used: false, // Cupons disponíveis não foram usados ainda
+              minValue: cupomCliente.cupom.ValorMinimo,
+              status: 'available', // Disponível para resgate
+              canRedeem: !cupomCliente.Resgatado
+            }));
+          }
         }
-      ]);
-      setLoading(false);
-    }, 1000);
+
+        // Buscar cupons já resgatados (usados ou não)
+        const redeemedResponse = await fetch('/api/cupons/meus', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        let redeemedCoupons = [];
+        if (redeemedResponse.ok) {
+          const data = await redeemedResponse.json();
+          if (data.success) {
+            redeemedCoupons = data.data.map(cupomCliente => ({
+              id: cupomCliente.CupomClienteID,
+              code: cupomCliente.cupom.Codigo,
+              discount: cupomCliente.cupom.ValorDesconto,
+              type: cupomCliente.cupom.TipoDesconto === 'PERCENTUAL' ? 'percentage' :
+                    cupomCliente.cupom.TipoDesconto === 'FRETE_GRATIS' ? 'free_shipping' : 'fixed',
+              description: cupomCliente.cupom.Descricao,
+              validUntil: cupomCliente.DataExpiracaoCliente || cupomCliente.cupom.DataExpiracao,
+              used: cupomCliente.Usado,
+              minValue: cupomCliente.cupom.ValorMinimo,
+              status: cupomCliente.Usado ? 'used' : 'redeemed', // Resgatado mas não usado ainda
+              redeemedAt: cupomCliente.DataResgate,
+              usedAt: cupomCliente.DataUso
+            }));
+          }
+        }
+
+        // Combinar e ordenar cupons
+        const allCoupons = [...availableCoupons, ...redeemedCoupons].sort((a, b) => {
+          // Ordenar por status: disponíveis primeiro, depois resgatados, depois usados
+          const statusOrder = { 'available': 0, 'redeemed': 1, 'used': 2 };
+          if (statusOrder[a.status] !== statusOrder[b.status]) {
+            return statusOrder[a.status] - statusOrder[b.status];
+          }
+          // Dentro do mesmo status, ordenar por data de validade
+          return new Date(a.validUntil) - new Date(b.validUntil);
+        });
+
+        setCoupons(allCoupons);
+      } catch (error) {
+        console.error('Erro ao carregar cupons:', error);
+        // Fallback para dados mock se a API falhar
+        setCoupons([
+          {
+            id: 1,
+            code: 'DESCONTO10',
+            discount: 10,
+            type: 'percentage',
+            description: '10% de desconto em produtos selecionados',
+            validUntil: '2024-12-31',
+            used: false,
+            minValue: 50,
+            status: 'available'
+          }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCoupons();
   }, []);
 
   const handleLogout = () => {
@@ -116,25 +171,33 @@ function MeusCuponsPage() {
     showSuccess('Código copiado para a área de transferência!');
   };
 
-  const generateCoupon = async () => {
-    setGenerating(true);
-    // Simulate API call
-    setTimeout(() => {
-      const newCoupon = {
-        id: Date.now(),
-        code: 'NOVO' + Math.random().toString(36).substr(2, 6).toUpperCase(),
-        discount: 5,
-        type: 'percentage',
-        description: '5% de desconto especial',
-        validUntil: '2024-12-31',
-        used: false,
-        minValue: 25
-      };
-      setCoupons(prev => [newCoupon, ...prev]);
-      setShowGenerateModal(false);
-      setGenerating(false);
-      showSuccess('Cupom gerado com sucesso!');
-    }, 1500);
+  const redeemCoupon = async (cupomClienteID) => {
+    try {
+      const response = await fetch('/api/cupons/resgatar', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ cupomClienteID })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          showSuccess('Cupom resgatado com sucesso!');
+          // Recarregar cupons
+          window.location.reload();
+        } else {
+          showError(data.message || 'Erro ao resgatar cupom');
+        }
+      } else {
+        showError('Erro ao resgatar cupom');
+      }
+    } catch (error) {
+      console.error('Erro ao resgatar cupom:', error);
+      showError('Erro interno do servidor');
+    }
   };
 
   const formatDiscount = (coupon) => {
@@ -318,13 +381,7 @@ function MeusCuponsPage() {
                   <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Meus Cupons</h1>
                   <p className="text-slate-600">Gerencie seus cupons de desconto</p>
                 </div>
-                <button
-                  onClick={() => setShowGenerateModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <FaPlus />
-                  <span>Gerar Cupom</span>
-                </button>
+                {/* Removido: Botão de gerar cupom - agora cupons são distribuídos pelos vendedores */}
               </div>
             </div>
 
@@ -365,12 +422,22 @@ function MeusCuponsPage() {
                           }`}>
                             {formatDiscount(coupon)}
                           </h3>
-                          {coupon.used && (
+                          {coupon.status === 'used' && (
                             <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full">
                               Utilizado
                             </span>
                           )}
-                          {isExpired(coupon.validUntil) && !coupon.used && (
+                          {coupon.status === 'available' && (
+                            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
+                              Disponível
+                            </span>
+                          )}
+                          {coupon.status === 'redeemed' && (
+                            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
+                              Resgatado
+                            </span>
+                          )}
+                          {isExpired(coupon.validUntil) && coupon.status !== 'used' && (
                             <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded-full">
                               Expirado
                             </span>
@@ -399,7 +466,16 @@ function MeusCuponsPage() {
                         }`}>
                           {coupon.code}
                         </span>
-                        {!coupon.used && !isExpired(coupon.validUntil) && (
+                        {coupon.status === 'available' && !isExpired(coupon.validUntil) && (
+                          <button
+                            onClick={() => redeemCoupon(coupon.id)}
+                            className="px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                            title="Resgatar cupom"
+                          >
+                            Resgatar
+                          </button>
+                        )}
+                        {coupon.status === 'redeemed' && !coupon.used && !isExpired(coupon.validUntil) && (
                           <div className="flex gap-2">
                             <button
                               onClick={() => copyToClipboard(coupon.code)}
@@ -410,17 +486,9 @@ function MeusCuponsPage() {
                             </button>
                             <button
                               onClick={() => {
-                                const couponData = {
-                                  code: coupon.code,
-                                  discount: coupon.discount,
-                                  type: coupon.type,
-                                  minValue: coupon.minValue || 0
-                                };
-                                applyCoupon(couponData);
-                                showSuccess('Cupom aplicado! Redirecionando para o carrinho...');
-                                setTimeout(() => navigate('/carrinho'), 1500);
+                                navigate('/carrinho');
                               }}
-                              className="px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                              className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
                               title="Usar no carrinho"
                             >
                               Usar
@@ -436,14 +504,7 @@ function MeusCuponsPage() {
               <div className="text-center py-16">
                 <FaTicketAlt className="mx-auto h-16 w-16 text-slate-300 mb-4" />
                 <h3 className="text-xl font-medium text-slate-900 mb-2">Nenhum cupom disponível</h3>
-                <p className="text-slate-600 mb-6">Você ainda não possui cupons de desconto</p>
-                <button
-                  onClick={() => setShowGenerateModal(true)}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <FaPlus />
-                  <span>Gerar Primeiro Cupom</span>
-                </button>
+                <p className="text-slate-600 mb-6">Você ainda não possui cupons de desconto. Aguarde os vendedores distribuírem cupons para você!</p>
               </div>
             )}
           </div>
@@ -464,45 +525,7 @@ function MeusCuponsPage() {
         </footer>
       </div>
 
-      {/* Modal de Geração de Cupom */}
-      {showGenerateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
-            <div className="p-6 border-b border-slate-200">
-              <h2 className="text-xl font-semibold text-slate-900">Gerar Novo Cupom</h2>
-              <p className="text-sm text-slate-600 mt-1">Crie um cupom de desconto personalizado</p>
-            </div>
-            <div className="p-6">
-              <div className="text-center">
-                <FaTicketAlt className="mx-auto h-12 w-12 text-blue-600 mb-4" />
-                <p className="text-slate-600 mb-6">
-                  Um novo cupom de desconto será gerado automaticamente com condições especiais.
-                </p>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                  <p className="text-sm text-blue-800">
-                    <strong>Benefício:</strong> 5% de desconto em qualquer compra acima de R$ 25
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
-              <button
-                onClick={() => setShowGenerateModal(false)}
-                className="px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={generateCoupon}
-                disabled={generating}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {generating ? 'Gerando...' : 'Gerar Cupom'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Removido: Modal de geração de cupom - agora cupons são distribuídos pelos vendedores */}
     </div>
   );
 }

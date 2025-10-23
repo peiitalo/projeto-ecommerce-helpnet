@@ -40,6 +40,8 @@ export function CartProvider({ children }) {
   const [freightLoading, setFreightLoading] = useState(false);
   const [freightError, setFreightError] = useState(null);
   const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState(null);
 
   // Persiste mudanças
   useEffect(() => {
@@ -270,20 +272,77 @@ export function CartProvider({ children }) {
   const subtotal = useMemo(() => items.reduce((sum, i) => sum + (i.price * (i.quantity || 0)), 0), [items]);
   const freight = useMemo(() => selectedFreight || { valor: 0, prazo: '', nome: '' }, [selectedFreight]);
   
+  // Aplicar cupom
+  const applyCoupon = async (couponCode) => {
+    if (!couponCode.trim()) {
+      setCouponError('Digite o código do cupom');
+      return false;
+    }
+
+    setCouponLoading(true);
+    setCouponError(null);
+
+    try {
+      const response = await fetch('/api/cupons/validar', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          codigo: couponCode.toUpperCase(),
+          clienteID: user?.id,
+          produtos: items.map(item => ({
+            ProdutoID: item.id,
+            CategoriaID: item.categoryId,
+            PrecoUnitario: item.price,
+            Quantidade: item.quantity
+          }))
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Erro ao validar cupom');
+      }
+
+      if (!data.valido) {
+        throw new Error(data.message || 'Cupom inválido');
+      }
+
+      setAppliedCoupon(data.data.cupom);
+      return true;
+    } catch (error) {
+      console.error('Erro ao aplicar cupom:', error);
+      setCouponError(error.message);
+      setAppliedCoupon(null);
+      return false;
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  // Remover cupom
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponError(null);
+  };
+
   // Calcular desconto do cupom
   const couponDiscount = useMemo(() => {
-    if (!appliedCoupon || subtotal < (appliedCoupon.minValue || 0)) return 0;
-    
-    if (appliedCoupon.type === 'percentage') {
-      return (subtotal * appliedCoupon.discount) / 100;
-    } else if (appliedCoupon.type === 'fixed') {
-      return Math.min(appliedCoupon.discount, subtotal);
+    if (!appliedCoupon || subtotal < (appliedCoupon.ValorMinimo || 0)) return 0;
+
+    if (appliedCoupon.TipoDesconto === 'PERCENTUAL') {
+      return (subtotal * appliedCoupon.ValorDesconto) / 100;
+    } else if (appliedCoupon.TipoDesconto === 'VALOR_FIXO') {
+      return Math.min(appliedCoupon.ValorDesconto, subtotal);
     }
     return 0;
   }, [appliedCoupon, subtotal]);
   
   const total = useMemo(() => {
-    const freightCost = appliedCoupon?.type === 'free_shipping' ? 0 : freight.valor;
+    const freightCost = appliedCoupon?.TipoDesconto === 'FRETE_GRATIS' ? 0 : freight.valor;
     return Math.max(0, subtotal - couponDiscount + freightCost);
   }, [subtotal, couponDiscount, freight.valor, appliedCoupon]);
 
@@ -307,8 +366,10 @@ export function CartProvider({ children }) {
     freightError,
     appliedCoupon,
     couponDiscount,
-    applyCoupon: setAppliedCoupon,
-    removeCoupon: () => setAppliedCoupon(null),
+    couponLoading,
+    couponError,
+    applyCoupon,
+    removeCoupon,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

@@ -13,7 +13,8 @@ export const criarPedido = async (req, res) => {
       itens,
       metodosPagamento,
       frete = 0,
-      observacoes
+      observacoes,
+      cupomCodigo
     } = req.body;
 
     logger.info('criar_pedido_iniciado', {
@@ -62,6 +63,71 @@ export const criarPedido = async (req, res) => {
     // Criar mapa de produtos para acesso rápido
     const produtosMap = new Map(produtos.map(p => [p.ProdutoID, p]));
 
+    // Validar cupom se fornecido
+    let cupomAplicado = null;
+    let descontoCupom = 0;
+    let freteGratisCupom = false;
+
+    if (cupomCodigo) {
+      try {
+        // Importar função de validação de cupom
+        const { validarCupom, calcularDesconto } = await import('../controllers/cupomController.js');
+
+        // Validar cupom
+        const validacao = await validarCupom({
+          body: {
+            codigo: cupomCodigo,
+            clienteID: user.id,
+            produtos: itens.map(item => ({
+              ProdutoID: parseInt(item.produtoId),
+              CategoriaID: null, // Será preenchido depois
+              PrecoUnitario: 0, // Será preenchido depois
+              Quantidade: item.quantidade
+            }))
+          }
+        });
+
+        if (!validacao || !validacao.valido) {
+          return res.status(400).json({
+            success: false,
+            errors: [validacao?.message || "Cupom inválido"]
+          });
+        }
+
+        cupomAplicado = validacao.data.cupom;
+
+        // Calcular desconto
+        const calculoDesconto = await calcularDesconto({
+          body: {
+            codigo: cupomCodigo,
+            subtotal: 0, // Será calculado depois
+            frete: frete,
+            produtos: [] // Será preenchido depois
+          }
+        });
+
+        descontoCupom = calculoDesconto.data.desconto;
+        freteGratisCupom = calculoDesconto.data.freteGratis;
+
+        logger.info('cupom_validado_aplicado', {
+          clienteId: user.id,
+          cupomCodigo,
+          desconto: descontoCupom,
+          freteGratis: freteGratisCupom
+        });
+      } catch (cupomError) {
+        logger.warn('erro_validacao_cupom', {
+          clienteId: user.id,
+          cupomCodigo,
+          error: cupomError.message
+        });
+        return res.status(400).json({
+          success: false,
+          errors: ["Erro ao validar cupom"]
+        });
+      }
+    }
+
     // Calcular total e verificar estoque
     let totalItens = 0;
     const itensComPreco = [];
@@ -99,13 +165,14 @@ export const criarPedido = async (req, res) => {
         nome: produto.Nome,
         quantidade: item.quantidade,
         precoUnitario,
-        subtotal
+        subtotal,
+        categoriaId: produto.CategoriaID
       });
     }
 
     // Usar o valor de frete enviado pelo frontend (já calculado)
-    // Para validação, podemos recalcular e comparar se necessário
-    let valorFrete = frete || 0;
+    // Aplicar frete grátis se cupom permitir
+    let valorFrete = freteGratisCupom ? 0 : (frete || 0);
 
     // Opcional: validar frete recalculando (comentado para evitar complexidade)
     // try {
@@ -135,9 +202,50 @@ export const criarPedido = async (req, res) => {
     //   });
     // }
 
+    // Recalcular desconto do cupom com valores reais
+    if (cupomAplicado) {
+      try {
+        const { calcularDesconto } = await import('../controllers/cupomController.js');
+
+        const produtosParaCalculo = itensComPreco.map(item => ({
+          ProdutoID: item.produtoId,
+          CategoriaID: item.categoriaId,
+          PrecoUnitario: item.precoUnitario,
+          Quantidade: item.quantidade
+        }));
+
+        const calculoDesconto = await calcularDesconto({
+          body: {
+            codigo: cupomCodigo,
+            subtotal: totalItens,
+            frete: valorFrete,
+            produtos: produtosParaCalculo
+          }
+        });
+
+        descontoCupom = calculoDesconto.data.desconto;
+        freteGratisCupom = calculoDesconto.data.freteGratis;
+        valorFrete = freteGratisCupom ? 0 : valorFrete;
+
+        logger.info('desconto_cupom_recalculado', {
+          clienteId: user.id,
+          subtotal: totalItens,
+          frete: valorFrete,
+          desconto: descontoCupom,
+          freteGratis: freteGratisCupom
+        });
+      } catch (recalculoError) {
+        logger.warn('erro_recalculo_desconto_cupom', {
+          clienteId: user.id,
+          error: recalculoError.message
+        });
+        // Manter desconto anterior se falhar
+      }
+    }
+
     // Calcular total dos pagamentos
     const totalPagamentos = metodosPagamento.reduce((total, metodo) => total + parseFloat(metodo.valor), 0);
-    const totalPedido = totalItens + valorFrete;
+    const totalPedido = totalItens + valorFrete - descontoCupom;
 
     logger.info('criar_pedido_calculos', {
       clienteId: user.id,
@@ -242,7 +350,10 @@ export const criarPedido = async (req, res) => {
           Status: 'AguardandoPagamento',
           StatusPagamento: 'PENDENTE',
           ExpiraEm: expiraEm,
-          TotalPago: 0
+          TotalPago: 0,
+          // Adicionar campos do cupom se aplicável
+          CupomID: cupomAplicado ? cupomAplicado.CupomID : null,
+          DescontoCupom: descontoCupom
         }
       });
 
@@ -327,6 +438,55 @@ export const criarPedido = async (req, res) => {
         }
       });
 
+      // Registrar uso do cupom se aplicável
+      if (cupomAplicado) {
+        try {
+          // Incrementar usos totais do cupom
+          await prisma.cupom.update({
+            where: { CupomID: cupomAplicado.CupomID },
+            data: { UsosAtuais: { increment: 1 } }
+          });
+
+          // Registrar uso por cliente
+          await prisma.cupomCliente.upsert({
+            where: {
+              CupomID_ClienteID: {
+                CupomID: cupomAplicado.CupomID,
+                ClienteID: user.id
+              }
+            },
+            update: {
+              Usado: true,
+              DataUso: new Date(),
+              PedidoID: resultado.PedidoID,
+              UsosCliente: { increment: 1 }
+            },
+            create: {
+              CupomID: cupomAplicado.CupomID,
+              ClienteID: user.id,
+              Usado: true,
+              DataUso: new Date(),
+              PedidoID: resultado.PedidoID,
+              UsosCliente: 1
+            }
+          });
+
+          logger.info('cupom_uso_registrado', {
+            pedidoId: resultado.PedidoID,
+            cupomId: cupomAplicado.CupomID,
+            clienteId: user.id,
+            desconto: descontoCupom
+          });
+        } catch (cupomUsoError) {
+          logger.error('erro_registro_uso_cupom', {
+            pedidoId: resultado.PedidoID,
+            cupomId: cupomAplicado?.CupomID,
+            error: cupomUsoError.message
+          });
+          // Não falhar o pedido por erro no registro do cupom
+        }
+      }
+
       // Notificar vendedor e criar entregas
       await notificarVendedorPedidoPago(resultado.PedidoID);
       await criarEntregasAutomaticas(resultado.PedidoID);
@@ -399,6 +559,12 @@ export const criarPedido = async (req, res) => {
         total: totalPedido,
         frete: valorFrete,
         subtotal: totalItens,
+        descontoCupom: descontoCupom,
+        cupomAplicado: cupomAplicado ? {
+          codigo: cupomAplicado.Codigo,
+          tipo: cupomAplicado.TipoDesconto,
+          valor: cupomAplicado.ValorDesconto
+        } : null,
         status: 'Pago',
         // Pagamento simulado aprovado - redirecionar para página de sucesso
         paymentUrl: null, // Não há URL de pagamento externa

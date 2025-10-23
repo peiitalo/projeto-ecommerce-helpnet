@@ -1,23 +1,8 @@
 // backend/src/routes/adminRoutes.js
 import express from 'express';
 import { authMiddleware } from '../middleware/authMiddleware.js';
-import {
-  listarPedidosAdmin,
-  atualizarStatusPedidoAdmin,
-  buscarPedidoAdmin
-} from '../controllers/pedidoController.js';
-import {
-  obterDashboardStats,
-  listarVendedores,
-  listarEmpresas,
-  atualizarStatusEmpresa,
-  listarClientes,
-  buscarCliente,
-  obterRelatoriosFinanceiros,
-  listarMensagensSuporte,
-  listarAvaliacoes,
-  atualizarVisibilidadeAvaliacao
-} from '../controllers/adminController.js';
+import * as pedidoController from '../controllers/pedidoController.js';
+import * as adminController from '../controllers/adminController.js';
 
 const router = express.Router();
 
@@ -37,30 +22,30 @@ router.use(authMiddleware);
 router.use(requireAdmin);
 
 // Dashboard
-router.get('/dashboard', obterDashboardStats);
+router.get('/dashboard', adminController.obterDashboardStats);
 
 // Rotas para gerenciamento de pedidos
-router.get('/pedidos', listarPedidosAdmin);
-router.get('/pedidos/:id', buscarPedidoAdmin);
-router.put('/pedidos/:id/status', atualizarStatusPedidoAdmin);
+router.get('/pedidos', pedidoController.listarPedidosAdmin);
+router.get('/pedidos/:id', pedidoController.buscarPedidoAdmin);
+router.put('/pedidos/:id/status', pedidoController.atualizarStatusPedidoAdmin);
 
 // Vendedores 
 router.get('/vendedores', adminController.listarVendedores);
 
 // Empresas/Vendedores
-router.get('/empresas', listarEmpresas);
-router.put('/empresas/:id/status', atualizarStatusEmpresa);
+router.get('/empresas', adminController.listarEmpresas);
+router.put('/empresas/:id/status', adminController.atualizarStatusEmpresa);
 
 // Clientes
-router.get('/clientes', listarClientes);
-router.get('/clientes/:id', buscarCliente);
+router.get('/clientes', adminController.listarClientes);
+router.get('/clientes/:id', adminController.buscarCliente);
 
 // Relatórios e Financeiro
-router.get('/relatorios/financeiro', obterRelatoriosFinanceiros);
+router.get('/relatorios/financeiro', adminController.obterRelatoriosFinanceiros);
 
 // Suporte
-router.get('/suporte/mensagens', listarMensagensSuporte);
-router.get('/avaliacoes', listarAvaliacoes);
-router.put('/avaliacoes/:id/visibilidade', atualizarVisibilidadeAvaliacao);
+router.get('/suporte/mensagens', adminController.listarMensagensSuporte);
+router.get('/avaliacoes', adminController.listarAvaliacoes);
+router.put('/avaliacoes/:id/visibilidade', adminController.atualizarVisibilidadeAvaliacao);
 
 export default router;

@@ -58,6 +58,10 @@ function CheckoutPage() {
   const [installments, setInstallments] = useState({});
   const [cashDiscount, setCashDiscount] = useState(0.05); // 5% de desconto à vista
   const [discountApplied, setDiscountApplied] = useState({}); // Controla se desconto foi aplicado por método
+  const [couponCode, setCouponCode] = useState(''); // Código do cupom
+  const [couponApplied, setCouponApplied] = useState(null); // Cupom aplicado
+  const [couponLoading, setCouponLoading] = useState(false); // Loading do cupom
+  const [couponError, setCouponError] = useState(''); // Erro do cupom
 
   const { items, count, clear, freight, freightOptions, selectedFreight, setSelectedFreight, calculateFreight, freightLoading, freightError, selectedAddress, setSelectedAddress, total, subtotal } = useCart();
   const { user } = useAuth();
@@ -176,6 +180,78 @@ function CheckoutPage() {
       console.error('Erro ao carregar dados do checkout:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Aplicar cupom
+  const handleAplicarCupom = async () => {
+    if (!couponCode.trim()) {
+      setCouponError('Digite o código do cupom');
+      return;
+    }
+
+    setCouponLoading(true);
+    setCouponError('');
+
+    try {
+      // Validar cupom via API
+      const response = await fetch('/api/cupons/validar', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          codigo: couponCode.toUpperCase(),
+          clienteID: user?.id,
+          produtos: items.map(item => ({
+            ProdutoID: item.id,
+            CategoriaID: item.categoryId,
+            PrecoUnitario: item.price,
+            Quantidade: item.quantity
+          }))
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Erro ao validar cupom');
+      }
+
+      if (!data.valido) {
+        throw new Error(data.message || 'Cupom inválido');
+      }
+
+      setCouponApplied(data.data.cupom);
+      showSuccess('Cupom aplicado com sucesso!');
+
+      // Recalcular frete se necessário (cupom pode dar frete grátis)
+      if (selectedAddress && data.data.cupom.TipoDesconto === 'FRETE_GRATIS') {
+        const selectedItemIds = getSelectedItems();
+        await calculateFreight(selectedAddress.EnderecoID, selectedItemIds);
+      }
+
+    } catch (error) {
+      console.error('Erro ao aplicar cupom:', error);
+      setCouponError(error.message);
+      setCouponApplied(null);
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  // Remover cupom
+  const handleRemoverCupom = () => {
+    setCouponApplied(null);
+    setCouponCode('');
+    setCouponError('');
+    showInfo('Cupom removido');
+
+    // Recalcular frete se necessário
+    if (selectedAddress) {
+      const selectedItemIds = getSelectedItems();
+      calculateFreight(selectedAddress.EnderecoID, selectedItemIds);
     }
   };
 
@@ -437,7 +513,8 @@ function CheckoutPage() {
           valor: method.amount
         })),
         frete: selectedFreight ? selectedFreight.valor : 0,
-        observacoes: ''
+        observacoes: '',
+        cupomCodigo: couponApplied?.Codigo
       };
 
       console.log('[DEBUG] Dados do pedido preparados:', {
@@ -1187,6 +1264,62 @@ function CheckoutPage() {
                       </span>
                     </div>
                     <div className="border-t border-slate-200 pt-3">
+                      {/* Cupom */}
+                      <div className="border-t border-slate-200 pt-3 mb-4">
+                        <div className="flex gap-2 mb-2">
+                          <input
+                            type="text"
+                            value={couponCode}
+                            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                            placeholder="Código do cupom"
+                            className="flex-1 px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
+                            disabled={couponApplied}
+                          />
+                          {!couponApplied ? (
+                            <button
+                              onClick={handleAplicarCupom}
+                              disabled={couponLoading || !couponCode.trim()}
+                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed text-sm font-medium"
+                            >
+                              {couponLoading ? 'Aplicando...' : 'Aplicar'}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={handleRemoverCupom}
+                              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium"
+                            >
+                              Remover
+                            </button>
+                          )}
+                        </div>
+                        {couponError && (
+                          <p className="text-red-600 text-sm mb-2">{couponError}</p>
+                        )}
+                        {couponApplied && (
+                          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium text-green-800">
+                                  Cupom aplicado: {couponApplied.Codigo}
+                                </p>
+                                <p className="text-xs text-green-600">
+                                  {couponApplied.Descricao || 'Desconto aplicado'}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm font-medium text-green-800">
+                                  {couponApplied.TipoDesconto === 'PERCENTUAL'
+                                    ? `${couponApplied.ValorDesconto}% OFF`
+                                    : couponApplied.TipoDesconto === 'FRETE_GRATIS'
+                                    ? 'Frete Grátis'
+                                    : `R$ ${couponApplied.ValorDesconto.toFixed(2)} OFF`}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+ 
                       <div className="flex justify-between text-lg font-semibold">
                         <span className="text-slate-900">Total</span>
                         <span className="text-blue-600">{formatPrice(orderData?.total || 0)}</span>

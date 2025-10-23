@@ -569,16 +569,7 @@ function OrdersPage() {
                           <FaEye />
                           <span>Ver Detalhes</span>
                         </button>
-                        <button
-                          onClick={() => {
-                            setOrderModalId(order.id);
-                            setShowOrderModal(true);
-                          }}
-                          className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200"
-                        >
-                          <FaReceipt />
-                          <span>Ver Comprovante</span>
-                        </button>
+                      
                         {(order.statusPagamento === 'PENDENTE' || order.statusPagamento === 'PARCIAL') && (
                           <Link
                             to={`/checkout/pagamento/${order.pedidoId}`}

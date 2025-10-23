@@ -50,8 +50,8 @@ export default function PaymentCheckout() {
 
       // Redirecionar quando pago
       if (resp.resumo.statusPagamento === 'PAGO') {
-        // Gerar e mostrar comprovante completo
-        gerarComprovante(resp.resumo);
+        // Redirecionar diretamente para pedidos sem mostrar comprovante
+        setTimeout(() => navigate('/meus-pedidos'), 1000);
       }
     } catch (e) {
       setError(e.message || 'Falha ao processar pagamento');
@@ -65,73 +65,6 @@ export default function PaymentCheckout() {
   );
 
   const formatBRL = (v) => v?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-  const gerarComprovante = (resumoCompleto) => {
-    const comprovante = `
-═══════════════════════════════════════
-           COMPROVANTE DE PAGAMENTO
-                   HelpNet
-═══════════════════════════════════════
-
-Pedido: #${resumoCompleto.pedidoId}
-Data: ${new Date().toLocaleString('pt-BR')}
-Cliente: ${resumoCompleto.cliente?.nome || 'Cliente'}
-Vendedor: ${resumoCompleto.vendedor?.nome || 'Vendedor'}
-
-───────────────────────────────────────
-                PRODUTOS
-───────────────────────────────────────
-${resumoCompleto.itens?.map(item => 
-  `${item.nome} - Qtd: ${item.quantidade}\nPreço unit.: ${formatBRL(item.precoUnitario)}\nSubtotal: ${formatBRL(item.quantidade * item.precoUnitario)}`
-).join('\n\n') || 'Itens não disponíveis'}
-
-───────────────────────────────────────
-              PAGAMENTOS
-───────────────────────────────────────
-${resumoCompleto.metodos?.map(metodo => 
-  `${metodo.metodo}: ${formatBRL(metodo.pago)}`
-).join('\n') || 'Métodos não disponíveis'}
-
-───────────────────────────────────────
-               ENDEREÇO
-───────────────────────────────────────
-${resumoCompleto.endereco?.nome || 'Não informado'}
-${resumoCompleto.endereco?.logradouro || ''} ${resumoCompleto.endereco?.numero || ''}
-${resumoCompleto.endereco?.cidade || ''} - ${resumoCompleto.endereco?.uf || ''}
-CEP: ${resumoCompleto.endereco?.cep || 'Não informado'}
-
-───────────────────────────────────────
-                VALORES
-───────────────────────────────────────
-Subtotal: ${formatBRL(resumoCompleto.subtotal || 0)}
-Frete: ${formatBRL(resumoCompleto.frete || 0)}
-Desconto: ${formatBRL(resumoCompleto.desconto || 0)}
-Cupons aplicados: ${resumoCompleto.cupons?.join(', ') || 'Nenhum'}
-
-TOTAL PAGO: ${formatBRL(resumoCompleto.totalPago || 0)}
-
-═══════════════════════════════════════
-        Obrigado pela preferência!
-═══════════════════════════════════════
-    `.trim();
-
-    if (navigator.share) {
-      navigator.share({
-        title: 'Comprovante de Pagamento - HelpNet',
-        text: comprovante
-      }).then(() => {
-        setTimeout(() => navigate('/meus-pedidos'), 2000);
-      }).catch(() => {
-        navigator.clipboard.writeText(comprovante);
-        alert('Comprovante copiado para área de transferência!');
-        setTimeout(() => navigate('/meus-pedidos'), 2000);
-      });
-    } else {
-      navigator.clipboard.writeText(comprovante);
-      alert('Comprovante copiado para área de transferência!');
-      setTimeout(() => navigate('/meus-pedidos'), 2000);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center p-6">

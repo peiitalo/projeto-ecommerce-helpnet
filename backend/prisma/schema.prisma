@@ -22,6 +22,7 @@ enum PedidoStatusPagamento {
 enum TipoDesconto {
   PERCENTUAL
   VALOR_FIXO
+  FRETE_GRATIS
 }
 
 model Administrador {
@@ -173,16 +174,22 @@ model Pedido {
   TotalPago        Float                 @default(0)
   StatusPagamento  PedidoStatusPagamento @default(PENDENTE)
   ExpiraEm         DateTime?
+  // Campos para cupom
+  CupomID          Int?                  // ID do cupom aplicado
+  DescontoCupom    Float                 @default(0) // Valor do desconto aplicado
   itensPedido      ItensPedido[]
   pagamentosPedido PagamentosPedido[]
   distribuicoes    DistribuicaoPagamentoPedido[]
   cliente          Cliente               @relation(fields: [ClienteID], references: [ClienteID])
   Endereco         Endereco              @relation(fields: [EnderecoID], references: [EnderecoID])
   entregas         Entrega[]
+  cupom            Cupom?                @relation(fields: [CupomID], references: [CupomID])
+  cuponsCliente    CupomCliente[]        // Relação reversa para cupons usados neste pedido
 
   @@index([ClienteID])
   @@index([Status])
   @@index([StatusPagamento])
+  @@index([CupomID])
   @@map("Pedido")
 }
 
@@ -417,21 +424,30 @@ model PasswordResetToken {
 }
 
 model Cupom {
-  CupomID       Int           @id @default(autoincrement())
-  Codigo        String        @unique
-  Descricao     String?
-  TipoDesconto  TipoDesconto
-  ValorDesconto Float
-  ValorMinimo   Float?        @default(0)
-  LimiteUso     Int?
-  UsosAtuais    Int           @default(0)
-  DataExpiracao DateTime?
-  Ativo         Boolean       @default(true)
-  VendedorID    Int
-  CriadoEm      DateTime      @default(now())
+  CupomID           Int           @id @default(autoincrement())
+  Codigo            String        @unique
+  Descricao         String?
+  TipoDesconto      TipoDesconto
+  ValorDesconto     Float
+  ValorMinimo       Float?        @default(0)
+  LimiteUso         Int?
+  UsosAtuais        Int           @default(0)
+  DataExpiracao     DateTime?
+  Ativo             Boolean       @default(true)
+  VendedorID        Int
+  CriadoEm          DateTime      @default(now())
+  // Novos campos para regras avançadas
+  AplicavelProdutos Boolean       @default(false) // Se aplica apenas a produtos específicos
+  AplicavelCategorias Boolean    @default(false) // Se aplica apenas a categorias específicas
+  ClientesElegiveis String[]     @default([]) // Lista de ClienteIDs elegíveis (vazio = todos)
+  TipoCliente       String?       // 'NOVO', 'ANIVERSARIANTE', etc.
+  ProdutosElegiveis Int[]         @default([]) // Lista de ProdutoIDs
+  CategoriasElegiveis Int[]       @default([]) // Lista de CategoriaIDs
+  LimiteUsoPorCliente Int?        @default(1) // Máximo de usos por cliente
 
   vendedor      Vendedor      @relation(fields: [VendedorID], references: [VendedorID])
   cuponsCliente CupomCliente[]
+  pedidos       Pedido[]      // Pedidos que usaram este cupom
 
   @@index([VendedorID])
   @@index([Ativo])
@@ -443,9 +459,16 @@ model CupomCliente {
   CupomClienteID Int      @id @default(autoincrement())
   CupomID        Int
   ClienteID      Int
-  Usado          Boolean   @default(false)
-  DataUso        DateTime?
-  PedidoID       Int?
+  // Controle de distribuição e resgate
+  DisponivelParaResgate Boolean   @default(false) // Se o cupom está disponível para este cliente resgatar
+  Resgatado             Boolean   @default(false) // Se o cliente já resgatou o cupom
+  DataResgate           DateTime? // Quando o cliente resgatou
+  DataExpiracaoCliente  DateTime? // Quando expira especificamente para este cliente
+  // Controle de uso
+  Usado                 Boolean   @default(false)
+  DataUso               DateTime?
+  PedidoID              Int?
+  UsosCliente           Int      @default(0) // Contador de usos por cliente para este cupom
 
   cupom    Cupom   @relation(fields: [CupomID], references: [CupomID])
   cliente  Cliente @relation(fields: [ClienteID], references: [ClienteID])
@@ -455,5 +478,8 @@ model CupomCliente {
   @@index([CupomID])
   @@index([ClienteID])
   @@index([PedidoID])
+  @@index([DisponivelParaResgate])
+  @@index([Resgatado])
+  @@index([DataExpiracaoCliente])
   @@map("CupomCliente")
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FaTimes, FaEye, FaSpinner, FaReceipt, FaBox, FaTruck, FaCheck, FaClock, FaMapMarkerAlt, FaShippingFast, FaPrint } from 'react-icons/fa';
+import { FaTimes, FaEye, FaUser, FaSpinner, FaReceipt, FaBox, FaTruck, FaCheck, FaClock, FaMapMarkerAlt, FaShippingFast, FaPrint, FaCreditCard } from 'react-icons/fa';
 import { clienteService } from '../services/api';
 import { FiX } from 'react-icons/fi'
 import api from '../services/api';
@@ -134,11 +134,17 @@ const OrderDetailsModal = ({ orderId, isOpen, onClose, isAdmin = false }) => {
     date: order.DataPedido,
     status: order.Status,
     total: parseFloat(order.Total),
-    clientName: order.cliente?.Nome || order.Cliente?.Nome || 'Cliente',
+    subtotal: parseFloat(order.Total) + parseFloat(order.DescontoCupom || 0) - parseFloat(order.Frete || 0),
+    frete: parseFloat(order.Frete || 0),
+    descontoCupom: parseFloat(order.DescontoCupom || 0),
+    clientName: order.cliente?.NomeCompleto || order.Cliente?.Nome || 'Cliente',
+    clientEmail: order.cliente?.Email || 'Não informado',
+    clientPhone: order.cliente?.TelefoneCelular || order.cliente?.TelefoneFixo || 'Não informado',
     items: order.itensPedido.map(item => ({
       name: item.produto.Nome,
       quantity: item.Quantidade,
       price: parseFloat(item.PrecoUnitario),
+      total: parseFloat(item.PrecoUnitario) * item.Quantidade,
       seller: item.produto.vendedor ? item.produto.vendedor.Nome : 'N/A',
       sellerId: item.produto.vendedor?.VendedorID || null,
       image: item.produto.ImagemPrincipal || '/placeholder-image.png'
@@ -149,17 +155,28 @@ const OrderDetailsModal = ({ orderId, isOpen, onClose, isAdmin = false }) => {
       street: order.Endereco?.Logradouro && order.Endereco?.Numero
         ? `${order.Endereco.Logradouro}, ${order.Endereco.Numero}`
         : 'Endereço não informado',
+      complement: order.Endereco?.Complemento || '',
+      neighborhood: order.Endereco?.Bairro || '',
       city: order.Endereco?.Cidade && order.Endereco?.UF
         ? `${order.Endereco.Cidade} - ${order.Endereco.UF}`
         : 'Cidade não informada',
-      cep: order.Endereco?.CEP || 'CEP não informado'
+      cep: order.Endereco?.CEP || 'CEP não informado',
+      fullAddress: `${order.Endereco?.Logradouro || ''}, ${order.Endereco?.Numero || ''}${order.Endereco?.Complemento ? ' - ' + order.Endereco.Complemento : ''}, ${order.Endereco?.Bairro || ''}, ${order.Endereco?.Cidade || ''} - ${order.Endereco?.UF || ''}, CEP: ${order.Endereco?.CEP || ''}`
     },
     paymentMethod: order.pagamentosPedido?.[0]?.MetodoPagamento?.Nome || 'Método não informado',
     paymentDetails: order.pagamentosPedido?.map(pagamento => ({
       method: pagamento.MetodoPagamento?.Nome || 'N/A',
-      amount: parseFloat(pagamento.Valor || 0),
+      amount: parseFloat(pagamento.ValorPago || 0),
+      status: pagamento.StatusPagamento || 'PENDENTE',
+      date: pagamento.DataPagamento,
       installments: pagamento.Parcelas || 1
-    })) || []
+    })) || [],
+    cupom: order.cupom ? {
+      codigo: order.cupom.Codigo,
+      tipo: order.cupom.TipoDesconto,
+      valor: order.cupom.ValorDesconto,
+      descontoAplicado: parseFloat(order.DescontoCupom || 0)
+    } : null
   };
 
   return (
@@ -272,23 +289,40 @@ const OrderDetailsModal = ({ orderId, isOpen, onClose, isAdmin = false }) => {
             <p className="text-sm font-medium text-slate-900">Pedido {formattedOrder.id}</p>
           </div>
 
-          {/* Informações do pedido */}
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p className="font-medium text-slate-900">Data da Compra</p>
-              <p className="text-slate-600">{formatDate(formattedOrder.date)}</p>
+          {/* Informações do cliente */}
+          <div className="bg-slate-50 rounded-lg p-4 mb-6">
+            <h3 className="font-medium text-slate-900 mb-3 flex items-center gap-2">
+              <FaUser className="text-blue-600" />
+              Informações do Cliente
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="font-medium text-slate-900">Nome</p>
+                <p className="text-slate-600">{formattedOrder.clientName}</p>
+              </div>
+              <div>
+                <p className="font-medium text-slate-900">Email</p>
+                <p className="text-slate-600">{formattedOrder.clientEmail}</p>
+              </div>
+              <div>
+                <p className="font-medium text-slate-900">Telefone</p>
+                <p className="text-slate-600">{formattedOrder.clientPhone}</p>
+              </div>
+              <div>
+                <p className="font-medium text-slate-900">Data da Compra</p>
+                <p className="text-slate-600">{formatDate(formattedOrder.date)}</p>
+              </div>
             </div>
+          </div>
+
+          {/* Informações do pedido */}
+          <div className="grid grid-cols-2 gap-4 text-sm mb-6">
             <div>
               <p className="font-medium text-slate-900">Status do Pedido</p>
               <p className="text-slate-600">{formattedOrder.status}</p>
             </div>
             <div>
-              <p className="font-medium text-slate-900">Cliente</p>
-              <p className="text-slate-600">{formattedOrder.clientName}</p>
-            </div>
-            <div>
-              <p className="font-medium text-slate-900">Método de Pagamento</p>
-              <p className="text-slate-600">{formattedOrder.paymentMethod}</p>
+           
             </div>
           </div>
 
@@ -319,12 +353,15 @@ const OrderDetailsModal = ({ orderId, isOpen, onClose, isAdmin = false }) => {
                               e.target.src = '/placeholder-image.png';
                             }}
                           />
-                          <span>{item.name}</span>
+                          <div>
+                            <p className="font-medium">{item.name}</p>
+                            <p className="text-xs text-slate-500">Vendedor: {item.seller}</p>
+                          </div>
                         </div>
                       </td>
                       <td className="border border-slate-200 px-3 py-2 text-center">{item.quantity}</td>
                       <td className="border border-slate-200 px-3 py-2 text-right">{formatPrice(item.price)}</td>
-                      <td className="border border-slate-200 px-3 py-2 text-right">{formatPrice(item.price * item.quantity)}</td>
+                      <td className="border border-slate-200 px-3 py-2 text-right">{formatPrice(item.total)}</td>
                       <td className="border border-slate-200 px-3 py-2">{item.seller}</td>
                     </tr>
                   ))}
@@ -332,41 +369,83 @@ const OrderDetailsModal = ({ orderId, isOpen, onClose, isAdmin = false }) => {
               </table>
             </div>
             <div className="border-t border-slate-200 pt-2 mt-3">
-              <div className="flex justify-between font-bold text-slate-900">
-                <span>Valor Total</span>
-                <span>{formatPrice(formattedOrder.total)}</span>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between text-slate-600">
+                  <span>Subtotal</span>
+                  <span>{formatPrice(formattedOrder.subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <span>Frete</span>
+                  <span>{formatPrice(formattedOrder.frete)}</span>
+                </div>
+                {formattedOrder.descontoCupom > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Desconto do Cupom</span>
+                    <span>-{formatPrice(formattedOrder.descontoCupom)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-slate-900 border-t border-slate-200 pt-1">
+                  <span>Valor Total</span>
+                  <span>{formatPrice(formattedOrder.total)}</span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Endereço e pagamento */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-            <div>
-              <h3 className="font-medium text-slate-900 mb-2">Endereço de Entrega</h3>
-              <div className="text-slate-600 space-y-1">
-                <p>{formattedOrder.address.name}</p>
-                <p>{formattedOrder.address.street}</p>
-                <p>{formattedOrder.address.city}</p>
-                <p>CEP: {formattedOrder.address.cep}</p>
-              </div>
-            </div>
-            <div>
-              <h3 className="font-medium text-slate-900 mb-2">Método de Pagamento</h3>
-              <div className="text-slate-600 space-y-1">
-                <p>{formattedOrder.paymentMethod}</p>
-                {formattedOrder.paymentDetails.length > 0 && (
-                  <div className="mt-2">
-                    {formattedOrder.paymentDetails.map((payment, index) => (
-                      <p key={index} className="text-xs">
-                        {payment.method}: {formatPrice(payment.amount)}
-                        {payment.installments > 1 && ` (${payment.installments}x)`}
-                      </p>
-                    ))}
-                  </div>
-                )}
-              </div>
+          {/* Endereço de entrega */}
+          <div className="bg-slate-50 rounded-lg p-4 mb-6">
+            <h3 className="font-medium text-slate-900 mb-3 flex items-center gap-2">
+              <FaMapMarkerAlt className="text-blue-600" />
+              Endereço de Entrega
+            </h3>
+            <div className="text-slate-600 space-y-1">
+              <p className="font-medium">{formattedOrder.address.name}</p>
+              <p>{formattedOrder.address.street}</p>
+              {formattedOrder.address.complement && <p>{formattedOrder.address.complement}</p>}
+              <p>{formattedOrder.address.neighborhood}</p>
+              <p>{formattedOrder.address.city}</p>
+              <p>CEP: {formattedOrder.address.cep}</p>
             </div>
           </div>
+
+          {/* Método de pagamento */}
+          <div className="bg-slate-50 rounded-lg p-4 mb-6">
+            <h3 className="font-medium text-slate-900 mb-3 flex items-center gap-2">
+              <FaCreditCard className="text-blue-600" />
+              Método de Pagamento
+            </h3>
+            <div className="text-slate-600 space-y-2">
+              {formattedOrder.paymentDetails.length > 0 && (
+                <div className="space-y-1">
+                  {formattedOrder.paymentDetails.map((payment, index) => (
+                    <div key={index} className="flex justify-between items-center text-sm">
+                      <span>{payment.method}</span>
+                      <div className="text-right">
+                        <p className="font-medium">{formatPrice(payment.amount)}</p>
+                        <p className="text-xs text-slate-500">{payment.status} • {formatDate(payment.date)}</p>
+                        {payment.installments > 1 && <p className="text-xs">({payment.installments}x)</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Cupom aplicado */}
+          {formattedOrder.cupom && (
+            <div className="bg-green-50 rounded-lg p-4 mb-6">
+              <h3 className="font-medium text-green-900 mb-3 flex items-center gap-2">
+                <FaPercentage className="text-green-600" />
+                Cupom Aplicado
+              </h3>
+              <div className="text-green-800 space-y-1">
+                <p className="font-medium">Código: {formattedOrder.cupom.codigo}</p>
+                <p>Tipo: {formattedOrder.cupom.tipo === 'PERCENTUAL' ? 'Percentual' : formattedOrder.cupom.tipo === 'VALOR_FIXO' ? 'Valor Fixo' : 'Frete Grátis'}</p>
+                <p>Valor do desconto: {formatPrice(formattedOrder.cupom.descontoAplicado)}</p>
+              </div>
+            </div>
+          )}
 
           {/* Rodapé */}
           <div className="text-center text-xs text-slate-500 border-t border-slate-200 pt-4">

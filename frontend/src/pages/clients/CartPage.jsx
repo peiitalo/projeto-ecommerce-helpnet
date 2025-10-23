@@ -12,7 +12,6 @@ export default function CartPage() {
   const navigate = useNavigate();
 
   const [selectedItems, setSelectedItems] = useState([]);
-  const [coupon, setCoupon] = useState('');
   const [selectedCoupons, setSelectedCoupons] = useState([]);
   const [availableCoupons, setAvailableCoupons] = useState([]);
 
@@ -52,14 +51,43 @@ export default function CartPage() {
   }, [user]);
 
   // Carregar cupons disponíveis
-  const loadAvailableCoupons = () => {
-    // Simular cupons disponíveis - em produção viria da API
-    const mockCoupons = [
-      { code: 'DESCONTO10', discount: 10, type: 'percentage', minValue: 50 },
-      { code: 'FRETEGRATIS', discount: 0, type: 'free_shipping', minValue: 100 },
-      { code: 'PRIMEIRA15', discount: 15, type: 'percentage', minValue: 0 }
-    ];
-    setAvailableCoupons(mockCoupons);
+  const loadAvailableCoupons = async () => {
+    try {
+      // Buscar cupons resgatados do cliente
+      const response = await fetch('/api/cupons/disponiveis', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          // Transformar dados da API para o formato esperado
+          const coupons = data.data.map(cupomCliente => ({
+            id: cupomCliente.CupomClienteID,
+            code: cupomCliente.cupom.Codigo,
+            discount: cupomCliente.cupom.ValorDesconto,
+            type: cupomCliente.cupom.TipoDesconto === 'PERCENTUAL' ? 'percentage' :
+                  cupomCliente.cupom.TipoDesconto === 'FRETE_GRATIS' ? 'free_shipping' : 'fixed',
+            minValue: cupomCliente.cupom.ValorMinimo,
+            description: cupomCliente.cupom.Descricao,
+            expiryDate: cupomCliente.DataExpiracaoCliente
+          }));
+          setAvailableCoupons(coupons);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao carregar cupons:', error);
+      // Fallback para dados mock se a API falhar
+      const mockCoupons = [
+        { code: 'DESCONTO10', discount: 10, type: 'percentage', minValue: 50 },
+        { code: 'FRETEGRATIS', discount: 0, type: 'free_shipping', minValue: 100 },
+        { code: 'PRIMEIRA15', discount: 15, type: 'percentage', minValue: 0 }
+      ];
+      setAvailableCoupons(mockCoupons);
+    }
   };
 
   const formatPrice = (n) =>
@@ -296,40 +324,19 @@ export default function CartPage() {
         <aside className="lg:col-span-1 sticky top-20 self-start space-y-4">
           <div className="p-4 border border-slate-200 rounded-xl bg-white space-y-3 shadow-sm">
 
-            {/* Input para cupom */}
-            <div className="mt-3 space-y-2">
-              <input
-                type="text"
-                placeholder="Código do cupom"
-                value={coupon}
-                onChange={(e) => setCoupon(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-              />
-              <button
-                onClick={() => {
-                  if (coupon.trim()) {
-                    toggleCoupon(coupon);
-                    setCoupon('');
-                  }
-                }}
-                disabled={!coupon.trim()}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                Aplicar cupom
-              </button>
-            </div>
+            {/* Removido: Input para cupom - agora os cupons são selecionados diretamente da lista */}
 
             {/* Cupons */}
             <div className="mt-4">
               <h3 className="font-semibold text-gray-700 mb-2">Seus cupons</h3>
               {availableCoupons.length === 0 ? (
                 <div className="p-3 border border-slate-200 rounded-lg text-center text-slate-500 text-sm">
-                  Você não tem cupons
+                  Você não tem cupons disponíveis
                   <button
                     onClick={() => navigate('/cupons')}
-                    className="ml-2 text-blue-600 hover:text-blue-700 font-medium"
+                    className="block mt-2 text-blue-600 hover:text-blue-700 font-medium"
                   >
-                    Mais detalhes
+                    Ver meus cupons
                   </button>
                 </div>
               ) : (
@@ -337,24 +344,36 @@ export default function CartPage() {
                   {availableCoupons.map((c) => (
                     <label
                       key={c.code}
-                      className="flex justify-between items-center border px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-50"
+                      className={`flex justify-between items-center border px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-50 ${
+                        selectedCoupons.includes(c.code) ? 'border-blue-500 bg-blue-50' : 'border-slate-200'
+                      }`}
                     >
-                      <div>
+                      <div className="flex-1">
                         <span className="text-slate-900 font-medium">
                           {c.code}
                         </span>
+                        {c.description && (
+                          <div className="text-xs text-slate-600 mt-1">
+                            {c.description}
+                          </div>
+                        )}
                         <div className="text-xs text-slate-500">
-                          {c.type === 'percentage' ? `${c.discount}% OFF` : 
-                           c.type === 'free_shipping' ? 'Frete grátis' : 
+                          {c.type === 'percentage' ? `${c.discount}% OFF` :
+                           c.type === 'free_shipping' ? 'Frete grátis' :
                            `R$ ${c.discount} OFF`}
                           {c.minValue > 0 && ` - Mín. R$ ${c.minValue}`}
                         </div>
+                        {c.expiryDate && (
+                          <div className="text-xs text-orange-600 mt-1">
+                            Vence em: {new Date(c.expiryDate).toLocaleDateString('pt-BR')}
+                          </div>
+                        )}
                       </div>
                       <input
                         type="checkbox"
                         checked={selectedCoupons.includes(c.code)}
                         onChange={() => toggleCoupon(c.code)}
-                        className="h-5 w-5 text-blue-600"
+                        className="h-5 w-5 text-blue-600 ml-2"
                       />
                     </label>
                   ))}
