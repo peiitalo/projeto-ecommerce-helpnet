@@ -111,10 +111,22 @@ app.use(cacheMiddleware); // Cache headers inteligentes
 app.use(requestLogger);
 
 // Segurança HTTP (helmet):
-// - Desabilita CSP padrão no dev para evitar conflitos com Vite/React; habilitar em produção com política definida
+// - Implementa CSP personalizado para prevenir XSS
 // - Libera CORP para servir uploads entre domínios quando necessário
 app.use(helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.jsdelivr.net"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:", "http:"],
+      connectSrc: ["'self'", "https://api.", "http://localhost:*", "http://127.0.0.1:*"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  },
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 

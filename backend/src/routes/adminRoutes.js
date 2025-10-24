@@ -3,10 +3,25 @@ import express from 'express';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import * as pedidoController from '../controllers/pedidoController.js';
 import * as adminController from '../controllers/adminController.js';
+import rateLimit from 'express-rate-limit';
 
 const router = express.Router();
 
-// Middleware para verificar se é admin (temporariamente removido para MVP)
+
+// Rate limiting específico para login admin (mais restritivo)
+const adminLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 5, // Máximo 5 tentativas por IP
+  message: {
+    success: false,
+    errors: ["Muitas tentativas de login. Tente novamente em 15 minutos."]
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => process.env.NODE_ENV === 'development', // Pula rate limit em desenvolvimento
+});
+
+
 const requireAdmin = (req, res, next) => {
   // Temporariamente permitindo vendedores também para testes
   // if (req.user.role !== 'admin' && req.user.role !== 'ADMIN') {
@@ -17,6 +32,9 @@ const requireAdmin = (req, res, next) => {
   // }
   next();
 };
+
+// Rota de login sem middleware de autenticação, mas com rate limiting
+router.post('/login', adminLoginLimiter, adminController.login);
 
 // Aplicar middleware de autenticação e verificação de admin para todas as rotas
 router.use(authMiddleware);
