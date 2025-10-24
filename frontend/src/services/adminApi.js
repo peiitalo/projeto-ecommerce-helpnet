@@ -13,6 +13,58 @@ const fetchConfig = {
 let isRefreshing = false;
 let refreshPromise = null;
 
+// Função auxiliar para validar token JWT
+const isTokenValid = (token) => {
+  if (!token) return false;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const currentTime = Date.now() / 1000;
+    return payload.exp > currentTime;
+  } catch {
+    return false;
+  }
+};
+
+// Função auxiliar para renovar token
+const refreshToken = async () => {
+  try {
+    const refreshResponse = await fetch(`${API_BASE_URL}/clientes/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!refreshResponse.ok) {
+      const errorText = await refreshResponse.text();
+      console.error('Refresh token response:', refreshResponse.status, errorText);
+      throw new Error(`Falha ao renovar token: ${refreshResponse.status}`);
+    }
+
+    const refreshData = await refreshResponse.json();
+
+    // Atualiza o accessToken no localStorage se fornecido
+    if (refreshData?.data?.accessToken && typeof window !== 'undefined') {
+      localStorage.setItem('accessToken', refreshData.data.accessToken);
+      console.log('Token renovado com sucesso');
+    }
+
+    return refreshData;
+  } catch (error) {
+    console.error('Erro no refreshToken:', error);
+    // Se refresh falhar, limpa o token expirado
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('accessToken');
+      }
+    } catch (e) {
+      console.error('Erro ao limpar token:', e);
+    }
+    throw error;
+  }
+};
+
 // Função auxiliar para fazer requisições
 const adminApiRequest = async (endpoint, options = {}, retryCount = 0) => {
   try {
@@ -22,18 +74,53 @@ const adminApiRequest = async (endpoint, options = {}, retryCount = 0) => {
       ...options,
     };
 
-    // Injeta Authorization se houver accessToken persistido
+    // Injeta Authorization se houver accessToken válido persistido
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('adminAccessToken') : null;
-      if (token) {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      if (token && isTokenValid(token)) {
         config.headers = {
           ...(config.headers || {}),
           Authorization: `Bearer ${token}`,
         };
+      } else if (token && !isTokenValid(token)) {
+        // Token expirado, remove do localStorage
+        localStorage.removeItem('accessToken');
       }
     } catch {}
 
     const response = await fetch(url, config);
+
+    // Se receber 401 e ainda não tentou refresh, tenta renovar o token
+    if (response.status === 401 && retryCount === 0) {
+      try {
+        // Evita múltiplas tentativas simultâneas
+        if (isRefreshing) {
+          await refreshPromise;
+        } else {
+          isRefreshing = true;
+          refreshPromise = refreshToken();
+          await refreshPromise;
+          isRefreshing = false;
+          refreshPromise = null;
+        }
+
+        // Retry com novo token
+        return adminApiRequest(endpoint, options, retryCount + 1);
+      } catch (refreshError) {
+        console.error('Erro ao renovar token:', refreshError);
+        // Se refresh falhar, limpa tokens e redireciona para login
+        try {
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('accessToken');
+            // Redirecionar para login se estiver em página protegida
+            if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
+              window.location.href = '/login';
+            }
+          }
+        } catch {}
+        throw new Error('Sessão expirada. Faça login novamente.');
+      }
+    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));

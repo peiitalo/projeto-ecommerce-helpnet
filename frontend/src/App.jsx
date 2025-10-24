@@ -42,6 +42,7 @@ const VendorDeliveriesPage = lazy(() => import('./pages/vendor/VendorDeliveriesP
 const VendorDeliveryDetailPage = lazy(() => import('./pages/vendor/VendorDeliveryDetailPage'));
 const RelatorioPage = lazy(() => import('./pages/vendor/RelatorioPage'));
 const VendorCuponsPage = lazy(() => import('./pages/vendor/VendorCuponsPage'));
+const SuporteAdminPage = lazy(() => import('./pages/admin/SuporteAdminPage'));
 import AdminLogin from "./pages/admin/AdminLogin.jsx";
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
@@ -84,6 +85,7 @@ function App() {
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin/pedidos" element={<AdminOrdersPage />} />
             <Route path="/admin/vendedores" element={<VendedoresPage />} />
+            <Route path="/admin/suporte" element={<SuporteAdminPage />} />
             <Route path="/admin/configuracoes" element={<ConfiguracoesPage />} />
           </Route>
 

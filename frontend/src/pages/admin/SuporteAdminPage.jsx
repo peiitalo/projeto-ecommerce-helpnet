@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FaSearch, FaReply, FaCheck, FaStar, FaFilter, FaEye, FaEyeSlash } from 'react-icons/fa';
 import { adminSuporteService } from '../../services/adminApi';
+import AdminLayout from '../../layouts/AdminLayout/index.jsx';
 
 function SuporteAdminPage() {
   const [activeTab, setActiveTab] = useState('duvidas');
@@ -111,11 +112,12 @@ function SuporteAdminPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Suporte Administrativo</h1>
-        <p className="text-gray-600">Gerencie dúvidas dos clientes e avaliações da plataforma</p>
-      </div>
+    <AdminLayout>
+      <div className="p-6">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Suporte Administrativo</h1>
+          <p className="text-gray-600">Gerencie dúvidas dos clientes e avaliações da plataforma</p>
+        </div>
 
       {/* Estatísticas */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -401,7 +403,8 @@ function SuporteAdminPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </AdminLayout>
   );
 }
 
