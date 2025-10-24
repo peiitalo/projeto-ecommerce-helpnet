@@ -64,13 +64,15 @@ router.get('/relatorios/financeiro', adminController.obterRelatoriosFinanceiros)
 
 // Suporte
 router.get('/suporte/mensagens', adminController.listarMensagensSuporte);
-router.put('/suporte/mensagens/:id/responder', adminController.responderMensagemSuporte);
-router.put('/suporte/mensagens/:id/resolver', adminController.resolverMensagemSuporte);
-router.delete('/suporte/mensagens/:id', adminController.excluirMensagemSuporte);
+// TODO: Implement responderMensagemSuporte, resolverMensagemSuporte, excluirMensagemSuporte
+// router.put('/suporte/mensagens/:id/responder', adminController.responderMensagemSuporte);
+// router.put('/suporte/mensagens/:id/resolver', adminController.resolverMensagemSuporte);
+// router.delete('/suporte/mensagens/:id', adminController.excluirMensagemSuporte);
 
 // Avaliações da Plataforma
-router.get('/suporte/avaliacoes', adminController.listarAvaliacoesPlataforma);
-router.put('/suporte/avaliacoes/:id/exibicao', adminController.alterarExibicaoAvaliacao);
-router.delete('/suporte/avaliacoes/:id', adminController.excluirAvaliacaoPlataforma);
+router.get('/suporte/avaliacoes', adminController.listarAvaliacoes);
+// TODO: Implement alterarExibicaoAvaliacao, excluirAvaliacaoPlataforma
+// router.put('/suporte/avaliacoes/:id/exibicao', adminController.alterarExibicaoAvaliacao);
+// router.delete('/suporte/avaliacoes/:id', adminController.excluirAvaliacaoPlataforma);
 
 export default router;
