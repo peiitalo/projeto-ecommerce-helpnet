@@ -1,16 +1,31 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FaArrowLeft, FaPaperPlane, FaComments, FaTimes, FaUser, FaEnvelope, FaPhone } from 'react-icons/fa';
+import { FaArrowLeft, FaPaperPlane, FaComments, FaTimes, FaUser, FaEnvelope, FaPhone, FaStar } from 'react-icons/fa';
+import { useAuth } from '../../context/AuthContext';
+import { suporteService } from '../../services/api';
 
 function SuportePage() {
+  const { user } = useAuth();
+
   // Contact form state
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    subject: '',
-    message: ''
+    tipo: 'DUVIDA', // DUVIDA ou COMENTARIO_PLATAFORMA
+    assunto: '',
+    mensagem: ''
   });
+
+  // Platform review state
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewData, setReviewData] = useState({
+    nota: 5,
+    comentario: '',
+    exibirSite: false
+  });
+  const [userReview, setUserReview] = useState(null);
+
+  // Loading states
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   // Chat widget state
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -19,18 +34,71 @@ function SuportePage() {
   ]);
   const [chatInput, setChatInput] = useState('');
 
-  // Handle form submission
-  const handleFormSubmit = (e) => {
+  // Load user's existing review
+  useState(() => {
+    const loadUserReview = async () => {
+      try {
+        const response = await suporteService.buscarMinhaAvaliacao();
+        setUserReview(response.avaliacao);
+      } catch (error) {
+        console.error('Erro ao carregar avaliação:', error);
+      }
+    };
+    loadUserReview();
+  }, []);
+
+  // Handle support message submission
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
-    // Simulate form submission
-    alert('Mensagem enviada com sucesso! Entraremos em contato em breve.');
-    setFormData({
-      name: '',
-      email: '',
-      phone: '',
-      subject: '',
-      message: ''
-    });
+    if (!user) {
+      alert('Você precisa estar logado para enviar mensagens.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await suporteService.enviarMensagem({
+        tipo: 'DUVIDA', // All support messages go to admin as doubts
+        assunto: getFinalSubject(),
+        mensagem: formData.mensagem
+      });
+
+      alert('Mensagem enviada com sucesso! Entraremos em contato em breve.');
+      setFormData({
+        tipo: 'DUVIDA',
+        assunto: '',
+        mensagem: ''
+      });
+    } catch (error) {
+      console.error('Erro ao enviar mensagem:', error);
+      alert('Erro ao enviar mensagem. Tente novamente.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle platform review submission
+  const handleReviewSubmit = async (e) => {
+    e.preventDefault();
+    if (!user) {
+      alert('Você precisa estar logado para avaliar a plataforma.');
+      return;
+    }
+
+    setIsSubmittingReview(true);
+    try {
+      await suporteService.avaliarPlataforma(reviewData);
+      alert('Avaliação enviada com sucesso! Obrigado pelo feedback.');
+      setShowReviewForm(false);
+      // Reload user review
+      const response = await suporteService.buscarMinhaAvaliacao();
+      setUserReview(response.avaliacao);
+    } catch (error) {
+      console.error('Erro ao enviar avaliação:', error);
+      alert('Erro ao enviar avaliação. Tente novamente.');
+    } finally {
+      setIsSubmittingReview(false);
+    }
   };
 
   // Handle form input changes
@@ -40,6 +108,34 @@ function SuportePage() {
       ...prev,
       [name]: value
     }));
+  };
+
+  // Update form submission to handle custom subject
+  const getFinalSubject = () => {
+    if (formData.assunto === 'Outro' && formData.assuntoPersonalizado) {
+      return formData.assuntoPersonalizado;
+    }
+    return formData.assunto;
+  };
+
+  // Handle review input changes
+  const handleReviewChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setReviewData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
+  // Render star rating
+  const renderStars = (rating, interactive = false, onChange) => {
+    return Array.from({ length: 5 }, (_, i) => (
+      <FaStar
+        key={i}
+        className={`text-lg ${i < rating ? 'text-yellow-400' : 'text-gray-300'} ${interactive ? 'cursor-pointer hover:text-yellow-400' : ''}`}
+        onClick={interactive ? () => onChange(i + 1) : undefined}
+      />
+    ));
   };
 
   // Handle chat message send
@@ -105,93 +201,54 @@ function SuportePage() {
             <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
               <h2 className="text-2xl font-bold text-slate-900 mb-6">Entre em Contato</h2>
               <form onSubmit={handleFormSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-2">
-                      Nome Completo *
-                    </label>
-                    <div className="relative">
-                      <FaUser className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm" />
-                      <input
-                        type="text"
-                        id="name"
-                        name="name"
-                        value={formData.name}
-                        onChange={handleInputChange}
-                        required
-                        className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                        placeholder="Seu nome completo"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
-                      E-mail *
-                    </label>
-                    <div className="relative">
-                      <FaEnvelope className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm" />
-                      <input
-                        type="email"
-                        id="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        required
-                        className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                        placeholder="seu@email.com"
-                      />
-                    </div>
-                  </div>
+                <div>
+                  <label htmlFor="assunto" className="block text-sm font-medium text-slate-700 mb-2">
+                    Assunto *
+                  </label>
+                  <select
+                    id="assunto"
+                    name="assunto"
+                    value={formData.assunto}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  >
+                    <option value="">Selecione um assunto</option>
+                    <option value="Problemas com pedido">Problemas com pedido</option>
+                    <option value="Dúvidas sobre pagamento">Dúvidas sobre pagamento</option>
+                    <option value="Problemas na conta">Problemas na conta</option>
+                    <option value="Informações sobre produto">Informações sobre produto</option>
+                    <option value="Sugestão ou comentário">Sugestão ou comentário</option>
+                    <option value="Outro">Outro</option>
+                  </select>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {formData.assunto === 'Outro' && (
                   <div>
-                    <label htmlFor="phone" className="block text-sm font-medium text-slate-700 mb-2">
-                      Telefone
+                    <label htmlFor="assuntoPersonalizado" className="block text-sm font-medium text-slate-700 mb-2">
+                      Especifique o assunto *
                     </label>
-                    <div className="relative">
-                      <FaPhone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm" />
-                      <input
-                        type="tel"
-                        id="phone"
-                        name="phone"
-                        value={formData.phone}
-                        onChange={handleInputChange}
-                        className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                        placeholder="(11) 99999-9999"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label htmlFor="subject" className="block text-sm font-medium text-slate-700 mb-2">
-                      Assunto *
-                    </label>
-                    <select
-                      id="subject"
-                      name="subject"
-                      value={formData.subject}
+                    <input
+                      type="text"
+                      id="assuntoPersonalizado"
+                      name="assuntoPersonalizado"
+                      value={formData.assuntoPersonalizado || ''}
                       onChange={handleInputChange}
-                      required
+                      required={formData.assunto === 'Outro'}
                       className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                    >
-                      <option value="">Selecione um assunto</option>
-                      <option value="pedido">Problemas com pedido</option>
-                      <option value="pagamento">Dúvidas sobre pagamento</option>
-                      <option value="conta">Problemas na conta</option>
-                      <option value="produto">Informações sobre produto</option>
-                      <option value="outros">Outros</option>
-                    </select>
+                      placeholder="Digite o assunto específico"
+                    />
                   </div>
-                </div>
+                )}
 
                 <div>
-                  <label htmlFor="message" className="block text-sm font-medium text-slate-700 mb-2">
+                  <label htmlFor="mensagem" className="block text-sm font-medium text-slate-700 mb-2">
                     Mensagem *
                   </label>
                   <textarea
-                    id="message"
-                    name="message"
-                    value={formData.message}
+                    id="mensagem"
+                    name="mensagem"
+                    value={formData.mensagem}
                     onChange={handleInputChange}
                     required
                     rows={6}
@@ -202,12 +259,91 @@ function SuportePage() {
 
                 <button
                   type="submit"
-                  className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center gap-2"
+                  disabled={isSubmitting}
+                  className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <FaPaperPlane className="text-sm" />
-                  Enviar Mensagem
+                  {isSubmitting ? 'Enviando...' : 'Enviar Mensagem'}
                 </button>
               </form>
+            </div>
+
+            {/* Platform Review Section */}
+            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 mt-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-slate-900">Avalie Nossa Plataforma</h3>
+                {!userReview && (
+                  <button
+                    onClick={() => setShowReviewForm(!showReviewForm)}
+                    className="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors text-sm"
+                  >
+                    {showReviewForm ? 'Cancelar' : 'Avaliar'}
+                  </button>
+                )}
+              </div>
+
+              {userReview && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="font-medium text-green-800">Sua avaliação:</span>
+                    {renderStars(userReview.Nota)}
+                  </div>
+                  {userReview.Comentario && (
+                    <p className="text-green-700 text-sm">"{userReview.Comentario}"</p>
+                  )}
+                </div>
+              )}
+
+              {showReviewForm && (
+                <form onSubmit={handleReviewSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Nota (1-5 estrelas) *
+                    </label>
+                    <div className="flex gap-1">
+                      {renderStars(reviewData.nota, true, (rating) => setReviewData(prev => ({ ...prev, nota: rating })))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="comentario" className="block text-sm font-medium text-slate-700 mb-2">
+                      Comentário (opcional)
+                    </label>
+                    <textarea
+                      id="comentario"
+                      name="comentario"
+                      value={reviewData.comentario}
+                      onChange={handleReviewChange}
+                      rows={3}
+                      className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 resize-none"
+                      placeholder="Conte-nos sua experiência..."
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="exibirSite"
+                      name="exibirSite"
+                      checked={reviewData.exibirSite}
+                      onChange={handleReviewChange}
+                      className="rounded"
+                    />
+                    <label htmlFor="exibirSite" className="text-sm text-slate-700">
+                      Permitir que minha avaliação apareça na página inicial (apenas avaliações positivas)
+                    </label>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmittingReview}
+                    className="w-full bg-yellow-500 text-white py-3 px-6 rounded-lg hover:bg-yellow-600 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <FaStar className="text-sm" />
+                    {isSubmittingReview ? 'Enviando...' : 'Enviar Avaliação'}
+                  </button>
+                </form>
+              )}
             </div>
           </div>
 

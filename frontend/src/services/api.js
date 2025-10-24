@@ -569,6 +569,35 @@ export const notificacaoService = {
   },
 };
 
+// Serviços de Suporte
+export const suporteService = {
+  // Enviar mensagem de suporte
+  enviarMensagem: async (dados) => {
+    return apiRequest('/suporte/mensagem', {
+      method: 'POST',
+      body: JSON.stringify(dados),
+    });
+  },
+
+  // Avaliar plataforma
+  avaliarPlataforma: async (dados) => {
+    return apiRequest('/suporte/avaliacao', {
+      method: 'POST',
+      body: JSON.stringify(dados),
+    });
+  },
+
+  // Buscar avaliação do usuário atual
+  buscarMinhaAvaliacao: async () => {
+    return apiRequest('/suporte/avaliacao/minha');
+  },
+
+  // Listar avaliações para exibir no site
+  listarAvaliacoesSite: async () => {
+    return apiRequest('/suporte/avaliacoes/site');
+  },
+};
+
 // Serviços de Vendedor
 export const vendedorService = {
   // Dashboard do vendedor
@@ -592,6 +621,11 @@ export const publicService = {
   // Obter depoimentos
   obterDepoimentos: async () => {
     return apiRequest('/public/testimonials');
+  },
+
+  // Obter avaliações da plataforma para landing page
+  obterAvaliacoesPlataforma: async () => {
+    return apiRequest('/suporte/avaliacoes/site');
   },
 };
 

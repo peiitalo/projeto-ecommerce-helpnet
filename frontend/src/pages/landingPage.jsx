@@ -12,14 +12,16 @@ function LandingPage() {
     totalPedidos: 0
   });
   const [depoimentos, setDepoimentos] = useState([]);
+  const [avaliacoesPlataforma, setAvaliacoesPlataforma] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsResponse, testimonialsResponse] = await Promise.all([
+        const [statsResponse, testimonialsResponse, reviewsResponse] = await Promise.all([
           publicService.obterStats(),
-          publicService.obterDepoimentos()
+          publicService.obterDepoimentos(),
+          publicService.obterAvaliacoesPlataforma()
         ]);
 
         if (statsResponse.success) {
@@ -28,6 +30,10 @@ function LandingPage() {
 
         if (testimonialsResponse.success) {
           setDepoimentos(testimonialsResponse.depoimentos);
+        }
+
+        if (reviewsResponse.success) {
+          setAvaliacoesPlataforma(reviewsResponse.avaliacoes);
         }
       } catch (error) {
         console.error('Erro ao carregar dados da landing page:', error);
@@ -167,7 +173,7 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* Depoimentos */}
+      {/* Depoimentos e Avaliações */}
       <section className="py-20 bg-slate-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -175,33 +181,81 @@ function LandingPage() {
               O que nossos clientes dizem
             </h2>
             <p className="text-xl text-slate-600">
-              Depoimentos reais de quem já usa nossa plataforma
+              Depoimentos e avaliações reais de quem já usa nossa plataforma
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {depoimentos.map((depoimento, index) => (
-              <div key={index} className="bg-white p-8 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border-l-4 border-blue-500 relative">
-                <div className="absolute top-4 right-4 text-blue-500 text-4xl opacity-20">
-                  "
-                </div>
-                <div className="flex items-center mb-6">
-                  {renderEstrelas(depoimento.estrelas)}
-                </div>
-                <p className="text-slate-700 mb-6 leading-relaxed text-lg">
-                  {depoimento.comentario}
-                </p>
-                <div className="flex items-center">
-                  <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-sky-500 rounded-full flex items-center justify-center text-white font-bold text-lg mr-4">
-                    {depoimento.nome.charAt(0)}
+          {/* Avaliações da Plataforma (5 estrelas) */}
+          {avaliacoesPlataforma.length > 0 && (
+            <div className="mb-16">
+              <h3 className="text-2xl font-bold text-slate-800 mb-8 text-center">
+                ⭐ Avaliações da Plataforma
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {avaliacoesPlataforma.slice(0, 6).map((avaliacao, index) => (
+                  <div key={`avaliacao-${index}`} className="bg-gradient-to-br from-yellow-50 to-orange-50 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-yellow-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: 5 }, (_, i) => (
+                          <FaStar
+                            key={i}
+                            className="w-5 h-5 text-yellow-400 fill-current"
+                          />
+                        ))}
+                      </div>
+                      <span className="text-sm text-slate-500">Plataforma</span>
+                    </div>
+                    {avaliacao.Comentario && (
+                      <p className="text-slate-700 mb-4 leading-relaxed">
+                        "{avaliacao.Comentario}"
+                      </p>
+                    )}
+                    <div className="flex items-center">
+                      <div className="w-10 h-10 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full flex items-center justify-center text-white font-bold text-sm mr-3">
+                        {avaliacao.cliente?.NomeCompleto?.charAt(0) || '?'}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-800 text-sm">
+                          {avaliacao.cliente?.NomeCompleto || 'Cliente Anônimo'}
+                        </p>
+                        <p className="text-xs text-slate-500">Avaliação da Plataforma</p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-semibold text-slate-800">{depoimento.nome}</p>
-                    <p className="text-sm text-slate-500">{depoimento.tipo}</p>
-                  </div>
-                </div>
+                ))}
               </div>
-            ))}
+            </div>
+          )}
+
+          {/* Depoimentos Tradicionais */}
+          <div>
+            <h3 className="text-2xl font-bold text-slate-800 mb-8 text-center">
+              💬 Depoimentos dos Clientes
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {depoimentos.map((depoimento, index) => (
+                <div key={index} className="bg-white p-8 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border-l-4 border-blue-500 relative">
+                  <div className="absolute top-4 right-4 text-blue-500 text-4xl opacity-20">
+                    "
+                  </div>
+                  <div className="flex items-center mb-6">
+                    {renderEstrelas(depoimento.estrelas)}
+                  </div>
+                  <p className="text-slate-700 mb-6 leading-relaxed text-lg">
+                    {depoimento.comentario}
+                  </p>
+                  <div className="flex items-center">
+                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-sky-500 rounded-full flex items-center justify-center text-white font-bold text-lg mr-4">
+                      {depoimento.nome.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-800">{depoimento.nome}</p>
+                      <p className="text-sm text-slate-500">{depoimento.tipo}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
