@@ -88,11 +88,11 @@ function AdminLayout({ children }) {
     if (window.confirm('Tem certeza que deseja sair da conta?')) {
       try {
         await logout();
-        navigate('/login');
+        navigate('/admin/login');
       } catch (error) {
         console.error('Erro ao fazer logout:', error);
         // Mesmo com erro, redireciona para login
-        navigate('/login');
+        navigate('/admin/login');
       }
     }
   };
