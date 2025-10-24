@@ -94,6 +94,17 @@ export const adminSuporteService = {
   },
 };
 
+export const adminService = {
+  // Login para administradores
+  login: async (email, password) => {
+    return adminApiRequest('/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  },
+};
+
 export default {
   adminSuporteService,
+  adminService,
 };

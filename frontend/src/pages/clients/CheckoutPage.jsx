@@ -1266,7 +1266,7 @@ function CheckoutPage() {
                     <div className="border-t border-slate-200 pt-3">
                       {/* Cupom */}
                       <div className="border-t border-slate-200 pt-3 mb-4">
-                        <div className="flex gap-2 mb-2">
+                        <div className="flex flex-wrap gap-2 mb-2">
                           <input
                             type="text"
                             value={couponCode}
@@ -1279,7 +1279,7 @@ function CheckoutPage() {
                             <button
                               onClick={handleAplicarCupom}
                               disabled={couponLoading || !couponCode.trim()}
-                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed text-sm font-medium"
+                              className="px-4 w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed text-sm font-medium"
                             >
                               {couponLoading ? 'Aplicando...' : 'Aplicar'}
                             </button>

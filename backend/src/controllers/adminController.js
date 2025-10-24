@@ -1,6 +1,130 @@
 // backend/src/controllers/adminController.js
 import prisma from "../config/prisma.js";
-import { logger } from '../utils/logger.js';
+import cryptoService from "../services/cryptoService.js";
+import { logger } from "../utils/logger.js";
+import jwt from 'jsonwebtoken';
+import DOMPurify from 'dompurify';
+import { JSDOM } from 'jsdom';
+
+// Initialize DOMPurify with JSDOM for server-side usage
+const window = new JSDOM('').window;
+const DOMPurifyServer = DOMPurify(window);
+
+// Helpers para tokens
+const ACCESS_SECRET = process.env.JWT_SECRET || 'seu_segredo';
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'seu_segredo_refresh';
+const ACCESS_EXPIRES = process.env.JWT_ACCESS_EXPIRES || '15m';
+const REFRESH_EXPIRES = process.env.JWT_REFRESH_EXPIRES || '30d';
+
+// Login para administradores
+export const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Sanitize inputs
+    const sanitizedEmail = DOMPurifyServer.sanitize(email?.toString() || '').trim();
+    const sanitizedPassword = password?.toString() || '';
+
+    // Enhanced validation with length limits
+    if (!sanitizedEmail || sanitizedEmail.length === 0) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Email é obrigatório"]
+      });
+    }
+
+    if (!sanitizedPassword || sanitizedPassword.length === 0) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Senha é obrigatória"]
+      });
+    }
+
+    // Validate email format and length
+    if (sanitizedEmail.length > 254) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Email muito longo"]
+      });
+    }
+
+    // Validate password length
+    if (sanitizedPassword.length > 128) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Senha muito longa"]
+      });
+    }
+
+    // Additional email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(sanitizedEmail)) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Formato de email inválido"]
+      });
+    }
+
+    const admin = await prisma.administrador.findUnique({
+      where: { Email: sanitizedEmail }
+    });
+
+    if (!admin) {
+      return res.status(401).json({
+        success: false,
+        errors: ["Credenciais inválidas"]
+      });
+    }
+
+    if (!admin.Ativo) {
+      return res.status(401).json({
+        success: false,
+        errors: ["Conta desativada"]
+      });
+    }
+
+    const isPasswordValid = await cryptoService.comparePassword(sanitizedPassword, admin.SenhaHash);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        errors: ["Credenciais inválidas"]
+      });
+    }
+
+    // Gerar tokens JWT
+    const accessToken = jwt.sign(
+      { id: admin.AdminID, email: admin.Email, role: 'admin' },
+      ACCESS_SECRET,
+      { expiresIn: ACCESS_EXPIRES }
+    );
+
+    const refreshToken = jwt.sign(
+      { id: admin.AdminID, email: admin.Email, role: 'admin' },
+      REFRESH_SECRET,
+      { expiresIn: REFRESH_EXPIRES }
+    );
+
+    res.json({
+      success: true,
+      accessToken,
+      refreshToken,
+      admin: {
+        id: admin.AdminID,
+        nome: admin.Nome,
+        email: admin.Email,
+        cargo: admin.Cargo
+      }
+    });
+
+  } catch (error) {
+    logControllerError('login', error, req);
+    res.status(500).json({
+      success: false,
+      errors: ["Erro interno do servidor"]
+    });
+  }
+};
 
 const logControllerError = (operation, error, req) => {
   logger.error(`admin_controller_${operation}_error`, {
@@ -150,6 +274,36 @@ export const listarVendedores = async (req, res) => {
     const { user } = req;
     const { pagina = 1, limit = 10, search = '', status = 'all' } = req.query;
 
+    // Sanitize and validate query parameters
+    const sanitizedSearch = DOMPurifyServer.sanitize(search?.toString() || '').trim();
+    const sanitizedStatus = DOMPurifyServer.sanitize(status?.toString() || 'all').trim();
+
+    // Validate pagination parameters
+    const pageNum = parseInt(pagina);
+    const limitNum = parseInt(limit);
+
+    if (isNaN(pageNum) || pageNum < 1 || pageNum > 1000) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Página inválida"]
+      });
+    }
+
+    if (isNaN(limitNum) || limitNum < 1 || limitNum > 100) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Limite inválido"]
+      });
+    }
+
+    // Validate status parameter
+    if (!['all', 'ativo', 'inativo'].includes(sanitizedStatus)) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Status inválido"]
+      });
+    }
+
     if (user.role !== 'admin' && user.role !== 'ADMIN') {
       return res.status(403).json({
         success: false,
@@ -157,13 +311,13 @@ export const listarVendedores = async (req, res) => {
       });
     }
 
-    const skip = (pagina - 1) * limit;
+    const skip = (pageNum - 1) * limitNum;
     const whereClause = {
-      ...(status !== 'all' && { Ativo: status === 'ativo' }),
-      ...(search && {
+      ...(sanitizedStatus !== 'all' && { Ativo: sanitizedStatus === 'ativo' }),
+      ...(sanitizedSearch && sanitizedSearch.length > 0 && sanitizedSearch.length <= 100 && {
         OR: [
-          { Nome: { contains: search, mode: 'insensitive' } },
-          { Email: { contains: search, mode: 'insensitive' } }
+          { Nome: { contains: sanitizedSearch, mode: 'insensitive' } },
+          { Email: { contains: sanitizedSearch, mode: 'insensitive' } }
         ]
       })
     };
@@ -283,8 +437,8 @@ export const listarVendedores = async (req, res) => {
       success: true,
       vendedores: vendedoresComDados,
       total,
-      pagina: parseInt(pagina),
-      limit: parseInt(limit)
+      pagina: pageNum,
+      limit: limitNum
     });
 
   } catch (error) {
@@ -340,7 +494,7 @@ export const listarEmpresas = async (req, res) => {
         },
         orderBy: { CriadoEm: 'desc' },
         skip,
-        take: parseInt(limit)
+        take: limitNum
       }),
       prisma.empresa.count({ where: whereClause })
     ]);
@@ -400,16 +554,29 @@ export const atualizarStatusEmpresa = async (req, res) => {
       });
     }
 
+    // Sanitize and validate parameters
+    const sanitizedId = DOMPurifyServer.sanitize(id?.toString() || '').trim();
+    const sanitizedAtivo = typeof ativo === 'boolean' ? ativo : Boolean(ativo);
+
+    // Validate ID
+    const empresaId = parseInt(sanitizedId);
+    if (isNaN(empresaId) || empresaId < 1) {
+      return res.status(400).json({
+        success: false,
+        errors: ["ID da empresa inválido"]
+      });
+    }
+
     const empresa = await prisma.empresa.update({
-      where: { EmpresaID: parseInt(id) },
-      data: { Ativo: ativo }
+      where: { EmpresaID: empresaId },
+      data: { Ativo: sanitizedAtivo }
     });
 
     // Log da ação administrativa
     logger.info('empresa_status_atualizado_admin', {
       adminId: user.id,
-      empresaId: id,
-      novoStatus: ativo
+      empresaId: empresaId,
+      novoStatus: sanitizedAtivo
     });
 
     res.json({
@@ -440,12 +607,33 @@ export const listarClientes = async (req, res) => {
       });
     }
 
-    const skip = (pagina - 1) * limit;
-    const whereClause = search ? {
+    // Sanitize and validate query parameters
+    const sanitizedSearch = DOMPurifyServer.sanitize(search?.toString() || '').trim();
+
+    // Validate pagination parameters
+    const pageNum = parseInt(pagina);
+    const limitNum = parseInt(limit);
+
+    if (isNaN(pageNum) || pageNum < 1 || pageNum > 1000) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Página inválida"]
+      });
+    }
+
+    if (isNaN(limitNum) || limitNum < 1 || limitNum > 100) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Limite inválido"]
+      });
+    }
+
+    const skip = (pageNum - 1) * limitNum;
+    const whereClause = sanitizedSearch && sanitizedSearch.length > 0 && sanitizedSearch.length <= 100 ? {
       OR: [
-        { NomeCompleto: { contains: search, mode: 'insensitive' } },
-        { Email: { contains: search, mode: 'insensitive' } },
-        { CPF_CNPJ: { contains: search } }
+        { NomeCompleto: { contains: sanitizedSearch, mode: 'insensitive' } },
+        { Email: { contains: sanitizedSearch, mode: 'insensitive' } },
+        { CPF_CNPJ: { contains: sanitizedSearch } }
       ]
     } : {};
 
@@ -466,7 +654,7 @@ export const listarClientes = async (req, res) => {
         },
         orderBy: { DataCadastro: 'desc' },
         skip,
-        take: parseInt(limit)
+        take: limitNum
       }),
       prisma.cliente.count({ where: whereClause })
     ]);
@@ -506,8 +694,8 @@ export const listarClientes = async (req, res) => {
       success: true,
       clientes: clientesComHistorico,
       total,
-      pagina: parseInt(pagina),
-      limit: parseInt(limit)
+      pagina: pageNum,
+      limit: limitNum
     });
 
   } catch (error) {
@@ -532,8 +720,19 @@ export const buscarCliente = async (req, res) => {
       });
     }
 
+    // Sanitize and validate ID parameter
+    const sanitizedId = DOMPurifyServer.sanitize(id?.toString() || '').trim();
+    const clienteId = parseInt(sanitizedId);
+
+    if (isNaN(clienteId) || clienteId < 1) {
+      return res.status(400).json({
+        success: false,
+        errors: ["ID do cliente inválido"]
+      });
+    }
+
     const cliente = await prisma.cliente.findUnique({
-      where: { ClienteID: parseInt(id) },
+      where: { ClienteID: clienteId },
       select: {
         ClienteID: true,
         NomeCompleto: true,
@@ -598,10 +797,22 @@ export const obterRelatoriosFinanceiros = async (req, res) => {
       });
     }
 
+    // Sanitize and validate periodo parameter
+    const sanitizedPeriodo = DOMPurifyServer.sanitize(periodo?.toString() || '30d').trim();
+
+    // Validate periodo parameter
+    const allowedPeriodos = ['7d', '30d', '90d', '1y'];
+    if (!allowedPeriodos.includes(sanitizedPeriodo)) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Período inválido"]
+      });
+    }
+
     // Calcular período
     const now = new Date();
     let startDate;
-    switch (periodo) {
+    switch (sanitizedPeriodo) {
       case '7d': startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); break;
       case '30d': startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); break;
       case '90d': startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); break;
@@ -801,18 +1012,31 @@ export const atualizarVisibilidadeAvaliacao = async (req, res) => {
       });
     }
 
+    // Sanitize and validate parameters
+    const sanitizedId = DOMPurifyServer.sanitize(id?.toString() || '').trim();
+    const sanitizedVisivel = typeof visivel === 'boolean' ? visivel : Boolean(visivel);
+
+    // Validate ID
+    const avaliacaoId = parseInt(sanitizedId);
+    if (isNaN(avaliacaoId) || avaliacaoId < 1) {
+      return res.status(400).json({
+        success: false,
+        errors: ["ID da avaliação inválido"]
+      });
+    }
+
     // Como não há campo de visibilidade na tabela Avaliacao,
     // podemos adicionar um campo ou usar uma abordagem diferente
     // Por enquanto, apenas logamos a ação
     logger.info('avaliacao_visibilidade_atualizada', {
       adminId: user.id,
-      avaliacaoId: id,
-      visivel
+      avaliacaoId: avaliacaoId,
+      visivel: sanitizedVisivel
     });
 
     res.json({
       success: true,
-      message: `Avaliação ${visivel ? 'tornada visível' : 'ocultada'} com sucesso`
+      message: `Avaliação ${sanitizedVisivel ? 'tornada visível' : 'ocultada'} com sucesso`
     });
 
   } catch (error) {

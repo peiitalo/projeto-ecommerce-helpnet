@@ -323,7 +323,7 @@ function ConfiguracoesPage() {
             className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 border border-red-200"
           >
             <FaSignOutAlt />
-            <span className="text-sm font-medium">Excluir Conta</span>
+            <span className="text-sm font-medium">Sair da conta</span>
           </button>
         </div>
       </aside>

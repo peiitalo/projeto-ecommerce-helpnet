@@ -10,6 +10,7 @@
     "create-clients": "node src/scripts/createSampleClients.js",
     "create-products": "node src/scripts/createSampleProducts.js",
     "create-payment-methods": "node src/scripts/createPaymentMethods.js",
+    "create-admin": "node src/scripts/createAdminUser.js",
     "build:css": "npx tailwindcss -i ./src/styles/email.css -o ./src/styles/email-compiled.css",
     "lint": "eslint .",
     "format": "prettier --write ."
@@ -19,7 +20,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@prisma/client": "^6.15.0",
+    "@prisma/client": "^6.18.0",
     "@sendgrid/mail": "^8.1.6",
     "@tailwindcss/postcss": "^4.1.15",
     "autoprefixer": "^10.4.21",
@@ -30,11 +31,13 @@
     "compression": "^1.8.1",
     "cors": "^2.8.5",
     "cpf-cnpj-validator": "^1.0.3",
+    "dompurify": "^3.3.0",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "express-rate-limit": "^8.1.0",
     "handlebars": "^4.7.8",
     "helmet": "^8.1.0",
+    "jsdom": "^27.0.1",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
     "multer-storage-cloudinary": "^4.0.0",
@@ -52,7 +55,7 @@
     "eslint-config-prettier": "^9.1.0",
     "globals": "^16.3.0",
     "prettier": "^3.3.3",
-    "prisma": "^6.15.0",
+    "prisma": "^6.18.0",
     "tailwindcss": "^3.4.18"
   }
 }
