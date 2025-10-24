@@ -56,6 +56,43 @@ const VendorDeliveryDetailPage = lazy(() =>
 );
 const RelatorioPage = lazy(() => import("./pages/vendor/RelatorioPage"));
 const VendorCuponsPage = lazy(() => import("./pages/vendor/VendorCuponsPage"));
+const LandingPage = lazy(() => import('./pages/landingPage'));
+const Login = lazy(() => import('./pages/login'));
+const Cadastro = lazy(() => import('./pages/cadastro'));
+const Dashboard = lazy(() => import('./pages/admin/dashboard'));
+const AdminOrdersPage = lazy(() => import('./pages/admin/orders'));
+const VendedoresPage = lazy(() => import('./pages/admin/VendedoresPage'));
+const FinanceiroPage = lazy(() => import('./pages/vendor/FinanceiroPage'));
+const ConfiguracoesPage = lazy(() => import('./pages/admin/ConfiguracoesPage'));
+const NotFound = lazy(() => import('./pages/errors/notFound'));
+const Home = lazy(() => import('./pages/clients/home'));
+const ProductPage = lazy(() => import('./pages/clients/ProductPage'));
+const CartPage = lazy(() => import('./pages/clients/CartPage'));
+const FavoritesPage = lazy(() => import('./pages/clients/FavoritesPage'));
+const NotificationsPage = lazy(() => import('./pages/clients/NotificationsPage'));
+const ProfilePage = lazy(() => import('./pages/clients/ProfilePage'));
+const ExplorePage = lazy(() => import('./pages/clients/ExplorePage'));
+const CheckoutPage = lazy(() => import('./pages/clients/CheckoutPage'));
+const AddressPage = lazy(() => import('./pages/clients/AddressPage'));
+const OrdersPage = lazy(() => import('./pages/clients/OrdersPage'));
+const HistoryPage = lazy(() => import('./pages/clients/HistoryPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
+const PaymentSimulator = lazy(() => import('./pages/clients/PaymentSimulator'));
+const PaymentCheckout = lazy(() => import('./pages/clients/PaymentCheckout'));
+const SuportePage = lazy(() => import('./pages/clients/SuportePage'));
+const MeusCuponsPage = lazy(() => import('./pages/clients/MeusCuponsPage'));
+const ClientConfiguracoesPage = lazy(() => import('./pages/clients/ConfiguracoesPage'));
+const ProductsManagement = lazy(() => import('./pages/vendor/ProductsManagement'));
+const ProductForm = lazy(() => import('./pages/vendor/ProductForm'));
+const VendorDashboard = lazy(() => import('./pages/vendor/VendorDashboard'));
+const VendorOrdersPage = lazy(() => import('./pages/vendor/VendorOrdersPage'));
+const VendorClientsPage = lazy(() => import('./pages/vendor/VendorClientsPage'));
+const VendorProfilePage = lazy(() => import('./pages/vendor/VendorProfilePage'));
+const VendorDeliveriesPage = lazy(() => import('./pages/vendor/VendorDeliveriesPage'));
+const VendorDeliveryDetailPage = lazy(() => import('./pages/vendor/VendorDeliveryDetailPage'));
+const RelatorioPage = lazy(() => import('./pages/vendor/RelatorioPage'));
+const VendorCuponsPage = lazy(() => import('./pages/vendor/VendorCuponsPage'));
+const SuporteAdminPage = lazy(() => import('./pages/admin/SuporteAdminPage'));
 import AdminLogin from "./pages/admin/AdminLogin.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
@@ -122,6 +159,15 @@ function App() {
                 element={<ConfiguracoesPage />}
               />
             </Route>
+          {/* Admin */}
+          <Route>
+            <Route path="/admin/dashboard" element={<Dashboard />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/admin/pedidos" element={<AdminOrdersPage />} />
+            <Route path="/admin/vendedores" element={<VendedoresPage />} />
+            <Route path="/admin/suporte" element={<SuporteAdminPage />} />
+            <Route path="/admin/configuracoes" element={<ConfiguracoesPage />} />
+          </Route>
 
             {/* Vendedor */}
             <Route

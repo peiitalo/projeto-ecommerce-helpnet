@@ -23,6 +23,18 @@ const fetchConfig = {
 let isRefreshing = false;
 let refreshPromise = null;
 
+// Função auxiliar para validar token JWT
+const isTokenValid = (token) => {
+  if (!token) return false;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const currentTime = Date.now() / 1000;
+    return payload.exp > currentTime;
+  } catch {
+    return false;
+  }
+};
+
 // Função auxiliar para fazer requisições
 const apiRequest = async (endpoint, options = {}, retryCount = 0) => {
   try {
@@ -32,16 +44,19 @@ const apiRequest = async (endpoint, options = {}, retryCount = 0) => {
       ...options,
     };
 
-    // Injeta Authorization se houver accessToken persistido
+    // Injeta Authorization se houver accessToken válido persistido
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-      if (token) {
+      if (token && isTokenValid(token)) {
         config.headers = {
           ...(config.headers || {}),
           Authorization: `Bearer ${token}`,
         };
+      } else if (token && !isTokenValid(token)) {
+        // Token expirado, remove do localStorage
+        localStorage.removeItem('accessToken');
       }
-    } catch {} 
+    } catch {}
 
     const response = await fetch(url, config);
 
@@ -63,7 +78,17 @@ const apiRequest = async (endpoint, options = {}, retryCount = 0) => {
         return apiRequest(endpoint, options, retryCount + 1);
       } catch (refreshError) {
         console.error('Erro ao renovar token:', refreshError);
-        // Se refresh falhar, continua com o erro original
+        // Se refresh falhar, limpa tokens e redireciona para login
+        try {
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('accessToken');
+            // Redirecionar para login se estiver em página protegida
+            if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
+              window.location.href = '/login';
+            }
+          }
+        } catch {}
+        throw new Error('Sessão expirada. Faça login novamente.');
       }
     }
 
@@ -100,7 +125,9 @@ const refreshToken = async () => {
     });
 
     if (!refreshResponse.ok) {
-      throw new Error('Falha ao renovar token');
+      const errorText = await refreshResponse.text();
+      console.error('Refresh token response:', refreshResponse.status, errorText);
+      throw new Error(`Falha ao renovar token: ${refreshResponse.status}`);
     }
 
     const refreshData = await refreshResponse.json();
@@ -108,16 +135,20 @@ const refreshToken = async () => {
     // Atualiza o accessToken no localStorage se fornecido
     if (refreshData?.data?.accessToken && typeof window !== 'undefined') {
       localStorage.setItem('accessToken', refreshData.data.accessToken);
+      console.log('Token renovado com sucesso');
     }
 
     return refreshData;
   } catch (error) {
+    console.error('Erro no refreshToken:', error);
     // Se refresh falhar, limpa o token expirado
     try {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('accessToken');
       }
-    } catch {}
+    } catch (e) {
+      console.error('Erro ao limpar token:', e);
+    }
     throw error;
   }
 };
@@ -283,13 +314,19 @@ export const clienteService = {
 
   // Auto-login usando access atual (ou após refresh)
   autoLogin: async () => {
-    // tenta refresh antes
-    try { await apiRequest('/clientes/refresh', { method: 'POST' }); } catch {}
+    try {
+      // tenta refresh antes
+      await apiRequest('/clientes/refresh', { method: 'POST' });
+    } catch (refreshError) {
+      console.log('Refresh falhou no auto-login, tentando com token atual:', refreshError.message);
+    }
     const resp = await apiRequest('/clientes/auto-login');
     try {
       const at = resp?.data?.accessToken;
       if (at && typeof window !== 'undefined') localStorage.setItem('accessToken', at);
-    } catch {}
+    } catch (storageError) {
+      console.error('Erro ao salvar token no auto-login:', storageError);
+    }
     return resp;
   },
 
@@ -638,6 +675,7 @@ export default {
   carrinhoService,
   notificacaoService,
   avaliacaoService,
+  suporteService,
 };
 
 // Exportar função apiRequest para uso em outros módulos

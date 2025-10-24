@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FaArrowLeft, FaPaperPlane, FaComments, FaTimes, FaUser, FaEnvelope, FaPhone, FaStar } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
@@ -35,7 +35,7 @@ function SuportePage() {
   const [chatInput, setChatInput] = useState('');
 
   // Load user's existing review
-  useState(() => {
+  useEffect(() => {
     const loadUserReview = async () => {
       try {
         const response = await suporteService.buscarMinhaAvaliacao();
