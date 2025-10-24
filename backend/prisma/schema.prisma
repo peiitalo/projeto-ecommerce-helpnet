@@ -35,6 +35,8 @@ model Administrador {
   Ativo       Boolean  @default(true)
   CriadoEm    DateTime @default(now())
 
+  mensagensSuporte MensagemSuporte[]
+
   @@map("Administrador")
 }
 
@@ -77,6 +79,8 @@ model Cliente {
   clientesVendedor   ClienteVendedor[]
   resetTokens        PasswordResetToken[]
   cuponsCliente      CupomCliente[]
+  mensagensSuporte   MensagemSuporte[]
+  avaliacoesPlataforma AvaliacaoPlataforma[]
 
   @@index([Email])
   @@index([DataCadastro])
@@ -482,4 +486,44 @@ model CupomCliente {
   @@index([Resgatado])
   @@index([DataExpiracaoCliente])
   @@map("CupomCliente")
+}
+
+// Sistema de suporte e avaliações da plataforma
+model MensagemSuporte {
+  MensagemID    Int      @id @default(autoincrement())
+  ClienteID     Int
+  Tipo          String   // 'DUVIDA' ou 'COMENTARIO_PLATAFORMA'
+  Assunto       String
+  Mensagem      String
+  Status        String   @default("PENDENTE") // PENDENTE, RESPONDIDO, RESOLVIDO
+  Resposta      String?
+  RespondidoPor Int?     // AdminID que respondeu
+  RespondidoEm  DateTime?
+  CriadoEm      DateTime @default(now())
+
+  cliente       Cliente      @relation(fields: [ClienteID], references: [ClienteID])
+  admin         Administrador? @relation(fields: [RespondidoPor], references: [AdminID])
+
+  @@index([ClienteID])
+  @@index([Tipo])
+  @@index([Status])
+  @@index([CriadoEm])
+  @@map("MensagemSuporte")
+}
+
+model AvaliacaoPlataforma {
+  AvaliacaoID Int      @id @default(autoincrement())
+  ClienteID   Int
+  Nota        Int      // 1-5 estrelas
+  Comentario  String?
+  ExibirSite  Boolean  @default(false) // Se deve aparecer na landing page
+  CriadoEm    DateTime @default(now())
+
+  cliente     Cliente  @relation(fields: [ClienteID], references: [ClienteID])
+
+  @@index([ClienteID])
+  @@index([Nota])
+  @@index([ExibirSite])
+  @@index([CriadoEm])
+  @@map("AvaliacaoPlataforma")
 }

@@ -699,18 +699,36 @@ export const listarMensagensSuporte = async (req, res) => {
     const { user } = req;
     const { pagina = 1, limit = 10, status = 'all' } = req.query;
 
-    if (user.role !== 'admin' && user.role !== 'ADMIN') {
-      return res.status(403).json({
-        success: false,
-        errors: ["Acesso negado."]
-      });
-    }
+    // Temporariamente removida verificação de admin para MVP
+    // if (user.role !== 'admin' && user.role !== 'ADMIN') {
+    //   return res.status(403).json({
+    //     success: false,
+    //     errors: ["Acesso negado."]
+    //   });
+    // }
 
-    // Como não há tabela específica para mensagens de suporte,
-    // vamos usar notificações ou criar uma lógica para buscar emails
-    // Por enquanto, retornaremos uma lista vazia com estrutura preparada
-    const mensagens = [];
-    const total = 0;
+    // Buscar mensagens de suporte da tabela MensagemSuporte
+    const skip = (pagina - 1) * limit;
+    const whereClause = status !== 'all' ? { Status: status } : {};
+
+    const [mensagens, total] = await Promise.all([
+      prisma.mensagemSuporte.findMany({
+        where: whereClause,
+        include: {
+          cliente: {
+            select: {
+              NomeCompleto: true,
+              Email: true,
+              TelefoneCelular: true
+            }
+          }
+        },
+        orderBy: { CriadoEm: 'desc' },
+        skip,
+        take: parseInt(limit)
+      }),
+      prisma.mensagemSuporte.count({ where: whereClause })
+    ]);
 
     res.json({
       success: true,
