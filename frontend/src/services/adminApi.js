@@ -189,6 +189,21 @@ export const adminService = {
       body: JSON.stringify({ email, password }),
     });
   },
+
+  // Listar pedidos
+  listarPedidos: async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    const endpoint = `/admin/pedidos${queryString ? `?${queryString}` : ''}`;
+    return adminApiRequest(endpoint);
+  },
+
+  // Atualizar status do pedido
+  atualizarStatusPedido: async (pedidoId, data) => {
+    return adminApiRequest(`/admin/pedidos/${pedidoId}/status`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
 };
 
 export default {

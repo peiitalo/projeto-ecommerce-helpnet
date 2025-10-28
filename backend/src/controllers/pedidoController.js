@@ -274,7 +274,9 @@ export const criarPedido = async (req, res) => {
       select: {
         NomeCompleto: true,
         Email: true,
-        CPF_CNPJ: true
+        CPF_CNPJ: true,
+        TelefoneCelular: true,
+        TelefoneFixo: true
       }
     });
 

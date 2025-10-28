@@ -11,6 +11,9 @@ router.use(authMiddleware);
 // Enviar mensagem de suporte (dúvida ou comentário da plataforma)
 router.post('/mensagem', suporteController.enviarMensagem);
 
+// Buscar mensagens de suporte do cliente
+router.get('/mensagens', suporteController.buscarMinhasMensagens);
+
 // Avaliar plataforma (5 estrelas)
 router.post('/avaliacao', suporteController.avaliarPlataforma);
 router.get('/avaliacao/minha', suporteController.buscarMinhaAvaliacao);

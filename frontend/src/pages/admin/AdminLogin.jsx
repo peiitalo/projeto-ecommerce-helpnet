@@ -154,7 +154,7 @@ function AdminLogin() {
                 </span>
               )}
             </div>
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2 text-center md:text-left">
               Login Administrativo
             </h1>
             <p className="text-blue-100 mb-6 md:mb-8 text-sm sm:text-base hidden md:block">

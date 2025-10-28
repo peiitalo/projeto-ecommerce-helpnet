@@ -123,6 +123,12 @@ function ProductPage() {
 
   useEffect(() => {
     const fetchProduct = async () => {
+      if (!id || id === 'undefined') {
+        setError('Produto não encontrado');
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError('');
       try {
@@ -139,6 +145,8 @@ function ProductPage() {
     };
 
     const checkFavoriteStatus = async () => {
+      if (!id || id === 'undefined') return;
+
       try {
         const favorites = await favoritoService.listar();
         const isFav = (favorites.favoritos || []).some(fav => fav.produto.ProdutoID === parseInt(id));
@@ -168,8 +176,8 @@ function ProductPage() {
   // Carregar avaliações
   useEffect(() => {
     const carregarAvaliacoes = async () => {
-      if (!id) return;
-      
+      if (!id || id === 'undefined') return;
+
       setLoadingAvaliacoes(true);
       try {
         const [avaliacoesResponse, minhaAvaliacaoResponse] = await Promise.all([
@@ -194,7 +202,8 @@ function ProductPage() {
   useEffect(() => {
     const carregarProdutosSugeridos = async () => {
       if (!product?.CategoriaID && !product?.VendedorID) return;
-      
+      if (!id || id === 'undefined') return;
+
       setLoadingProdutosSugeridos(true);
       try {
         const filtros = {
@@ -202,7 +211,7 @@ function ProductPage() {
           limit: 6,
           exclude: id // Excluir o produto atual
         };
-        
+
         const response = await produtoService.listar(filtros);
         setProdutosSugeridos(response.data?.produtos || []);
       } catch (error) {
@@ -947,7 +956,7 @@ function ProductPage() {
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
                               <h5 className="font-semibold text-slate-900">
-                                {avaliacao.cliente?.Nome || avaliacao.Cliente?.Nome || 'Cliente Anônimo'}
+                                {avaliacao.cliente?.NomeCompleto || avaliacao.Cliente?.NomeCompleto || 'Cliente'}
                               </h5>
                               <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
                                 {new Date(avaliacao.CriadoEm).toLocaleDateString('pt-BR')}

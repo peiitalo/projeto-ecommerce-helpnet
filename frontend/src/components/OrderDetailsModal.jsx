@@ -140,6 +140,7 @@ const OrderDetailsModal = ({ orderId, isOpen, onClose, isAdmin = false }) => {
     clientName: order.cliente?.NomeCompleto || order.Cliente?.Nome || 'Cliente',
     clientEmail: order.cliente?.Email || 'Não informado',
     clientPhone: order.cliente?.TelefoneCelular || order.cliente?.TelefoneFixo || 'Não informado',
+    clientCpfCnpj: order.cliente?.CPF_CNPJ || 'Não informado',
     items: order.itensPedido.map(item => ({
       name: item.produto.Nome,
       quantity: item.Quantidade,
@@ -215,6 +216,9 @@ const OrderDetailsModal = ({ orderId, isOpen, onClose, isAdmin = false }) => {
                           <div><strong>Data da Compra:</strong> ${formatDate(formattedOrder.date)}</div>
                           <div><strong>Status do Pedido:</strong> ${formattedOrder.status}</div>
                           <div><strong>Cliente:</strong> ${formattedOrder.clientName}</div>
+                          <div><strong>CPF/CNPJ:</strong> ${formattedOrder.clientCpfCnpj}</div>
+                          <div><strong>Email:</strong> ${formattedOrder.clientEmail}</div>
+                          <div><strong>Telefone:</strong> ${formattedOrder.clientPhone}</div>
                           <div><strong>Método de Pagamento:</strong> ${formattedOrder.paymentMethod}</div>
                         </div>
 
@@ -299,6 +303,10 @@ const OrderDetailsModal = ({ orderId, isOpen, onClose, isAdmin = false }) => {
               <div>
                 <p className="font-medium text-slate-900">Nome</p>
                 <p className="text-slate-600">{formattedOrder.clientName}</p>
+              </div>
+              <div>
+                <p className="font-medium text-slate-900">CPF/CNPJ</p>
+                <p className="text-slate-600">{formattedOrder.clientCpfCnpj}</p>
               </div>
               <div>
                 <p className="font-medium text-slate-900">Email</p>

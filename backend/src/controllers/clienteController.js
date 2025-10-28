@@ -576,6 +576,48 @@ export const buscarPerfil = async (req, res) => {
   }
 };
 
+// Buscar avaliações do cliente
+export const buscarAvaliacoesCliente = async (req, res) => {
+ try {
+   const { user } = req;
+
+   const avaliacoes = await prisma.avaliacao.findMany({
+     where: { ClienteID: user.id },
+     orderBy: { CriadoEm: 'desc' },
+     include: {
+       produto: {
+         select: {
+           ProdutoID: true,
+           Nome: true,
+           Imagens: true
+         }
+       }
+     }
+   });
+
+   // Mapear para o formato esperado pelo frontend
+   const avaliacoesMapeadas = avaliacoes.map(avaliacao => ({
+     id: avaliacao.AvaliacaoID,
+     produto: {
+       id: avaliacao.produto?.ProdutoID || null,
+       nome: avaliacao.produto?.Nome || 'Produto não encontrado',
+       imagem: avaliacao.produto?.Imagens?.[0] || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?q=80&w=400&auto=format&fit=crop'
+     },
+     nota: avaliacao.Nota,
+     comentario: avaliacao.Comentario,
+     data: avaliacao.CriadoEm
+   }));
+
+   res.json({
+     success: true,
+     avaliacoes: avaliacoesMapeadas
+   });
+ } catch (error) {
+   logControllerError('buscar_avaliacoes_cliente_error', error, req);
+   res.status(500).json({ success: false, errors: ['Erro interno do servidor'] });
+ }
+};
+
 export const listarEnderecos = async (req, res) => {
   try {
     const { user } = req;

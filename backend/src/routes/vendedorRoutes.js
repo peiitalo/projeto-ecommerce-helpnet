@@ -1,24 +1,33 @@
 // backend/src/routes/vendedorRoutes.js
 import express from 'express';
-import {
-  listarVendedores,
-  buscarVendedor,
-  criarVendedor,
-  atualizarVendedor,
-  excluirVendedor
-} from '../controllers/vendedorController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
+import * as suporteController from '../controllers/suporteController.js';
+import * as vendedorController from '../controllers/vendedorController.js';
 
 const router = express.Router();
 
-// Todas as rotas requerem autenticação
-router.use(authMiddleware);
+// Middleware para verificar se é vendedor
+const requireVendedor = (req, res, next) => {
+  if (req.user.role !== 'vendedor' && req.user.role !== 'VENDEDOR') {
+    return res.status(403).json({
+      success: false,
+      errors: ["Acesso negado. Apenas vendedores podem acessar esta funcionalidade."]
+    });
+  }
+  next();
+};
 
-// Rotas para gestão de vendedores
-router.get('/', listarVendedores);
-router.get('/:vendedorId', buscarVendedor);
-router.post('/', criarVendedor);
-router.put('/:vendedorId', atualizarVendedor);
-router.delete('/:vendedorId', excluirVendedor);
+// Aplicar middleware de autenticação
+router.use(authMiddleware);
+router.use(requireVendedor);
+
+// Rotas de suporte para vendedores
+router.post('/suporte/mensagem', suporteController.enviarMensagem);
+router.get('/suporte/avaliacao/minha', suporteController.buscarMinhaAvaliacao);
+router.post('/suporte/avaliacao', suporteController.avaliarPlataforma);
+
+// Outras rotas específicas do vendedor podem ser adicionadas aqui
+router.get('/perfil', vendedorController.buscarPerfilVendedor);
+router.put('/perfil', vendedorController.atualizarPerfilVendedor);
 
 export default router;

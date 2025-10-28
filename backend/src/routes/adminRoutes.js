@@ -42,6 +42,7 @@ router.use(requireAdmin);
 
 // Dashboard
 router.get('/dashboard', adminController.obterDashboardStats);
+router.get('/dashboard-stats', adminController.obterDashboardStats);
 
 // Rotas para gerenciamento de pedidos
 router.get('/pedidos', pedidoController.listarPedidosAdmin);
@@ -64,15 +65,12 @@ router.get('/relatorios/financeiro', adminController.obterRelatoriosFinanceiros)
 
 // Suporte
 router.get('/suporte/mensagens', adminController.listarMensagensSuporte);
-// TODO: Implement responderMensagemSuporte, resolverMensagemSuporte, excluirMensagemSuporte
-// router.put('/suporte/mensagens/:id/responder', adminController.responderMensagemSuporte);
-// router.put('/suporte/mensagens/:id/resolver', adminController.resolverMensagemSuporte);
-// router.delete('/suporte/mensagens/:id', adminController.excluirMensagemSuporte);
+router.put('/suporte/mensagens/:id/responder', adminController.responderMensagemSuporte);
+router.put('/suporte/mensagens/:id/resolver', adminController.resolverMensagemSuporte);
 
 // Avaliações da Plataforma
 router.get('/suporte/avaliacoes', adminController.listarAvaliacoes);
-// TODO: Implement alterarExibicaoAvaliacao, excluirAvaliacaoPlataforma
-// router.put('/suporte/avaliacoes/:id/exibicao', adminController.alterarExibicaoAvaliacao);
-// router.delete('/suporte/avaliacoes/:id', adminController.excluirAvaliacaoPlataforma);
+router.put('/suporte/avaliacoes/:id/visibilidade', adminController.atualizarVisibilidadeAvaliacao);
+router.delete('/suporte/avaliacoes/:id', adminController.deletarAvaliacao);
 
 export default router;

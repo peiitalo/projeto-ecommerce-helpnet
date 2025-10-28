@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { FiPackage, FiSearch, FiFilter, FiEdit, FiEye, FiCheck, FiX } from 'react-icons/fi';
 import { FaEye } from 'react-icons/fa';
-import AdminLayout from '../../components/AdminLayout';
-import api from '../../services/api';
+import AdminLayout from '../../layouts/AdminLayout';
+import { adminService } from '../../services/adminApi';
 import { useNotifications } from '../../hooks/useNotifications';
 import OrderDetailsModal from '../../components/OrderDetailsModal';
 
@@ -76,7 +76,7 @@ function AdminOrdersPage() {
 
       if (statusFilter) params.append('status', statusFilter);
 
-      const response = await api.get(`/admin/pedidos?${params}`);
+      const response = await adminService.listarPedidos(params);
 
       if (response.success) {
         setOrders(response.pedidos || []);
@@ -98,7 +98,7 @@ function AdminOrdersPage() {
     try {
       setUpdatingStatus(true);
 
-      const response = await api.put(`/admin/pedidos/${selectedOrder.PedidoID}/status`, {
+      const response = await adminService.atualizarStatusPedido(selectedOrder.PedidoID, {
         status: newStatus,
         observacoes: statusNotes
       });

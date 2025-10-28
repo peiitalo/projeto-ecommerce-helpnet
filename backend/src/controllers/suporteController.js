@@ -111,6 +111,33 @@ export const avaliarPlataforma = async (req, res) => {
   }
 };
 
+// Buscar mensagens de suporte do cliente
+export const buscarMinhasMensagens = async (req, res) => {
+  try {
+    const { user } = req;
+
+    const mensagens = await prisma.mensagemSuporte.findMany({
+      where: { ClienteID: user.id },
+      orderBy: { CriadoEm: 'desc' },
+      include: {
+        admin: {
+          select: {
+            Nome: true
+          }
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      mensagens
+    });
+  } catch (error) {
+    logControllerError('buscar_minhas_mensagens_error', error, req);
+    res.status(500).json({ success: false, errors: ['Erro interno do servidor'] });
+  }
+};
+
 // Buscar avaliação do usuário atual
 export const buscarMinhaAvaliacao = async (req, res) => {
   try {

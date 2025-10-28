@@ -405,6 +405,11 @@ export const clienteService = {
     return apiRequest('/pedidos');
   },
 
+  // Buscar avaliações do cliente
+  buscarAvaliacoes: async () => {
+    return apiRequest('/clientes/avaliacoes');
+  },
+
   // Buscar pedido por ID
   buscarPedido: async (id) => {
     return apiRequest(`/pedidos/${id}`);
@@ -614,6 +619,11 @@ export const suporteService = {
       method: 'POST',
       body: JSON.stringify(dados),
     });
+  },
+
+  // Buscar mensagens de suporte do cliente
+  buscarMinhasMensagens: async () => {
+    return apiRequest('/suporte/mensagens');
   },
 
   // Avaliar plataforma

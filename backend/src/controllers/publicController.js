@@ -53,10 +53,11 @@ export const obterEstatisticasPublicas = async (req, res) => {
 // Obter depoimentos para landing page
 export const obterDepoimentos = async (req, res) => {
   try {
-    // Buscar avaliações com 5 estrelas, incluindo nome do cliente
-    const depoimentos = await prisma.avaliacao.findMany({
+    // Buscar avaliações da plataforma com 5 estrelas que têm permissão para exibir no site
+    const depoimentos = await prisma.avaliacaoPlataforma.findMany({
       where: {
         Nota: 5,
+        ExibirSite: true,
         Comentario: {
           not: null
         }
@@ -65,7 +66,8 @@ export const obterDepoimentos = async (req, res) => {
         Comentario: true,
         cliente: {
           select: {
-            NomeCompleto: true
+            NomeCompleto: true,
+            TipoPessoa: true
           }
         }
       },
@@ -80,8 +82,18 @@ export const obterDepoimentos = async (req, res) => {
       nome: dep.cliente.NomeCompleto,
       comentario: dep.Comentario,
       estrelas: 5,
-      tipo: "Cliente Verificado"
+      tipo: dep.cliente.TipoPessoa === 'JURIDICA' ? 'Pessoa Jurídica' : 'Pessoa Física'
     }));
+
+    // Se não houver depoimentos, retornar mensagem padrão
+    if (depoimentosFormatados.length === 0) {
+      depoimentosFormatados.push({
+        nome: "",
+        comentario: "Não há comentários ainda",
+        estrelas: 5,
+        tipo: ""
+      });
+    }
 
     res.json({
       success: true,

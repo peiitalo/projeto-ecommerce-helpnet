@@ -15,17 +15,21 @@ import {
   FiMenu,
   FiX,
   FiBriefcase,
-  FiPlus
+  FiPlus,
+  FiStar
 } from 'react-icons/fi';
-import { produtoService } from '../../services/api';
 import AdminLayout from '../../layouts/AdminLayout';
 
 function Dashboard() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  const [productsTotal, setProductsTotal] = useState(null);
-  const [productsActive, setProductsActive] = useState(null);
-  const [productsNoStock, setProductsNoStock] = useState(null);
+  const [stats, setStats] = useState({
+    totalPedidos: 0,
+    totalClientes: 0,
+    totalVendedores: 0,
+    totalProdutos: 0,
+    faturamentoTotal: 0,
+    pedidosRecentes: [],
+    produtosMaisVendidos: []
+  });
 
   // Usuário admin mockado - em produção viriam do contexto/estado global
   const adminUser = {
@@ -38,53 +42,50 @@ function Dashboard() {
     let isMounted = true;
     const loadData = async () => {
       try {
-        const [all, active, noStock] = await Promise.all([
-          produtoService.listar({ limit: 1 }),
-          produtoService.listar({ status: 'ativo', limit: 1 }),
-          produtoService.listar({ status: 'sem-estoque', limit: 1 }),
-        ]);
-        if (!isMounted) return;
-        const getTotal = (resp) => resp?.total ?? (Array.isArray(resp) ? resp.length : (resp?.produtos?.length ?? 0));
-        setProductsTotal(getTotal(all));
-        setProductsActive(getTotal(active));
-        setProductsNoStock(getTotal(noStock));
+        // Carregar estatísticas reais do backend
+        const response = await fetch('/api/admin/dashboard-stats', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && isMounted) {
+            setStats(data.stats);
+          }
+        } else {
+          console.error('Erro ao carregar estatísticas do dashboard');
+        }
       } catch (e) {
-        console.error('Erro ao carregar KPIs de produtos:', e);
+        console.error('Erro ao carregar dados do dashboard:', e);
       }
     };
     loadData();
     return () => { isMounted = false; };
   }, []);
 
-  // KPIs do painel administrativo
+  // KPIs do painel administrativo com dados reais
   const kpis = [
-    { titulo: "Receita", valor: "R$ 12.450", icone: <FiBarChart2 />, cor: "bg-blue-600" },
-    { titulo: "Pedidos", valor: "126", icone: <FiPackage />, cor: "bg-blue-500" },
-    { titulo: "Clientes", valor: "824", icone: <FiUsers />, cor: "bg-blue-400" },
-    { titulo: "Produtos", valor: productsTotal !== null ? String(productsTotal) : "342", icone: <FiBox />, cor: "bg-blue-700" },
+    { titulo: "Receita", valor: `R$ ${stats.faturamentoTotal?.toFixed(2) || "0,00"}`, icone: <FiBarChart2 />, cor: "bg-blue-600" },
+    { titulo: "Pedidos", valor: String(stats.totalPedidos || 0), icone: <FiPackage />, cor: "bg-blue-500" },
+    { titulo: "Clientes", valor: String(stats.totalClientes || 0), icone: <FiUsers />, cor: "bg-blue-400" },
+    { titulo: "Produtos", valor: String(stats.totalProdutos || 0), icone: <FiBox />, cor: "bg-blue-700" },
+    { titulo: "Vendedores", valor: String(stats.totalVendedores || 0), icone: <FiBriefcase />, cor: "bg-green-600" },
+    { titulo: "Avaliações", valor: "1.2k", icone: <FiStar />, cor: "bg-yellow-500" },
+    { titulo: "Cupons", valor: "23", icone: <FiTag />, cor: "bg-purple-600" },
+    { titulo: "Entregas", valor: "89", icone: <FiTruck />, cor: "bg-orange-600" },
   ];
 
-  const pedidosRecentes = [
-    { id: "001", data: "2024-01-20", status: "Entregue", valor: "R$ 299,90" },
-    { id: "002", data: "2024-01-15", status: "Em trânsito", valor: "R$ 159,90" },
-    { id: "003", data: "2024-01-10", status: "Processando", valor: "R$ 89,90" },
-  ];
+  const pedidosRecentes = stats.pedidosRecentes?.map(p => ({
+    id: String(p.id),
+    data: new Date(p.data).toLocaleDateString('pt-BR'),
+    status: p.status,
+    valor: `R$ ${p.total?.toFixed(2) || "0,00"}`
+  })) || [];
 
-  const menuAdministrativo = [
-    { label: 'Visão Geral', to: '/admin', icon: <FiHome className="text-slate-500" /> },
-    { label: 'Pedidos', to: '/admin/pedidos', icon: <FiPackage className="text-slate-500" /> },
-    { label: 'Produtos', to: '/admin/produtos', icon: <FiBox className="text-slate-500" /> },
-    { label: 'Categorias', to: '/admin/categorias', icon: <FiTag className="text-slate-500" /> },
-    { label: 'Clientes', to: '/admin/clientes', icon: <FiUsers className="text-slate-500" /> },
-    { label: 'Vendedores', to: '/admin/vendedores', icon: <FiBriefcase className="text-slate-500" /> },
-    { label: 'Estoque', to: '/admin/estoque', icon: <FiBox className="text-slate-500" /> },
-    { label: 'Cupons', to: '/admin/cupons', icon: <FiTag className="text-slate-500" /> },
-    { label: 'Relatórios', to: '/admin/relatorios', icon: <FiBarChart2 className="text-slate-500" /> },
-    { label: 'Entregas', to: '/admin/entregas', icon: <FiTruck className="text-slate-500" /> },
-    { label: 'Financeiro', to: '/admin/financeiro', icon: <FiCreditCard className="text-slate-500" /> },
-    { label: 'Configurações', to: '/admin/configuracoes', icon: <FiSettings className="text-slate-500" /> },
-    { label: 'Suporte', to: '/admin/suporte', icon: <FiHelpCircle className="text-slate-500" /> },
-  ];
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -107,7 +108,7 @@ function Dashboard() {
           </section>
 
           {/* KPIs */}
-          <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {kpis.map((kpi, index) => (
               <div key={index} className="bg-white rounded-xl shadow-sm p-6 border border-slate-200 hover:shadow-md transition-shadow">
                 <div className="flex flex-col items-center text-center space-y-4">
@@ -123,42 +124,6 @@ function Dashboard() {
             ))}
           </section>
 
-          {/* Métricas de Produtos (dados reais) */}
-          <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-200 hover:shadow-md transition-shadow">
-              <div className="flex flex-col items-center text-center space-y-4">
-                <div className="bg-blue-700 p-4 rounded-xl text-white">
-                  <FiBox className="text-3xl" />
-                </div>
-                <div>
-                  <p className="text-3xl font-bold text-slate-900">{productsTotal !== null ? productsTotal : '—'}</p>
-                  <p className="text-slate-600 text-sm mt-1">Produtos (Total)</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-200 hover:shadow-md transition-shadow">
-              <div className="flex flex-col items-center text-center space-y-4">
-                <div className="bg-green-600 p-4 rounded-xl text-white">
-                  <FiBox className="text-3xl" />
-                </div>
-                <div>
-                  <p className="text-3xl font-bold text-slate-900">{productsActive !== null ? productsActive : '—'}</p>
-                  <p className="text-slate-600 text-sm mt-1">Produtos Ativos</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-200 hover:shadow-md transition-shadow lg:col-span-2">
-              <div className="flex flex-col items-center text-center space-y-4">
-                <div className="bg-yellow-600 p-4 rounded-xl text-white">
-                  <FiBox className="text-3xl" />
-                </div>
-                <div>
-                  <p className="text-3xl font-bold text-slate-900">{productsNoStock !== null ? productsNoStock : '—'}</p>
-                  <p className="text-slate-600 text-sm mt-1">Sem Estoque</p>
-                </div>
-              </div>
-            </div>
-          </section>
 
           <section className="grid grid-cols-1 xl:grid-cols-3 gap-8">
             {/* Pedidos Recentes */}

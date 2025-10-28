@@ -5,6 +5,8 @@ import "react-toastify/dist/ReactToastify.css";
 import LoadingSkeleton from "./components/LoadingSkeleton";
 import { NotificationProvider } from "./context/NotificationContext";
 import NotificationContainer from "./components/NotificationContainer";
+import { CountersProvider } from "./context/CountersContext";
+import { AuthProvider } from "./context/AuthContext";
 
 const LandingPage = lazy(() => import("./pages/landingPage"));
 const Login = lazy(() => import("./pages/login"));
@@ -62,8 +64,10 @@ import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 function App() {
   return (
-    <NotificationProvider>
-      <Router>
+    <AuthProvider>
+      <CountersProvider>
+        <NotificationProvider>
+          <Router>
         <Suspense
           fallback={
             <LoadingSkeleton type="page" message="Carregando página..." />
@@ -74,6 +78,7 @@ function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/home" element={<Home />} />
             <Route path="/suporte" element={<SuportePage />} />
+            <Route path="/vendedor/suporte" element={<SuportePage />} />
             <Route path="/carrinho" element={<CartPage />} />
             <Route path="/produto/:id" element={<ProductPage />} />
             <Route path="/login" element={<Login />} />
@@ -233,8 +238,10 @@ function App() {
           pauseOnHover
           theme="light"
         />
-      </Router>
-    </NotificationProvider>
+          </Router>
+        </NotificationProvider>
+      </CountersProvider>
+    </AuthProvider>
   );
 }
 

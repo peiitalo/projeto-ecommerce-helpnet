@@ -958,6 +958,158 @@ export const listarMensagensSuporte = async (req, res) => {
   }
 };
 
+// Responder mensagem de suporte
+export const responderMensagemSuporte = async (req, res) => {
+  try {
+    const { user } = req;
+    const { id } = req.params;
+    const { resposta } = req.body;
+
+    if (user.role !== 'admin' && user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        errors: ["Acesso negado."]
+      });
+    }
+
+    if (!resposta || resposta.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        errors: ["Resposta é obrigatória"]
+      });
+    }
+
+    // Sanitize and validate parameters
+    const sanitizedId = DOMPurifyServer.sanitize(id?.toString() || '').trim();
+    const sanitizedResposta = DOMPurifyServer.sanitize(resposta?.toString() || '').trim();
+
+    // Validate ID
+    const mensagemId = parseInt(sanitizedId);
+    if (isNaN(mensagemId) || mensagemId < 1) {
+      return res.status(400).json({
+        success: false,
+        errors: ["ID da mensagem inválido"]
+      });
+    }
+
+    // Buscar mensagem
+    const mensagem = await prisma.mensagemSuporte.findUnique({
+      where: { MensagemID: mensagemId },
+      include: { cliente: true }
+    });
+
+    if (!mensagem) {
+      return res.status(404).json({
+        success: false,
+        errors: ["Mensagem não encontrada"]
+      });
+    }
+
+    // Atualizar mensagem com resposta
+    await prisma.mensagemSuporte.update({
+      where: { MensagemID: mensagemId },
+      data: {
+        Resposta: sanitizedResposta,
+        RespondidoPor: null, // Temporariamente null até resolver foreign key
+        RespondidoEm: new Date(),
+        Status: 'RESPONDIDO'
+      }
+    });
+
+    // Criar notificação para o cliente
+    await prisma.notificacao.create({
+      data: {
+        Titulo: 'Resposta do Suporte',
+        Mensagem: `Sua mensagem sobre "${mensagem.Assunto}" foi respondida. Verifique sua caixa de entrada.`,
+        Tipo: 'info',
+        ClienteID: mensagem.ClienteID
+      }
+    });
+
+    logger.info('mensagem_suporte_respondida', {
+      adminId: user.id,
+      mensagemId: mensagemId,
+      clienteId: mensagem.ClienteID
+    });
+
+    res.json({
+      success: true,
+      message: 'Mensagem respondida com sucesso'
+    });
+
+  } catch (error) {
+    logControllerError('responder_mensagem_suporte', error, req);
+    res.status(500).json({
+      success: false,
+      errors: ["Erro interno do servidor"]
+    });
+  }
+};
+
+// Resolver mensagem de suporte
+export const resolverMensagemSuporte = async (req, res) => {
+  try {
+    const { user } = req;
+    const { id } = req.params;
+
+    if (user.role !== 'admin' && user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        errors: ["Acesso negado."]
+      });
+    }
+
+    // Sanitize and validate parameters
+    const sanitizedId = DOMPurifyServer.sanitize(id?.toString() || '').trim();
+
+    // Validate ID
+    const mensagemId = parseInt(sanitizedId);
+    if (isNaN(mensagemId) || mensagemId < 1) {
+      return res.status(400).json({
+        success: false,
+        errors: ["ID da mensagem inválido"]
+      });
+    }
+
+    // Buscar mensagem
+    const mensagem = await prisma.mensagemSuporte.findUnique({
+      where: { MensagemID: mensagemId }
+    });
+
+    if (!mensagem) {
+      return res.status(404).json({
+        success: false,
+        errors: ["Mensagem não encontrada"]
+      });
+    }
+
+    // Atualizar status para resolvido
+    await prisma.mensagemSuporte.update({
+      where: { MensagemID: mensagemId },
+      data: {
+        Status: 'RESOLVIDO'
+      }
+    });
+
+    logger.info('mensagem_suporte_resolvida', {
+      adminId: user.id,
+      mensagemId: mensagemId
+    });
+
+    res.json({
+      success: true,
+      message: 'Mensagem marcada como resolvida'
+    });
+
+  } catch (error) {
+    logControllerError('resolver_mensagem_suporte', error, req);
+    res.status(500).json({
+      success: false,
+      errors: ["Erro interno do servidor"]
+    });
+  }
+};
+
 // Avaliações da plataforma
 export const listarAvaliacoes = async (req, res) => {
   try {
@@ -973,7 +1125,9 @@ export const listarAvaliacoes = async (req, res) => {
 
     const skip = (pagina - 1) * limit;
 
-    const [avaliacoes, total] = await Promise.all([
+    // Buscar avaliações de produtos E avaliações da plataforma (sistema)
+    const [avaliacoesProdutos, totalProdutos, avaliacoesSistema, totalSistema] = await Promise.all([
+      // Avaliações de produtos
       prisma.avaliacao.findMany({
         select: {
           AvaliacaoID: true,
@@ -996,12 +1150,62 @@ export const listarAvaliacoes = async (req, res) => {
         skip,
         take: parseInt(limit)
       }),
-      prisma.avaliacao.count()
+      prisma.avaliacao.count(),
+
+      // Avaliações da plataforma (sistema)
+      prisma.sistemaAvaliacao.findMany({
+        select: {
+          AvaliacaoID: true,
+          Nome: true,
+          Email: true,
+          Estrelas: true,
+          Comentario: true,
+          Aprovado: true,
+          ExibirLanding: true,
+          CriadoEm: true
+        },
+        orderBy: { CriadoEm: 'desc' },
+        skip,
+        take: parseInt(limit)
+      }),
+      prisma.sistemaAvaliacao.count()
     ]);
+
+    // Combinar as avaliações
+    const todasAvaliacoes = [
+      ...avaliacoesSistema.map(av => ({
+        id: av.AvaliacaoID,
+        tipo: 'plataforma',
+        nome: av.Nome,
+        email: av.Email,
+        nota: av.Estrelas,
+        comentario: av.Comentario,
+        aprovado: av.Aprovado,
+        exibirLanding: av.ExibirLanding,
+        criadoEm: av.CriadoEm,
+        produto: null
+      })),
+      ...avaliacoesProdutos.map(av => ({
+        id: av.AvaliacaoID,
+        tipo: 'produto',
+        nome: av.cliente.NomeCompleto,
+        email: av.cliente.Email,
+        nota: av.Nota,
+        comentario: av.Comentario,
+        aprovado: true, // Avaliações de produto são sempre aprovadas
+        exibirLanding: false,
+        criadoEm: av.CriadoEm,
+        produto: av.produto?.Nome
+      }))
+    ].sort((a, b) => new Date(b.criadoEm) - new Date(a.criadoEm));
+
+    // Paginação da lista combinada
+    const total = totalProdutos + totalSistema;
+    const paginatedAvaliacoes = todasAvaliacoes.slice(0, parseInt(limit)); // Remover skip para mostrar as mais recentes primeiro
 
     res.json({
       success: true,
-      avaliacoes,
+      avaliacoes: paginatedAvaliacoes,
       total,
       pagina: parseInt(pagina),
       limit: parseInt(limit)
@@ -1021,7 +1225,7 @@ export const atualizarVisibilidadeAvaliacao = async (req, res) => {
   try {
     const { user } = req;
     const { id } = req.params;
-    const { visivel } = req.body;
+    const { visivel, tipo } = req.body;
 
     if (user.role !== 'admin' && user.role !== 'ADMIN') {
       return res.status(403).json({
@@ -1033,6 +1237,7 @@ export const atualizarVisibilidadeAvaliacao = async (req, res) => {
     // Sanitize and validate parameters
     const sanitizedId = DOMPurifyServer.sanitize(id?.toString() || '').trim();
     const sanitizedVisivel = typeof visivel === 'boolean' ? visivel : Boolean(visivel);
+    const sanitizedTipo = DOMPurifyServer.sanitize(tipo?.toString() || '').trim();
 
     // Validate ID
     const avaliacaoId = parseInt(sanitizedId);
@@ -1043,22 +1248,98 @@ export const atualizarVisibilidadeAvaliacao = async (req, res) => {
       });
     }
 
-    // Como não há campo de visibilidade na tabela Avaliacao,
-    // podemos adicionar um campo ou usar uma abordagem diferente
-    // Por enquanto, apenas logamos a ação
+    if (sanitizedTipo === 'plataforma') {
+      // Atualizar avaliação da plataforma
+      await prisma.sistemaAvaliacao.update({
+        where: { AvaliacaoID: avaliacaoId },
+        data: {
+          Aprovado: sanitizedVisivel,
+          ExibirLanding: sanitizedVisivel
+        }
+      });
+    } else {
+      // Para avaliações de produto, não há campo de visibilidade
+      // Apenas logamos a ação
+      logger.info('avaliacao_produto_visibilidade_solicitada', {
+        adminId: user.id,
+        avaliacaoId: avaliacaoId,
+        visivel: sanitizedVisivel
+      });
+    }
+
     logger.info('avaliacao_visibilidade_atualizada', {
       adminId: user.id,
       avaliacaoId: avaliacaoId,
+      tipo: sanitizedTipo,
       visivel: sanitizedVisivel
     });
 
     res.json({
       success: true,
-      message: `Avaliação ${sanitizedVisivel ? 'tornada visível' : 'ocultada'} com sucesso`
+      message: `Avaliação ${sanitizedVisivel ? 'aprovada' : 'ocultada'} com sucesso`
     });
 
   } catch (error) {
     logControllerError('atualizar_visibilidade_avaliacao', error, req);
+    res.status(500).json({
+      success: false,
+      errors: ["Erro interno do servidor"]
+    });
+  }
+};
+
+// Deletar avaliação
+export const deletarAvaliacao = async (req, res) => {
+  try {
+    const { user } = req;
+    const { id } = req.params;
+    const { tipo } = req.query;
+
+    if (user.role !== 'admin' && user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        errors: ["Acesso negado."]
+      });
+    }
+
+    // Sanitize and validate parameters
+    const sanitizedId = DOMPurifyServer.sanitize(id?.toString() || '').trim();
+    const sanitizedTipo = DOMPurifyServer.sanitize(tipo?.toString() || '').trim();
+
+    // Validate ID
+    const avaliacaoId = parseInt(sanitizedId);
+    if (isNaN(avaliacaoId) || avaliacaoId < 1) {
+      return res.status(400).json({
+        success: false,
+        errors: ["ID da avaliação inválido"]
+      });
+    }
+
+    if (sanitizedTipo === 'plataforma') {
+      // Deletar avaliação da plataforma
+      await prisma.sistemaAvaliacao.delete({
+        where: { AvaliacaoID: avaliacaoId }
+      });
+    } else {
+      // Deletar avaliação de produto
+      await prisma.avaliacao.delete({
+        where: { AvaliacaoID: avaliacaoId }
+      });
+    }
+
+    logger.info('avaliacao_deletada', {
+      adminId: user.id,
+      avaliacaoId: avaliacaoId,
+      tipo: sanitizedTipo
+    });
+
+    res.json({
+      success: true,
+      message: 'Avaliação deletada com sucesso'
+    });
+
+  } catch (error) {
+    logControllerError('deletar_avaliacao', error, req);
     res.status(500).json({
       success: false,
       errors: ["Erro interno do servidor"]
