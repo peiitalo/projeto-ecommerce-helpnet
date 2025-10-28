@@ -213,7 +213,7 @@ function ConfiguracoesPage() {
         },
         nota: avaliacao.Nota || avaliacao.nota,
         comentario: avaliacao.Comentario || avaliacao.comentario,
-        data: avaliacao.DataCriacao || avaliacao.data
+        data: avaliacao.CriadoEm || avaliacao.DataCriacao || avaliacao.data
       }));
 
       setAvaliacoes(avaliacoesMapeadas);
@@ -274,7 +274,7 @@ function ConfiguracoesPage() {
   };
 
   const handleLogout = () => {
-    if (window.confirm('Deseja realmente sair?')) {
+    if (window.confirm('Tem certeza que deseja sair da conta?')) {
       logout();
       navigate('/login');
     }

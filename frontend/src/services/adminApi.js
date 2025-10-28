@@ -28,7 +28,7 @@ const isTokenValid = (token) => {
 // Função auxiliar para renovar token
 const refreshToken = async () => {
   try {
-    const refreshResponse = await fetch(`${API_BASE_URL}/clientes/refresh`, {
+    const refreshResponse = await fetch(`${API_BASE_URL}/admin/refresh`, {
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -76,7 +76,7 @@ const adminApiRequest = async (endpoint, options = {}, retryCount = 0) => {
 
     // Injeta Authorization se houver accessToken válido persistido
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      const token = typeof window !== 'undefined' ? localStorage.getItem('adminAccessToken') : null;
       if (token && isTokenValid(token)) {
         config.headers = {
           ...(config.headers || {}),
@@ -84,9 +84,11 @@ const adminApiRequest = async (endpoint, options = {}, retryCount = 0) => {
         };
       } else if (token && !isTokenValid(token)) {
         // Token expirado, remove do localStorage
-        localStorage.removeItem('accessToken');
+        localStorage.removeItem('adminAccessToken');
       }
-    } catch {}
+    } catch (error) {
+      console.error('Erro ao verificar token:', error);
+    }
 
     const response = await fetch(url, config);
 
@@ -111,13 +113,15 @@ const adminApiRequest = async (endpoint, options = {}, retryCount = 0) => {
         // Se refresh falhar, limpa tokens e redireciona para login
         try {
           if (typeof window !== 'undefined') {
-            localStorage.removeItem('accessToken');
-            // Redirecionar para login se estiver em página protegida
-            if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
-              window.location.href = '/login';
+            localStorage.removeItem('adminAccessToken');
+            // Redirecionar para login admin se estiver em página protegida
+            if (window.location.pathname.startsWith('/admin')) {
+              window.location.href = '/admin/login';
             }
           }
-        } catch {}
+        } catch (error) {
+          console.error('Erro ao limpar token:', error);
+        }
         throw new Error('Sessão expirada. Faça login novamente.');
       }
     }
@@ -169,9 +173,9 @@ export const adminSuporteService = {
 
   // Gerenciar exibição de avaliação
   gerenciarExibicaoAvaliacao: async (avaliacaoId, exibirSite) => {
-    return adminApiRequest(`/admin/suporte/avaliacoes/${avaliacaoId}/exibicao`, {
+    return adminApiRequest(`/admin/suporte/avaliacoes/${avaliacaoId}/visibilidade`, {
       method: 'PUT',
-      body: JSON.stringify({ exibirSite }),
+      body: JSON.stringify({ visivel: exibirSite, tipo: 'plataforma' }),
     });
   },
 

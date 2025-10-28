@@ -457,7 +457,7 @@ function ExplorePage() {
 
   // Função para logout
   const handleLogout = () => {
-    if (window.confirm('Deseja realmente sair?')) {
+    if (window.confirm('Tem certeza que deseja sair da conta?')) {
       logout();
       navigate('/login');
     }

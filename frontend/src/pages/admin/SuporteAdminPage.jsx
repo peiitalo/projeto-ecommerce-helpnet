@@ -22,13 +22,11 @@ function SuporteAdminPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [duvidasResponse, estatisticasResponse] = await Promise.all([
+      const [duvidasResponse, avaliacoesResponse, estatisticasResponse] = await Promise.all([
         adminSuporteService.listarMensagens(),
+        adminSuporteService.listarAvaliacoes(),
         adminSuporteService.estatisticas()
       ]);
-
-      // Temporarily disable evaluations loading due to permission issues
-      const avaliacoesResponse = { success: true, avaliacoes: [] };
 
       if (duvidasResponse.success) {
         setDuvidas(duvidasResponse.mensagens);

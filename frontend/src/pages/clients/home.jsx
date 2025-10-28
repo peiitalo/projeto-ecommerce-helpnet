@@ -251,15 +251,11 @@ function Home() {
   };
 
   const handleLogout = () => {
-    showWarning('Deseja realmente sair?', {
-      autoClose: false,
-      closeOnClick: false,
-      draggable: false,
-      onClose: () => {
-        logout();
-        navigate('/login');
-      }
-    });
+    const confirmed = window.confirm('Deseja realmente sair da conta?');
+    if (confirmed) {
+      logout();
+      navigate('/login');
+    }
   };
 
   return (

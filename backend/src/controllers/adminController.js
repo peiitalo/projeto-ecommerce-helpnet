@@ -1153,22 +1153,25 @@ export const listarAvaliacoes = async (req, res) => {
       prisma.avaliacao.count(),
 
       // Avaliações da plataforma (sistema)
-      prisma.sistemaAvaliacao.findMany({
+      prisma.avaliacaoPlataforma.findMany({
         select: {
           AvaliacaoID: true,
-          Nome: true,
-          Email: true,
-          Estrelas: true,
+          Nota: true,
           Comentario: true,
-          Aprovado: true,
-          ExibirLanding: true,
-          CriadoEm: true
+          ExibirSite: true,
+          CriadoEm: true,
+          cliente: {
+            select: {
+              NomeCompleto: true,
+              Email: true
+            }
+          }
         },
         orderBy: { CriadoEm: 'desc' },
         skip,
         take: parseInt(limit)
       }),
-      prisma.sistemaAvaliacao.count()
+      prisma.avaliacaoPlataforma.count()
     ]);
 
     // Combinar as avaliações
@@ -1176,12 +1179,12 @@ export const listarAvaliacoes = async (req, res) => {
       ...avaliacoesSistema.map(av => ({
         id: av.AvaliacaoID,
         tipo: 'plataforma',
-        nome: av.Nome,
-        email: av.Email,
-        nota: av.Estrelas,
+        nome: av.cliente?.NomeCompleto || 'Anônimo',
+        email: av.cliente?.Email || '',
+        nota: av.Nota,
         comentario: av.Comentario,
-        aprovado: av.Aprovado,
-        exibirLanding: av.ExibirLanding,
+        aprovado: av.ExibirSite,
+        exibirLanding: av.ExibirSite,
         criadoEm: av.CriadoEm,
         produto: null
       })),
@@ -1250,11 +1253,10 @@ export const atualizarVisibilidadeAvaliacao = async (req, res) => {
 
     if (sanitizedTipo === 'plataforma') {
       // Atualizar avaliação da plataforma
-      await prisma.sistemaAvaliacao.update({
+      await prisma.avaliacaoPlataforma.update({
         where: { AvaliacaoID: avaliacaoId },
         data: {
-          Aprovado: sanitizedVisivel,
-          ExibirLanding: sanitizedVisivel
+          ExibirSite: sanitizedVisivel
         }
       });
     } else {
@@ -1317,7 +1319,7 @@ export const deletarAvaliacao = async (req, res) => {
 
     if (sanitizedTipo === 'plataforma') {
       // Deletar avaliação da plataforma
-      await prisma.sistemaAvaliacao.delete({
+      await prisma.avaliacaoPlataforma.delete({
         where: { AvaliacaoID: avaliacaoId }
       });
     } else {

@@ -95,15 +95,11 @@ function AddressPage() {
   };
 
   const handleLogout = () => {
-    showWarning('Tem certeza que deseja sair da conta?', {
-      autoClose: false,
-      closeOnClick: false,
-      draggable: false,
-      onClose: () => {
-        logout();
-        window.location.href = '/login';
-      }
-    });
+    const confirmed = window.confirm('Tem certeza que deseja sair da conta?');
+    if (confirmed) {
+      logout();
+      window.location.href = '/login';
+    }
   };
 
   const handleAddAddress = () => {
