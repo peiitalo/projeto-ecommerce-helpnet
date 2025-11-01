@@ -18,10 +18,38 @@ const criarCupom = async (req, res) => {
       tipoCliente,
       produtosElegiveis,
       categoriasElegiveis,
-      limiteUsoPorCliente
+      limiteUsoPorCliente,
+      tipoDistribuicao
     } = req.body;
 
     const vendedorID = req.user.VendedorID;
+
+    // Se for VENDEDOR_ESPECIFICO, buscar clientes do vendedor e definir limiteUso baseado no número de clientes
+    let limiteUsoFinal = limiteUso ? parseInt(limiteUso) : null;
+    let clientesElegiveisFinal = clientesElegiveis || [];
+
+    if (tipoDistribuicao === 'VENDEDOR_ESPECIFICO') {
+      // Buscar todos os clientes associados ao vendedor
+      const clientesVendedor = await prisma.clienteVendedor.findMany({
+        where: { VendedorID: vendedorID },
+        select: { ClienteID: true }
+      });
+
+      const clienteIDs = clientesVendedor.map(cv => cv.ClienteID.toString());
+
+      // Se não especificou clientes elegíveis, usar todos os clientes do vendedor
+      if (!clientesElegiveis || clientesElegiveis.length === 0) {
+        clientesElegiveisFinal = clienteIDs;
+      } else {
+        // Filtrar apenas clientes que são do vendedor
+        clientesElegiveisFinal = clientesElegiveis.filter(id => clienteIDs.includes(id));
+      }
+
+      // Definir limite de uso baseado no número de clientes elegíveis
+      if (!limiteUsoFinal) {
+        limiteUsoFinal = clientesElegiveisFinal.length;
+      }
+    }
 
     const cupom = await prisma.cupom.create({
       data: {
@@ -30,16 +58,17 @@ const criarCupom = async (req, res) => {
         TipoDesconto: tipoDesconto,
         ValorDesconto: parseFloat(valorDesconto),
         ValorMinimo: valorMinimo ? parseFloat(valorMinimo) : 0,
-        LimiteUso: limiteUso ? parseInt(limiteUso) : null,
+        LimiteUso: limiteUsoFinal,
         DataExpiracao: dataExpiracao ? new Date(dataExpiracao) : null,
         VendedorID: vendedorID,
         AplicavelProdutos: aplicavelProdutos || false,
         AplicavelCategorias: aplicavelCategorias || false,
-        ClientesElegiveis: clientesElegiveis || [],
+        ClientesElegiveis: clientesElegiveisFinal,
         TipoCliente: tipoCliente,
         ProdutosElegiveis: produtosElegiveis || [],
         CategoriasElegiveis: categoriasElegiveis || [],
-        LimiteUsoPorCliente: limiteUsoPorCliente ? parseInt(limiteUsoPorCliente) : 1
+        LimiteUsoPorCliente: limiteUsoPorCliente ? parseInt(limiteUsoPorCliente) : 1,
+        TipoDistribuicao: tipoDistribuicao || 'PUBLICO'
       }
     });
 
@@ -160,7 +189,8 @@ const atualizarCupom = async (req, res) => {
       tipoCliente,
       produtosElegiveis,
       categoriasElegiveis,
-      limiteUsoPorCliente
+      limiteUsoPorCliente,
+      tipoDistribuicao
     } = req.body;
 
     const cupom = await prisma.cupom.findFirst({
@@ -177,6 +207,33 @@ const atualizarCupom = async (req, res) => {
       });
     }
 
+    // Se for VENDEDOR_ESPECIFICO, buscar clientes do vendedor e definir limiteUso baseado no número de clientes
+    let limiteUsoFinal = limiteUso ? parseInt(limiteUso) : cupom.LimiteUso;
+    let clientesElegiveisFinal = clientesElegiveis || cupom.ClientesElegiveis;
+
+    if (tipoDistribuicao === 'VENDEDOR_ESPECIFICO') {
+      // Buscar todos os clientes associados ao vendedor
+      const clientesVendedor = await prisma.clienteVendedor.findMany({
+        where: { VendedorID: vendedorID },
+        select: { ClienteID: true }
+      });
+
+      const clienteIDs = clientesVendedor.map(cv => cv.ClienteID.toString());
+
+      // Se não especificou clientes elegíveis, usar todos os clientes do vendedor
+      if (!clientesElegiveis || clientesElegiveis.length === 0) {
+        clientesElegiveisFinal = clienteIDs;
+      } else {
+        // Filtrar apenas clientes que são do vendedor
+        clientesElegiveisFinal = clientesElegiveis.filter(id => clienteIDs.includes(id));
+      }
+
+      // Definir limite de uso baseado no número de clientes elegíveis
+      if (!limiteUsoFinal) {
+        limiteUsoFinal = clientesElegiveisFinal.length;
+      }
+    }
+
     const cupomAtualizado = await prisma.cupom.update({
       where: { CupomID: parseInt(id) },
       data: {
@@ -184,16 +241,17 @@ const atualizarCupom = async (req, res) => {
         TipoDesconto: tipoDesconto,
         ValorDesconto: parseFloat(valorDesconto),
         ValorMinimo: valorMinimo ? parseFloat(valorMinimo) : 0,
-        LimiteUso: limiteUso ? parseInt(limiteUso) : null,
+        LimiteUso: limiteUsoFinal,
         DataExpiracao: dataExpiracao ? new Date(dataExpiracao) : null,
         Ativo: ativo,
         AplicavelProdutos: aplicavelProdutos,
         AplicavelCategorias: aplicavelCategorias,
-        ClientesElegiveis: clientesElegiveis,
+        ClientesElegiveis: clientesElegiveisFinal,
         TipoCliente: tipoCliente,
         ProdutosElegiveis: produtosElegiveis,
         CategoriasElegiveis: categoriasElegiveis,
-        LimiteUsoPorCliente: limiteUsoPorCliente ? parseInt(limiteUsoPorCliente) : 1
+        LimiteUsoPorCliente: limiteUsoPorCliente ? parseInt(limiteUsoPorCliente) : 1,
+        TipoDistribuicao: tipoDistribuicao || cupom.TipoDistribuicao
       }
     });
 
@@ -414,7 +472,7 @@ const resgatarCupom = async (req, res) => {
 // Validar cupom para uso (cliente)
 const validarCupom = async (req, res) => {
   try {
-    const { codigo, clienteID, produtos = [] } = req.body;
+    const { codigo, clienteID, produtos = [], subtotal, frete } = req.body;
 
     const cupom = await prisma.cupom.findUnique({
       where: { Codigo: codigo.toUpperCase() }
@@ -451,29 +509,49 @@ const validarCupom = async (req, res) => {
       });
     }
 
-    // Verificar se cliente resgatou o cupom
-    const cupomCliente = await prisma.cupomCliente.findUnique({
-      where: {
-        CupomID_ClienteID: {
-          CupomID: cupom.CupomID,
-          ClienteID: clienteID
+    // Para cupons PUBLICOS, não precisa ter resgatado
+    if (cupom.TipoDistribuicao === 'PUBLICO') {
+      // Verificar se cliente já usou o limite por cliente
+      const cupomCliente = await prisma.cupomCliente.findUnique({
+        where: {
+          CupomID_ClienteID: {
+            CupomID: cupom.CupomID,
+            ClienteID: clienteID
+          }
         }
+      });
+
+      if (cupomCliente && cupomCliente.UsosCliente >= cupom.LimiteUsoPorCliente) {
+        return res.status(400).json({
+          success: false,
+          message: 'Limite de uso por cliente atingido'
+        });
       }
-    });
-
-    if (!cupomCliente || !cupomCliente.Resgatado) {
-      return res.status(400).json({
-        success: false,
-        message: 'Você precisa resgatar este cupom antes de usá-lo'
+    } else {
+      // Para cupons VENDEDOR_ESPECIFICO, precisa ter resgatado
+      const cupomCliente = await prisma.cupomCliente.findUnique({
+        where: {
+          CupomID_ClienteID: {
+            CupomID: cupom.CupomID,
+            ClienteID: clienteID
+          }
+        }
       });
-    }
 
-    // Verificar uso por cliente
-    if (cupomCliente.UsosCliente >= cupom.LimiteUsoPorCliente) {
-      return res.status(400).json({
-        success: false,
-        message: 'Limite de uso por cliente atingido'
-      });
+      if (!cupomCliente || !cupomCliente.Resgatado) {
+        return res.status(400).json({
+          success: false,
+          message: 'Você precisa resgatar este cupom antes de usá-lo'
+        });
+      }
+
+      // Verificar uso por cliente
+      if (cupomCliente.UsosCliente >= cupom.LimiteUsoPorCliente) {
+        return res.status(400).json({
+          success: false,
+          message: 'Limite de uso por cliente atingido'
+        });
+      }
     }
 
     // Verificar aplicabilidade a produtos/categorias

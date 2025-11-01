@@ -39,7 +39,6 @@ router.post('/reset-senha/:token', clienteController.resetarSenha);
 
 // Aplicar middleware de autenticação para rotas protegidas
 router.use(authMiddleware);
-router.use(requireCliente);
 
 // Rotas de suporte para clientes
 router.post('/suporte/mensagem', suporteController.enviarMensagem);
@@ -63,9 +62,12 @@ router.put('/enderecos/:id', clienteController.atualizarEndereco);
 router.delete('/enderecos/:id', clienteController.excluirEndereco);
 router.put('/enderecos/:id/padrao', clienteController.definirEnderecoPadrao);
 
-// Rotas de autenticação
+// Rotas de autenticação (antes do requireCliente)
 router.post('/refresh', clienteController.refreshToken);
 router.post('/logout', clienteController.logout);
 router.get('/auto-login', clienteController.autoLoginClient);
+
+// Aplicar middleware requireCliente para rotas que precisam ser cliente
+router.use(requireCliente);
 
 export default router;

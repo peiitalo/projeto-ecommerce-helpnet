@@ -25,6 +25,11 @@ enum TipoDesconto {
   FRETE_GRATIS
 }
 
+enum TipoDistribuicao {
+  PUBLICO
+  VENDEDOR_ESPECIFICO
+}
+
 model Administrador {
   AdminID     Int      @id @default(autoincrement())
   Nome        String
@@ -448,6 +453,7 @@ model Cupom {
   ProdutosElegiveis Int[]         @default([]) // Lista de ProdutoIDs
   CategoriasElegiveis Int[]       @default([]) // Lista de CategoriaIDs
   LimiteUsoPorCliente Int?        @default(1) // Máximo de usos por cliente
+  TipoDistribuicao  TipoDistribuicao @default(PUBLICO) // PUBLICO ou VENDEDOR_ESPECIFICO
 
   vendedor      Vendedor      @relation(fields: [VendedorID], references: [VendedorID])
   cuponsCliente CupomCliente[]
@@ -456,6 +462,7 @@ model Cupom {
   @@index([VendedorID])
   @@index([Ativo])
   @@index([DataExpiracao])
+  @@index([TipoDistribuicao])
   @@map("Cupom")
 }
 

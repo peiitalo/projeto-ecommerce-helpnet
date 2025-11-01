@@ -209,7 +209,9 @@ function CheckoutPage() {
             CategoriaID: item.categoryId,
             PrecoUnitario: item.price,
             Quantidade: item.quantity
-          }))
+          })),
+          subtotal: orderData?.subtotal || 0,
+          frete: freight.valor || 0
         })
       });
 

@@ -11,9 +11,57 @@ function VendorCuponsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
 
-  // Mock coupons data
+  // Load coupons from API
   useEffect(() => {
-    setTimeout(() => {
+    loadCoupons();
+  }, []);
+
+  const loadCoupons = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        window.location.href = '/login';
+        return;
+      }
+
+      const response = await fetch('/api/cupons/vendedor/', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          const formattedCoupons = data.data.map(coupon => ({
+            id: coupon.CupomID,
+            code: coupon.Codigo,
+            discount: coupon.ValorDesconto,
+            type: coupon.TipoDesconto === 'PERCENTUAL' ? 'percentage' :
+                  coupon.TipoDesconto === 'FRETE_GRATIS' ? 'free_shipping' : 'fixed',
+            description: coupon.Descricao,
+            validUntil: coupon.DataExpiracao ? coupon.DataExpiracao.split('T')[0] : null,
+            active: coupon.Ativo,
+            usageLimit: coupon.LimiteUso || 0,
+            usageCount: coupon.UsosAtuais || 0,
+            minValue: coupon.ValorMinimo || 0,
+            tipoDistribuicao: coupon.TipoDistribuicao
+          }));
+          setCoupons(formattedCoupons);
+        }
+      } else if (response.status === 401) {
+        // Token expirado ou inválido - redirecionar para login
+        localStorage.removeItem('token');
+        localStorage.removeItem('auth:user');
+        window.location.href = '/login';
+        return;
+      } else {
+        console.error('Erro na resposta da API:', response.status);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar cupons:', error);
+      // Fallback para dados mock se a API falhar
       setCoupons([
         {
           id: 1,
@@ -25,7 +73,8 @@ function VendorCuponsPage() {
           active: true,
           usageLimit: 100,
           usageCount: 45,
-          minValue: 50
+          minValue: 50,
+          tipoDistribuicao: 'PUBLICO'
         },
         {
           id: 2,
@@ -37,24 +86,14 @@ function VendorCuponsPage() {
           active: true,
           usageLimit: 50,
           usageCount: 23,
-          minValue: 100
-        },
-        {
-          id: 3,
-          code: 'BLACKFRIDAY',
-          discount: 20,
-          type: 'percentage',
-          description: '20% OFF na Black Friday',
-          validUntil: '2024-11-30',
-          active: false,
-          usageLimit: 200,
-          usageCount: 0,
-          minValue: 0
+          minValue: 100,
+          tipoDistribuicao: 'VENDEDOR_ESPECIFICO'
         }
       ]);
+    } finally {
       setLoading(false);
-    }, 1000);
-  }, []);
+    }
+  };
 
   const filteredCoupons = coupons.filter(coupon => {
     const matchesSearch = coupon.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -75,33 +114,140 @@ function VendorCuponsPage() {
     setShowCreateModal(true);
   };
 
-  const handleDeleteCoupon = (couponId) => {
+  const handleDeleteCoupon = async (couponId) => {
     if (window.confirm('Tem certeza que deseja excluir este cupom?')) {
-      setCoupons(prev => prev.filter(c => c.id !== couponId));
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          window.location.href = '/login';
+          return;
+        }
+
+        const response = await fetch(`/api/cupons/vendedor/${couponId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          setCoupons(prev => prev.filter(c => c.id !== couponId));
+          // Show success message
+        } else if (response.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('auth:user');
+          window.location.href = '/login';
+        } else {
+          alert('Erro ao excluir cupom');
+        }
+      } catch (error) {
+        console.error('Erro ao excluir cupom:', error);
+        alert('Erro ao excluir cupom');
+      }
     }
   };
 
-  const handleToggleStatus = (couponId) => {
-    setCoupons(prev => prev.map(c =>
-      c.id === couponId ? { ...c, active: !c.active } : c
-    ));
+  const handleToggleStatus = async (couponId) => {
+    try {
+      const coupon = coupons.find(c => c.id === couponId);
+      if (!coupon) return;
+
+      const token = localStorage.getItem('token');
+      if (!token) {
+        window.location.href = '/login';
+        return;
+      }
+
+      const response = await fetch(`/api/cupons/vendedor/${couponId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ativo: !coupon.active
+        })
+      });
+
+      if (response.ok) {
+        setCoupons(prev => prev.map(c =>
+          c.id === couponId ? { ...c, active: !c.active } : c
+        ));
+      } else if (response.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('auth:user');
+        window.location.href = '/login';
+      } else {
+        alert('Erro ao alterar status do cupom');
+      }
+    } catch (error) {
+      console.error('Erro ao alterar status:', error);
+      alert('Erro ao alterar status do cupom');
+    }
   };
 
-  const handleSaveCoupon = (couponData) => {
-    if (editingCoupon) {
-      setCoupons(prev => prev.map(c =>
-        c.id === editingCoupon.id ? { ...c, ...couponData } : c
-      ));
-    } else {
-      const newCoupon = {
-        ...couponData,
-        id: Date.now(),
-        usageCount: 0
+  const handleSaveCoupon = async (couponData) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        window.location.href = '/login';
+        return;
+      }
+
+      const apiData = {
+        codigo: couponData.code,
+        descricao: couponData.description,
+        tipoDesconto: couponData.type === 'percentage' ? 'PERCENTUAL' :
+                     couponData.type === 'free_shipping' ? 'FRETE_GRATIS' : 'VALOR_FIXO',
+        valorDesconto: couponData.discount,
+        valorMinimo: couponData.minValue,
+        limiteUso: couponData.usageLimit || null,
+        dataExpiracao: couponData.validUntil,
+        ativo: couponData.active,
+        tipoDistribuicao: couponData.tipoDistribuicao || 'PUBLICO'
       };
-      setCoupons(prev => [newCoupon, ...prev]);
+
+      let response;
+      if (editingCoupon) {
+        response = await fetch(`/api/cupons/vendedor/${editingCoupon.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(apiData)
+        });
+      } else {
+        response = await fetch('/api/cupons/vendedor/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(apiData)
+        });
+      }
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          await loadCoupons(); // Recarregar lista
+          setShowCreateModal(false);
+          setEditingCoupon(null);
+        } else {
+          alert('Erro: ' + result.message);
+        }
+      } else if (response.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('auth:user');
+        window.location.href = '/login';
+      } else {
+        alert('Erro ao salvar cupom');
+      }
+    } catch (error) {
+      console.error('Erro ao salvar cupom:', error);
+      alert('Erro ao salvar cupom');
     }
-    setShowCreateModal(false);
-    setEditingCoupon(null);
   };
 
   const copyToClipboard = (code) => {
@@ -190,6 +336,9 @@ function VendorCuponsPage() {
                     Tipo
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Distribuição
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -243,15 +392,24 @@ function VendorCuponsPage() {
                         <span className="text-sm text-gray-900">{formatDiscount(coupon)}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          coupon.tipoDistribuicao === 'PUBLICO'
+                            ? 'text-blue-700 bg-blue-100'
+                            : 'text-purple-700 bg-purple-100'
+                        }`}>
+                          {coupon.tipoDistribuicao === 'PUBLICO' ? 'Público' : 'Clientes Específicos'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(coupon.active)}`}>
                           {getStatusText(coupon.active)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {coupon.usageCount}/{coupon.usageLimit}
+                        {coupon.usageCount || 0}/{coupon.usageLimit || '∞'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(coupon.validUntil).toLocaleDateString('pt-BR')}
+                        {coupon.validUntil ? new Date(coupon.validUntil).toLocaleDateString('pt-BR') : 'Sem expiração'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center gap-2">
@@ -317,8 +475,9 @@ function CouponModal({ coupon, onSave, onClose }) {
     description: coupon?.description || '',
     validUntil: coupon?.validUntil || '',
     active: coupon?.active ?? true,
-    usageLimit: coupon?.usageLimit || 100,
-    minValue: coupon?.minValue || 0
+    usageLimit: coupon?.usageLimit || (coupon?.tipoDistribuicao === 'VENDEDOR_ESPECIFICO' ? null : 100),
+    minValue: coupon?.minValue || 0,
+    tipoDistribuicao: coupon?.tipoDistribuicao || 'PUBLICO'
   });
 
   const handleSubmit = (e) => {
@@ -378,6 +537,25 @@ function CouponModal({ coupon, onSave, onClose }) {
               </select>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Tipo de Distribuição
+              </label>
+              <select
+                value={formData.tipoDistribuicao}
+                onChange={(e) => setFormData(prev => ({ ...prev, tipoDistribuicao: e.target.value }))}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+              >
+                <option value="PUBLICO">Público (todos os clientes)</option>
+                <option value="VENDEDOR_ESPECIFICO">Clientes Específicos (apenas meus clientes)</option>
+              </select>
+              <p className="text-xs text-slate-500 mt-1">
+                {formData.tipoDistribuicao === 'VENDEDOR_ESPECIFICO'
+                  ? 'Cupom disponível apenas para clientes que já compraram seus produtos. Limite de uso será definido automaticamente.'
+                  : 'Cupom disponível para todos os clientes da plataforma.'}
+              </p>
+            </div>
+
             {formData.type === 'percentage' && (
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -402,11 +580,17 @@ function CouponModal({ coupon, onSave, onClose }) {
               <input
                 type="number"
                 min="1"
-                value={formData.usageLimit}
-                onChange={(e) => setFormData(prev => ({ ...prev, usageLimit: parseInt(e.target.value) }))}
+                value={formData.usageLimit || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, usageLimit: e.target.value ? parseInt(e.target.value) : null }))}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                required
+                required={formData.tipoDistribuicao !== 'VENDEDOR_ESPECIFICO'}
+                disabled={formData.tipoDistribuicao === 'VENDEDOR_ESPECIFICO'}
               />
+              {formData.tipoDistribuicao === 'VENDEDOR_ESPECIFICO' && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Limite será definido automaticamente baseado no número de seus clientes
+                </p>
+              )}
             </div>
 
             <div>

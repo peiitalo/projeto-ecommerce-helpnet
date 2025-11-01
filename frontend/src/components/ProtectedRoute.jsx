@@ -19,7 +19,7 @@ export default function ProtectedRoute({ allowedRoles }) {
     if (!allowedRoles.includes(user.role)) {
       // Redirecionar por função
       if (user.role === 'vendedor' || user.role === 'juridico') return <Navigate to="/vendedor" replace />;
-      if (user.role === 'admin') return <Navigate to="/admin" replace />;
+      if (user.role === 'admin') return <Navigate to="/admin/dashboard" replace />;
       return <Navigate to="/home" replace />;
     }
   }

@@ -14,7 +14,7 @@ export default function vendorScope(req, res, next) {
       return res.status(400).json({ erro: 'Empresa não vinculada ao vendedor' });
     }
 
-    const vendedorId = parseInt(user.vendedorId || user.VendedorID || 0, 10);
+    const vendedorId = parseInt(user.vendedorId || user.VendedorID || user.vendorId || 0, 10);
     if (!vendedorId || Number.isNaN(vendedorId)) {
       return res.status(400).json({ erro: 'VendedorID não encontrado no token' });
     }
