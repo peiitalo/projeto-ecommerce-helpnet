@@ -285,6 +285,9 @@ model Vendedor {
   clientesVendedor ClienteVendedor[]
   enderecosVendedor EnderecoVendedor[]
   cupons       Cupom[]
+  // Parcerias
+  parceriasEnviadas   ParceriaVendedor[] @relation("ParceriaSolicitante")
+  parceriasRecebidas  ParceriaVendedor[] @relation("ParceriaConvidado")
 
   @@index([EmpresaID])
   @@index([Ativo])
@@ -533,4 +536,33 @@ model AvaliacaoPlataforma {
   @@index([ExibirSite])
   @@index([CriadoEm])
   @@map("AvaliacaoPlataforma")
+}
+
+enum StatusParceria {
+  PENDENTE
+  ATIVA
+  RECUSADA
+  ENCERRADA
+}
+
+model ParceriaVendedor {
+  ParceriaID         Int             @id @default(autoincrement())
+  SolicitanteID      Int             // Vendedor que enviou o convite
+  ConvidadoID        Int             // Vendedor que recebeu o convite
+  Status             StatusParceria  @default(PENDENTE)
+  PercentualSolicitante Float         // Percentual do solicitante (ex: 50.0 para 50%)
+  PercentualConvidado   Float         // Percentual do convidado (ex: 50.0 para 50%)
+  Mensagem           String?         // Mensagem opcional do convite
+  DataCriacao        DateTime        @default(now())
+  DataAceitacao      DateTime?
+  DataEncerramento   DateTime?
+
+  solicitante        Vendedor        @relation("ParceriaSolicitante", fields: [SolicitanteID], references: [VendedorID])
+  convidado          Vendedor        @relation("ParceriaConvidado", fields: [ConvidadoID], references: [VendedorID])
+
+  @@unique([SolicitanteID, ConvidadoID])
+  @@index([SolicitanteID])
+  @@index([ConvidadoID])
+  @@index([Status])
+  @@map("ParceriaVendedor")
 }

@@ -696,3 +696,4 @@ export { default as entregaApi } from './entregaApi.js';
 export { default as clienteVendedorApi } from './clienteVendedorApi.js';
 export { default as vendedorApi } from './vendedorApi.js';
 export { default as relatoriosApi } from './relatoriosApi.js';
+export { default as parceriaApi } from './parceriaApi.js';

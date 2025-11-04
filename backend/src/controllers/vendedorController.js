@@ -32,9 +32,8 @@ export const listarVendedores = async (req, res) => {
     const limitNum = parseInt(limit);
     const offset = (pageNum - 1) * limitNum;
 
-    // Construir where clause
+    // Construir where clause - mostrar TODOS os vendedores do sistema, não apenas da empresa
     const whereClause = {
-      EmpresaID: user.empresaId,
       Ativo: true
     };
 
@@ -955,6 +954,126 @@ export const atualizarEnderecoVendedor = async (req, res) => {
 
   } catch (error) {
     logControllerError('atualizar_endereco_vendedor', error, req);
+    res.status(500).json({
+      success: false,
+      errors: ["Erro interno do servidor"]
+    });
+  }
+};
+
+// Buscar vendedor por CNPJ ou email
+export const buscarPorCnpjEmail = async (req, res) => {
+  try {
+    const { user } = req;
+    const { cnpj_email } = req.query;
+
+    if (!cnpj_email || cnpj_email.trim().length < 3) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Termo de busca deve ter pelo menos 3 caracteres"]
+      });
+    }
+
+    // Buscar cliente associado ao vendedor pelo CNPJ ou email
+    const cliente = await prisma.cliente.findFirst({
+      where: {
+        OR: [
+          { CPF_CNPJ: { contains: cnpj_email, mode: 'insensitive' } },
+          { Email: { contains: cnpj_email, mode: 'insensitive' } }
+        ]
+      },
+      include: {
+        enderecos: {
+          select: {
+            Cidade: true,
+            UF: true,
+            Bairro: true
+          },
+          take: 1
+        }
+      }
+    });
+
+    if (!cliente) {
+      return res.status(404).json({
+        success: false,
+        errors: ["Vendedor não encontrado"]
+      });
+    }
+
+    // Buscar o vendedor associado a este cliente
+    const vendedor = await prisma.vendedor.findUnique({
+      where: { Email: cliente.Email },
+      select: {
+        VendedorID: true,
+        Nome: true,
+        Email: true,
+        CriadoEm: true,
+        Ativo: true,
+        _count: {
+          select: {
+            produtos: true,
+            clientesVendedor: true
+          }
+        },
+        clientesVendedor: {
+          select: {
+            cliente: {
+              select: {
+                pedidos: {
+                  where: {
+                    Status: 'Entregue'
+                  },
+                  select: {
+                    Total: true
+                  }
+                }
+              }
+            }
+          },
+          take: 1
+        }
+      }
+    });
+
+    if (!vendedor) {
+      return res.status(404).json({
+        success: false,
+        errors: ["Vendedor não encontrado"]
+      });
+    }
+
+    // Calcular estatísticas
+    const totalPedidos = vendedor.clientesVendedor.reduce((acc, cv) => {
+      return acc + cv.cliente.pedidos.length;
+    }, 0);
+
+    const totalVendas = vendedor.clientesVendedor.reduce((acc, cv) => {
+      return acc + cv.cliente.pedidos.reduce((pedidoAcc, pedido) => pedidoAcc + pedido.Total, 0);
+    }, 0);
+
+    res.json({
+      success: true,
+      vendedor: {
+        id: vendedor.VendedorID.toString(),
+        name: vendedor.Nome,
+        email: vendedor.Email,
+        cpfCnpj: cliente.CPF_CNPJ,
+        razaoSocial: cliente.RazaoSocial,
+        phone: cliente.TelefoneCelular || cliente.TelefoneFixo,
+        whatsapp: cliente.Whatsapp,
+        address: cliente.enderecos[0] ? `${cliente.enderecos[0].Bairro}, ${cliente.enderecos[0].Cidade} - ${cliente.enderecos[0].UF}` : null,
+        city: cliente.enderecos[0]?.Cidade,
+        state: cliente.enderecos[0]?.UF,
+        joinDate: vendedor.CriadoEm.toISOString(),
+        status: vendedor.Ativo ? 'active' : 'inactive',
+        totalSales: totalVendas,
+        totalOrders: totalPedidos
+      }
+    });
+
+  } catch (error) {
+    logControllerError('buscar_por_cnpj_email', error, req);
     res.status(500).json({
       success: false,
       errors: ["Erro interno do servidor"]

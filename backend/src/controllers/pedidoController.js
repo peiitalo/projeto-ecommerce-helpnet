@@ -371,10 +371,24 @@ export const criarPedido = async (req, res) => {
         });
 
         // Atualizar estoque
-        await tx.produto.update({
+        const produtoAtualizado = await tx.produto.update({
           where: { ProdutoID: item.produtoId },
-          data: { Estoque: { decrement: item.quantidade } }
+          data: { Estoque: { decrement: item.quantidade } },
+          select: { ProdutoID: true, Nome: true, Estoque: true, Ativo: true }
         });
+
+        // Se estoque chegou a zero, desativar produto automaticamente
+        if (produtoAtualizado.Estoque <= 0 && produtoAtualizado.Ativo) {
+          await tx.produto.update({
+            where: { ProdutoID: item.produtoId },
+            data: { Ativo: false }
+          });
+          logger.info('produto_desativado_estoque_esgotado', {
+            produtoId: item.produtoId,
+            nome: produtoAtualizado.Nome,
+            pedidoId: pedido.PedidoID
+          });
+        }
       }
 
       // Salvar distribuição de pagamento (usando métodos já validados)
@@ -492,6 +506,9 @@ export const criarPedido = async (req, res) => {
       // Notificar vendedor e criar entregas
       await notificarVendedorPedidoPago(resultado.PedidoID);
       await criarEntregasAutomaticas(resultado.PedidoID);
+
+      // Calcular e registrar divisão de lucros para parcerias
+      await calcularDivisaoLucrosParcerias(resultado.PedidoID, itensComPreco);
 
       logger.info('pagamento_mock_aprovado', {
         pedidoId: resultado.PedidoID,
@@ -1503,4 +1520,135 @@ function getStatusDescription(status) {
     'Reembolsado': 'Reembolsado'
   };
   return descriptions[status] || status;
+}
+
+// Função para calcular divisão de lucros entre parceiros
+async function calcularDivisaoLucrosParcerias(pedidoId, itensComPreco) {
+  try {
+    logger.info('iniciando_calculo_divisao_lucros', { pedidoId });
+
+    // Buscar informações dos produtos e vendedores
+    const produtoIds = itensComPreco.map(item => item.produtoId);
+    const produtos = await prisma.produto.findMany({
+      where: {
+        ProdutoID: { in: produtoIds }
+      },
+      select: {
+        ProdutoID: true,
+        VendedorID: true,
+        Nome: true
+      }
+    });
+
+    // Criar mapa de produtos para acesso rápido
+    const produtosMap = new Map(produtos.map(p => [p.ProdutoID, p.VendedorID]));
+
+    // Agrupar vendas por vendedor
+    const vendasPorVendedor = new Map();
+
+    for (const item of itensComPreco) {
+      const vendedorId = produtosMap.get(item.produtoId);
+      if (!vendedorId) continue;
+
+      if (!vendasPorVendedor.has(vendedorId)) {
+        vendasPorVendedor.set(vendedorId, {
+          vendedorId,
+          valorTotal: 0,
+          produtos: []
+        });
+      }
+
+      const dadosVendedor = vendasPorVendedor.get(vendedorId);
+      dadosVendedor.valorTotal += item.subtotal;
+      dadosVendedor.produtos.push({
+        produtoId: item.produtoId,
+        nome: item.nome,
+        quantidade: item.quantidade,
+        precoUnitario: item.precoUnitario,
+        subtotal: item.subtotal
+      });
+    }
+
+    // Para cada vendedor, verificar se tem parcerias ativas e calcular divisão
+    for (const [vendedorId, dadosVendas] of vendasPorVendedor) {
+      // Buscar parcerias ativas deste vendedor
+      const parceriasAtivas = await prisma.parceriaVendedor.findMany({
+        where: {
+          OR: [
+            { SolicitanteID: vendedorId, Status: 'ATIVA' },
+            { ConvidadoID: vendedorId, Status: 'ATIVA' }
+          ]
+        },
+        select: {
+          ParceriaID: true,
+          SolicitanteID: true,
+          ConvidadoID: true,
+          PercentualSolicitante: true,
+          PercentualConvidado: true
+        }
+      });
+
+      if (parceriasAtivas.length === 0) continue;
+
+      // Para cada parceria, calcular a divisão dos lucros
+      for (const parceria of parceriasAtivas) {
+        const isSolicitante = parceria.SolicitanteID === vendedorId;
+        const parceiroId = isSolicitante ? parceria.ConvidadoID : parceria.SolicitanteID;
+        const percentualProprio = isSolicitante ? parceria.PercentualSolicitante : parceria.PercentualConvidado;
+        const percentualParceiro = isSolicitante ? parceria.PercentualConvidado : parceria.PercentualSolicitante;
+
+        // Calcular valores de divisão
+        const valorProprio = (dadosVendas.valorTotal * percentualProprio) / 100;
+        const valorParceiro = (dadosVendas.valorTotal * percentualParceiro) / 100;
+
+        logger.info('divisao_lucros_calculada', {
+          pedidoId,
+          parceriaId: parceria.ParceriaID,
+          vendedorId,
+          parceiroId,
+          valorTotal: dadosVendas.valorTotal,
+          percentualProprio,
+          percentualParceiro,
+          valorProprio,
+          valorParceiro
+        });
+
+        // Aqui seria implementada a lógica de transferência/repartição dos valores
+        // Por exemplo, criar registros em uma tabela de repasses ou integrar com sistema de pagamentos
+        // Para este exemplo, apenas registramos no log
+
+        // Criar notificações para ambos os parceiros sobre a divisão
+        const mensagemPropria = `Parceria #${parceria.ParceriaID}: Você recebeu R$ ${valorProprio.toFixed(2)} da venda de produtos (Pedido #${pedidoId})`;
+        const mensagemParceiro = `Parceria #${parceria.ParceriaID}: Você recebeu R$ ${valorParceiro.toFixed(2)} da venda de produtos (Pedido #${pedidoId})`;
+
+        await prisma.notificacao.create({
+          data: {
+            Titulo: 'Repasse de Lucros - Parceria',
+            Mensagem: mensagemPropria,
+            Tipo: 'success',
+            VendedorID: vendedorId
+          }
+        });
+
+        await prisma.notificacao.create({
+          data: {
+            Titulo: 'Repasse de Lucros - Parceria',
+            Mensagem: mensagemParceiro,
+            Tipo: 'success',
+            VendedorID: parceiroId
+          }
+        });
+      }
+    }
+
+    logger.info('calculo_divisao_lucros_concluido', { pedidoId });
+
+  } catch (error) {
+    logger.error('erro_calculo_divisao_lucros', {
+      pedidoId,
+      error: error.message,
+      stack: error.stack
+    });
+    // Não falhar o pedido por erro na divisão de lucros
+  }
 }

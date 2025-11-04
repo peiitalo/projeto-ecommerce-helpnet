@@ -31,6 +31,7 @@ import publicRoutes from './routes/publicRoutes.js';
 import cupomRoutes from './routes/cupomRoutes.js';
 import suporteRoutes from './routes/suporteRoutes.js';
 import adminSuporteRoutes from './routes/adminSuporteRoutes.js';
+import parceriaRoutes from './routes/parceriaRoutes.js';
 import { logger, requestLogger } from './utils/logger.js';
 // Middlewares de erro centralizados
 import { notFound, errorHandler } from './middleware/errorHandler.js';
@@ -168,7 +169,7 @@ app.use('/api/pagamentos', pagamentoRoutes);
 app.use('/api/vendedor/clientes', clienteVendedorRoutes);
 app.use('/api/vendedor/pedidos', vendorPedidoRoutes);
 app.use('/api/entregas', entregaRoutes);
-app.use('/api/vendedor/vendedores', vendedorRoutes);
+app.use('/api/vendedor', vendedorRoutes);
 app.use('/api/vendedor/relatorios', relatoriosRoutes);
 app.use('/api/vendedor', vendorRoutes);
 app.use('/api/upload', uploadRoutes);
@@ -177,6 +178,7 @@ app.use('/api/public', publicRoutes);
 app.use('/api/cupons', cupomRoutes);
 app.use('/api/suporte', suporteRoutes);
 app.use('/api/admin/suporte', adminSuporteRoutes);
+app.use('/api/vendedor/parcerias', parceriaRoutes);
 
 // Helper: healthcheck simples
 app.get('/api/health', (req, res) => res.json({ ok: true }));
