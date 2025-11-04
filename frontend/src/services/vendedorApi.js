@@ -2,7 +2,12 @@
 import { apiRequest } from './api.js';
 
 const vendedorApi = {
-  // Listar vendedores
+  // Buscar vendedor por CNPJ ou email
+  buscarPorCnpjEmail: (searchTerm) => {
+    return apiRequest(`/vendedor/buscar?cnpj_email=${encodeURIComponent(searchTerm)}`);
+  },
+
+  // Listar vendedores (para compatibilidade)
   listarVendedores: (params = {}) => {
     const queryString = new URLSearchParams(params).toString();
     return apiRequest(`/vendedor/vendedores?${queryString}`);

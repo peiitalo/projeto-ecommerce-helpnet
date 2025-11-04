@@ -30,4 +30,7 @@ router.post('/suporte/avaliacao', suporteController.avaliarPlataforma);
 router.get('/perfil', vendedorController.buscarPerfilVendedor);
 router.put('/perfil', vendedorController.atualizarPerfilVendedor);
 
+// Buscar vendedor por CNPJ ou email
+router.get('/buscar', vendedorController.buscarPorCnpjEmail);
+
 export default router;

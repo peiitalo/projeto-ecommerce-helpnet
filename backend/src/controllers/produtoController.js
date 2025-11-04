@@ -20,9 +20,10 @@ export const listarProdutos = async (req, res) => {
      const where = {};
 
      // Default filter: only show active products for clients (unless explicitly filtering for inactive)
+     // Products with zero stock are automatically deactivated, so they won't appear unless explicitly requested
      if (status !== "inativo" && status !== "sem-estoque") {
-       where.Ativo = true;
-     }
+         where.Ativo = true;
+       }
 
     // Handle category filtering - support both ID and name
     if (categoria) {
