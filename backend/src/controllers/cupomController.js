@@ -1,5 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+import prisma from '../config/prisma.js';
 
 // Criar cupom
 const criarCupom = async (req, res) => {
@@ -22,7 +21,7 @@ const criarCupom = async (req, res) => {
       tipoDistribuicao
     } = req.body;
 
-    const vendedorID = req.user.VendedorID;
+    const vendedorID = req.vendorId;
 
     // Se for VENDEDOR_ESPECIFICO, buscar clientes do vendedor e definir limiteUso baseado no número de clientes
     let limiteUsoFinal = limiteUso ? parseInt(limiteUso) : null;
@@ -95,7 +94,7 @@ const criarCupom = async (req, res) => {
 // Listar cupons do vendedor
 const listarCupons = async (req, res) => {
   try {
-    const vendedorID = req.user.VendedorID;
+    const vendedorID = req.vendorId;
     const { page = 1, limit = 10, ativo } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -141,7 +140,7 @@ const listarCupons = async (req, res) => {
 const buscarCupomPorId = async (req, res) => {
   try {
     const { id } = req.params;
-    const vendedorID = req.user.VendedorID;
+    const vendedorID = req.vendorId;
 
     const cupom = await prisma.cupom.findFirst({
       where: {
@@ -174,7 +173,7 @@ const buscarCupomPorId = async (req, res) => {
 const atualizarCupom = async (req, res) => {
   try {
     const { id } = req.params;
-    const vendedorID = req.user.VendedorID;
+    const vendedorID = req.vendorId;
     const {
       descricao,
       tipoDesconto,
@@ -273,7 +272,7 @@ const atualizarCupom = async (req, res) => {
 const deletarCupom = async (req, res) => {
   try {
     const { id } = req.params;
-    const vendedorID = req.user.VendedorID;
+    const vendedorID = req.vendorId;
 
     const cupom = await prisma.cupom.findFirst({
       where: {
@@ -310,7 +309,7 @@ const deletarCupom = async (req, res) => {
 const distribuirCupom = async (req, res) => {
   try {
     const { cupomID, clientesIDs, dataExpiracaoCliente } = req.body;
-    const vendedorID = req.user.VendedorID;
+    const vendedorID = req.vendorId;
 
     // Verificar se cupom pertence ao vendedor
     const cupom = await prisma.cupom.findFirst({
@@ -687,7 +686,7 @@ const listarMeusCupons = async (req, res) => {
       include: {
         cupom: true
       },
-      orderBy: { CriadoEm: 'desc' }
+      orderBy: { cupom: { CriadoEm: 'desc' } }
     });
 
     const cuponsFormatados = cuponsCliente.map(cupomCliente => ({

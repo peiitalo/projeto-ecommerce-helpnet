@@ -8,13 +8,57 @@ const calcularFrete = async (req, res) => {
   try {
     const { clienteId, enderecoId, produtoIds } = req.body;
 
+    logger.info('frete_calculo_request', {
+      rawBody: req.body,
+      clienteId: clienteId,
+      enderecoId: enderecoId,
+      produtoIds: produtoIds,
+      clienteIdType: typeof clienteId,
+      enderecoIdType: typeof enderecoId,
+      produtoIdsType: typeof produtoIds,
+      produtoIdsIsArray: Array.isArray(produtoIds)
+    });
+
     if (!clienteId || !enderecoId || !produtoIds || !Array.isArray(produtoIds)) {
+      logger.error('frete_calculo_validacao_falhou', {
+        clienteId: !!clienteId,
+        enderecoId: !!enderecoId,
+        produtoIds: !!produtoIds,
+        produtoIdsIsArray: Array.isArray(produtoIds)
+      });
       return res.status(400).json({
         erro: "clienteId, enderecoId e produtoIds (array) são obrigatórios"
       });
     }
 
     // Buscar endereço do cliente
+    logger.info('frete_calculo_iniciado', {
+      clienteId,
+      enderecoId,
+      produtoIds,
+      parsedClienteId: parseInt(clienteId),
+      parsedEnderecoId: parseInt(enderecoId),
+      parsedProdutoIds: produtoIds.map(id => parseInt(id))
+    });
+
+    // Primeiro verificar se o cliente existe
+    const cliente = await prisma.cliente.findUnique({
+      where: { ClienteID: parseInt(clienteId) },
+      select: { ClienteID: true, NomeCompleto: true }
+    });
+
+    logger.info('cliente_verificado', {
+      clienteEncontrado: !!cliente,
+      clienteId: parseInt(clienteId),
+      clienteNome: cliente?.NomeCompleto
+    });
+
+    if (!cliente) {
+      logger.error('cliente_nao_encontrado', { clienteId: parseInt(clienteId) });
+      return res.status(404).json({ erro: "Cliente não encontrado" });
+    }
+
+    // Verificar se o endereço existe para este cliente
     const endereco = await prisma.endereco.findFirst({
       where: {
         EnderecoID: parseInt(enderecoId),
@@ -22,7 +66,25 @@ const calcularFrete = async (req, res) => {
       }
     });
 
+    logger.info('endereco_encontrado', {
+      enderecoEncontrado: !!endereco,
+      enderecoId: parseInt(enderecoId),
+      clienteId: parseInt(clienteId),
+      enderecoData: endereco ? {
+        EnderecoID: endereco.EnderecoID,
+        ClienteID: endereco.ClienteID,
+        CEP: endereco.CEP,
+        Cidade: endereco.Cidade,
+        UF: endereco.UF
+      } : null
+    });
+
     if (!endereco) {
+      logger.error('endereco_nao_encontrado', {
+        clienteId: parseInt(clienteId),
+        enderecoId: parseInt(enderecoId),
+        produtoIds
+      });
       return res.status(404).json({ erro: "Endereço não encontrado" });
     }
 

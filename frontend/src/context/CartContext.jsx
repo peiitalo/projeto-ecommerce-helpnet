@@ -287,7 +287,7 @@ export function CartProvider({ children }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`
         },
         body: JSON.stringify({
           codigo: couponCode.toUpperCase(),

@@ -805,6 +805,20 @@ export const listarPedidosCliente = async (req, res) => {
       prisma.pedido.count({ where: { ClienteID: user.id } })
     ]);
 
+    // Log de diagnóstico para imagens
+    pedidos.forEach(pedido => {
+      pedido.itensPedido.forEach(item => {
+        logger.info('diagnostico_imagem_pedido', {
+          pedidoId: pedido.PedidoID,
+          produtoId: item.produto.ProdutoID,
+          produtoNome: item.produto.Nome,
+          imagensCount: item.produto.Imagens?.length || 0,
+          imagens: item.produto.Imagens || [],
+          primeiraImagem: item.produto.Imagens?.[0] || null
+        });
+      });
+    });
+
     logger.info('listar_pedidos_cliente_ok', { clienteId: user.id, total });
     res.json({ pedidos, total });
 
@@ -829,6 +843,8 @@ export const buscarPedidoPorId = async (req, res) => {
     }
     const pedidoId = parseInt(match[1]);
 
+    logger.info('buscar_pedido_iniciado', { pedidoId, clienteId: user.id });
+
     const pedido = await prisma.pedido.findFirst({
       where: {
         PedidoID: pedidoId,
@@ -843,6 +859,17 @@ export const buscarPedidoPorId = async (req, res) => {
         TotalPago: true,
         StatusPagamento: true,
         ExpiraEm: true,
+        EnderecoID: true, // Adicionar para debug
+        cliente: {
+          select: {
+            ClienteID: true,
+            NomeCompleto: true,
+            Email: true,
+            CPF_CNPJ: true,
+            TelefoneCelular: true,
+            TelefoneFixo: true
+          }
+        },
         itensPedido: {
           select: {
             Quantidade: true,
@@ -883,6 +910,7 @@ export const buscarPedidoPorId = async (req, res) => {
         },
         Endereco: {
           select: {
+            EnderecoID: true, // Adicionar para debug
             Nome: true,
             Complemento: true,
             CEP: true,
@@ -897,12 +925,33 @@ export const buscarPedidoPorId = async (req, res) => {
       }
     });
 
+    // Logs de debug para endereço
+    logger.info('pedido_encontrado_debug', {
+      pedidoId,
+      clienteId: user.id,
+      enderecoId: pedido?.EnderecoID,
+      enderecoEncontrado: !!pedido?.Endereco,
+      enderecoDados: pedido?.Endereco
+    });
+
     if (!pedido) {
       return res.status(404).json({
         success: false,
         errors: ["Pedido não encontrado"]
       });
     }
+
+    // Log de diagnóstico para imagens
+    pedido.itensPedido.forEach(item => {
+      logger.info('diagnostico_imagem_pedido_detalhado', {
+        pedidoId: pedido.PedidoID,
+        produtoId: item.produto.ProdutoID,
+        produtoNome: item.produto.Nome,
+        imagensCount: item.produto.Imagens?.length || 0,
+        imagens: item.produto.Imagens || [],
+        primeiraImagem: item.produto.Imagens?.[0] || null
+      });
+    });
 
     logger.info('buscar_pedido_ok', { pedidoId: pedidoId, clienteId: user.id });
     res.json({ success: true, pedido });
@@ -1140,7 +1189,8 @@ export const listarPedidosVendedor = async (req, res) => {
             select: {
               NomeCompleto: true,
               Email: true,
-              TelefoneCelular: true
+              TelefoneCelular: true,
+              CPF_CNPJ: true
             }
           }
         },
@@ -1431,7 +1481,9 @@ export const buscarPedidoAdmin = async (req, res) => {
             ClienteID: true,
             NomeCompleto: true,
             Email: true,
-            CPF_CNPJ: true
+            CPF_CNPJ: true,
+            TelefoneCelular: true,
+            TelefoneFixo: true
           }
         },
         itensPedido: {

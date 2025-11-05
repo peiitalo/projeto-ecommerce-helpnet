@@ -56,7 +56,7 @@ export default function CartPage() {
       // Buscar cupons resgatados do cliente
       const response = await fetch('/api/cupons/disponiveis', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`,
           'Content-Type': 'application/json'
         }
       });

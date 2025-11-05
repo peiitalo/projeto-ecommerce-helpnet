@@ -134,7 +134,7 @@ function OrdersPage() {
               empresa: item.produto?.vendedor?.NomeEmpresa || VENDOR_INFO.empresa,
               endereco: VENDOR_INFO.endereco
             },
-            image: item.produto?.ImagemPrincipal || '/placeholder-image.png'
+            image: item.produto?.Imagens?.[0] || '/placeholder-image.png'
           })) || [],
           sellers: [...new Map((pedido.itensPedido || []).map(item => [
             item.produto?.vendedor?.VendedorID,

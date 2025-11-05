@@ -19,16 +19,27 @@ function VendorCuponsPage() {
   const loadCoupons = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      if (!token) {
-        window.location.href = '/login';
-        return;
-      }
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+
+      console.log('[VendorCuponsPage] Debug - Load Coupons:', {
+        token: token ? 'present' : 'missing',
+        tokenLength: token ? token.length : 0,
+        tokenPrefix: token ? token.substring(0, 20) + '...' : 'none',
+        tokenSource: localStorage.getItem('accessToken') ? 'accessToken' : 'token',
+        url: '/api/cupons/vendedor/',
+        method: 'GET'
+      });
 
       const response = await fetch('/api/cupons/vendedor/', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
+      });
+
+      console.log('[VendorCuponsPage] Debug - Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
       });
 
       if (response.ok) {
@@ -50,12 +61,6 @@ function VendorCuponsPage() {
           }));
           setCoupons(formattedCoupons);
         }
-      } else if (response.status === 401) {
-        // Token expirado ou inválido - redirecionar para login
-        localStorage.removeItem('token');
-        localStorage.removeItem('auth:user');
-        window.location.href = '/login';
-        return;
       } else {
         console.error('Erro na resposta da API:', response.status);
       }
@@ -97,10 +102,10 @@ function VendorCuponsPage() {
 
   const filteredCoupons = coupons.filter(coupon => {
     const matchesSearch = coupon.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         coupon.description.toLowerCase().includes(searchTerm.toLowerCase());
+                          coupon.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'all' ||
-                         (filterStatus === 'active' && coupon.active) ||
-                         (filterStatus === 'inactive' && !coupon.active);
+                          (filterStatus === 'active' && coupon.active) ||
+                          (filterStatus === 'inactive' && !coupon.active);
     return matchesSearch && matchesStatus;
   });
 
@@ -117,11 +122,7 @@ function VendorCuponsPage() {
   const handleDeleteCoupon = async (couponId) => {
     if (window.confirm('Tem certeza que deseja excluir este cupom?')) {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          window.location.href = '/login';
-          return;
-        }
+        const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
 
         const response = await fetch(`/api/cupons/vendedor/${couponId}`, {
           method: 'DELETE',
@@ -132,11 +133,6 @@ function VendorCuponsPage() {
 
         if (response.ok) {
           setCoupons(prev => prev.filter(c => c.id !== couponId));
-          // Show success message
-        } else if (response.status === 401) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('auth:user');
-          window.location.href = '/login';
         } else {
           alert('Erro ao excluir cupom');
         }
@@ -152,11 +148,7 @@ function VendorCuponsPage() {
       const coupon = coupons.find(c => c.id === couponId);
       if (!coupon) return;
 
-      const token = localStorage.getItem('token');
-      if (!token) {
-        window.location.href = '/login';
-        return;
-      }
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
 
       const response = await fetch(`/api/cupons/vendedor/${couponId}`, {
         method: 'PUT',
@@ -173,10 +165,6 @@ function VendorCuponsPage() {
         setCoupons(prev => prev.map(c =>
           c.id === couponId ? { ...c, active: !c.active } : c
         ));
-      } else if (response.status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('auth:user');
-        window.location.href = '/login';
       } else {
         alert('Erro ao alterar status do cupom');
       }
@@ -188,17 +176,13 @@ function VendorCuponsPage() {
 
   const handleSaveCoupon = async (couponData) => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        window.location.href = '/login';
-        return;
-      }
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
 
       const apiData = {
         codigo: couponData.code,
         descricao: couponData.description,
         tipoDesconto: couponData.type === 'percentage' ? 'PERCENTUAL' :
-                     couponData.type === 'free_shipping' ? 'FRETE_GRATIS' : 'VALOR_FIXO',
+                      couponData.type === 'free_shipping' ? 'FRETE_GRATIS' : 'VALOR_FIXO',
         valorDesconto: couponData.discount,
         valorMinimo: couponData.minValue,
         limiteUso: couponData.usageLimit || null,
@@ -237,10 +221,6 @@ function VendorCuponsPage() {
         } else {
           alert('Erro: ' + result.message);
         }
-      } else if (response.status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('auth:user');
-        window.location.href = '/login';
       } else {
         alert('Erro ao salvar cupom');
       }
@@ -252,7 +232,6 @@ function VendorCuponsPage() {
 
   const copyToClipboard = (code) => {
     navigator.clipboard.writeText(code);
-    // Could show a toast here
   };
 
   const formatDiscount = (coupon) => {

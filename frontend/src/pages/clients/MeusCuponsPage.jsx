@@ -66,10 +66,13 @@ function MeusCuponsPage() {
   useEffect(() => {
     const loadCoupons = async () => {
       try {
+        const token = localStorage.getItem('accessToken');
+        console.log('Frontend Debug - Token:', token ? 'present' : 'missing');
+
         // Buscar cupons disponíveis para resgate
         const availableResponse = await fetch('/api/cupons/disponiveis', {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
         });
@@ -77,6 +80,7 @@ function MeusCuponsPage() {
         let availableCoupons = [];
         if (availableResponse.ok) {
           const data = await availableResponse.json();
+          console.log('Frontend Debug - Available coupons response:', data);
           if (data.success) {
             availableCoupons = data.data.map(cupomCliente => ({
               id: cupomCliente.CupomClienteID,
@@ -92,12 +96,14 @@ function MeusCuponsPage() {
               canRedeem: !cupomCliente.Resgatado
             }));
           }
+        } else {
+          console.log('Frontend Debug - Available coupons failed:', availableResponse.status, await availableResponse.text());
         }
 
         // Buscar cupons já resgatados (usados ou não)
         const redeemedResponse = await fetch('/api/cupons/meus', {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
         });
@@ -105,6 +111,7 @@ function MeusCuponsPage() {
         let redeemedCoupons = [];
         if (redeemedResponse.ok) {
           const data = await redeemedResponse.json();
+          console.log('Frontend Debug - Redeemed coupons response:', data);
           if (data.success) {
             redeemedCoupons = data.data.map(cupomCliente => ({
               id: cupomCliente.CupomClienteID,
@@ -121,6 +128,8 @@ function MeusCuponsPage() {
               usedAt: cupomCliente.DataUso
             }));
           }
+        } else {
+          console.log('Frontend Debug - Redeemed coupons failed:', redeemedResponse.status, await redeemedResponse.text());
         }
 
         // Combinar e ordenar cupons
@@ -173,10 +182,11 @@ function MeusCuponsPage() {
 
   const redeemCoupon = async (cupomClienteID) => {
     try {
+      const token = localStorage.getItem('accessToken');
       const response = await fetch('/api/cupons/resgatar', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ cupomClienteID })

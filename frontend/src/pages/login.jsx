@@ -153,9 +153,41 @@ function Login() {
         vendedorId: data?.data?.vendedorId || null,
         token: data?.token || data?.data?.token || null,
       };
+      console.log('[Login] Dados do usuário preparados:', userData);
+      console.log('[Login] Resposta completa da API:', data);
 
       // Atualizar contexto de autenticação
+      console.log('[Login] Salvando dados do usuário no AuthContext:', userData);
+      console.log('[Login] Chamando login() do AuthContext com dados:', JSON.stringify(userData, null, 2));
       login(userData);
+
+      // Verificar se os dados foram salvos corretamente no localStorage
+      setTimeout(() => {
+        const savedUser = localStorage.getItem('auth:user');
+        const savedToken = localStorage.getItem('token');
+        const savedAccessToken = localStorage.getItem('accessToken');
+        console.log('[Login] Verificação após salvar:', {
+          savedUser: savedUser ? 'presente' : 'ausente',
+          savedToken: savedToken ? 'presente' : 'ausente',
+          savedAccessToken: savedAccessToken ? 'presente' : 'ausente'
+        });
+
+        if (savedUser) {
+          try {
+            const parsedUser = JSON.parse(savedUser);
+            console.log('[Login] Usuário salvo no localStorage:', {
+              id: parsedUser.id,
+              nome: parsedUser.nome,
+              email: parsedUser.email,
+              role: parsedUser.role
+            });
+          } catch (parseError) {
+            console.error('[Login] Erro ao fazer parse do usuário salvo:', parseError);
+          }
+        } else {
+          console.error('[Login] ERRO: Usuário não foi salvo no localStorage após login!');
+        }
+      }, 100);
 
       setTimeout(() => {
         // redirecionar por role

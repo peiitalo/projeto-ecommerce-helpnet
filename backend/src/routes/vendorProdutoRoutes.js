@@ -14,6 +14,7 @@ router.use(vendorScope);
 router.get('/', async (req, res) => {
   try {
     console.log('Debug: vendorId:', req.vendorId, 'vendorEmpresaId:', req.vendorEmpresaId, 'query:', req.query);
+    console.log('Debug: prisma object:', typeof prisma, prisma ? 'defined' : 'undefined');
     const { status, busca, categoria, pagina = 1, limit = 10 } = req.query;
     const skip = (parseInt(pagina) - 1) * parseInt(limit);
 

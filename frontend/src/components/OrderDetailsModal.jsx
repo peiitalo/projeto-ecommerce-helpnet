@@ -54,6 +54,19 @@ const OrderDetailsModal = ({ orderId, isOpen, onClose, isAdmin = false }) => {
        // Debug logs to inspect received data
        console.log('OrderDetailsModal - Order data:', order);
        console.log('OrderDetailsModal - Delivery data:', delivery);
+       console.log('OrderDetailsModal - Client data:', order?.cliente);
+       console.log('OrderDetailsModal - Address data:', order?.Endereco);
+       console.log('OrderDetailsModal - EnderecoID:', order?.EnderecoID);
+       console.log('OrderDetailsModal - Address fields:', {
+         nome: order?.Endereco?.Nome,
+         logradouro: order?.Endereco?.Logradouro,
+         numero: order?.Endereco?.Numero,
+         complemento: order?.Endereco?.Complemento,
+         bairro: order?.Endereco?.Bairro,
+         cidade: order?.Endereco?.Cidade,
+         uf: order?.Endereco?.UF,
+         cep: order?.Endereco?.CEP
+       });
      } catch (err) {
        console.error('Erro ao buscar detalhes do pedido:', err);
        setError('Erro ao carregar detalhes do pedido');
@@ -148,7 +161,7 @@ const OrderDetailsModal = ({ orderId, isOpen, onClose, isAdmin = false }) => {
       total: parseFloat(item.PrecoUnitario) * item.Quantidade,
       seller: item.produto.vendedor ? item.produto.vendedor.Nome : 'N/A',
       sellerId: item.produto.vendedor?.VendedorID || null,
-      image: item.produto.ImagemPrincipal || '/placeholder-image.png'
+      image: item.produto.Imagens?.[0] || '/placeholder-image.png'
     })),
     sellers: [...new Set(order.itensPedido.map(item => item.produto.vendedor?.Nome).filter(Boolean))],
     address: {
