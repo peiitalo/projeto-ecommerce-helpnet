@@ -198,97 +198,8 @@ const OrderDetailsModal = ({ orderId, isOpen, onClose, isAdmin = false }) => {
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-slate-200">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-slate-900">Comprovante - Pedido {formattedOrder.id}</h2>
+            <h2 className="text-xl font-semibold text-slate-900">Detalhes - Pedido {formattedOrder.id}</h2>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  const printWindow = window.open('', '_blank');
-                  const receiptHTML = `
-                    <html>
-                      <head>
-                        <title>Comprovante - Pedido ${formattedOrder.id}</title>
-                        <style>
-                          body { font-family: Arial, sans-serif; margin: 20px; }
-                          .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
-                          .info { margin-bottom: 20px; }
-                          .info div { margin-bottom: 10px; }
-                          .items { margin-bottom: 20px; }
-                          .items table { width: 100%; border-collapse: collapse; }
-                          .items th, .items td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                          .total { font-weight: bold; text-align: right; }
-                          .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #666; }
-                        </style>
-                      </head>
-                      <body>
-                        <div class="header">
-                          <h1>HelpNet - Comprovante de Compra</h1>
-                          <h2>Pedido ${formattedOrder.id}</h2>
-                        </div>
-
-                        <div class="info">
-                          <div><strong>Data da Compra:</strong> ${formatDate(formattedOrder.date)}</div>
-                          <div><strong>Status do Pedido:</strong> ${formattedOrder.status}</div>
-                          <div><strong>Cliente:</strong> ${formattedOrder.clientName}</div>
-                          <div><strong>CPF/CNPJ:</strong> ${formattedOrder.clientCpfCnpj}</div>
-                          <div><strong>Email:</strong> ${formattedOrder.clientEmail}</div>
-                          <div><strong>Telefone:</strong> ${formattedOrder.clientPhone}</div>
-                          <div><strong>Método de Pagamento:</strong> ${formattedOrder.paymentMethod}</div>
-                        </div>
-
-                        <div class="items">
-                          <h3>Produtos Comprados</h3>
-                          <table>
-                            <thead>
-                              <tr>
-                                <th>Produto</th>
-                                <th>Quantidade</th>
-                                <th>Preço Unitário</th>
-                                <th>Total</th>
-                                <th>Vendedor</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              ${formattedOrder.items.map(item => `
-                                <tr>
-                                  <td>${item.name}</td>
-                                  <td>${item.quantity}</td>
-                                  <td>${formatPrice(item.price)}</td>
-                                  <td>${formatPrice(item.price * item.quantity)}</td>
-                                  <td>${item.seller}</td>
-                                </tr>
-                              `).join('')}
-                            </tbody>
-                          </table>
-                          <div class="total">
-                            <strong>Valor Total: ${formatPrice(formattedOrder.total)}</strong>
-                          </div>
-                        </div>
-
-                        <div class="info">
-                          <h3>Endereço de Entrega</h3>
-                          <div>${formattedOrder.address.name}</div>
-                          <div>${formattedOrder.address.street}</div>
-                          <div>${formattedOrder.address.city}</div>
-                          <div>CEP: ${formattedOrder.address.cep}</div>
-                        </div>
-
-                        <div class="footer">
-                          <p>Este é um comprovante oficial da HelpNet. Data de emissão: ${new Date().toLocaleDateString('pt-BR')}</p>
-                        </div>
-                      </body>
-                    </html>
-                  `;
-
-                  printWindow.document.write(receiptHTML);
-                  printWindow.document.close();
-                  printWindow.print();
-                }}
-                className="flex items-center gap-2 px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200"
-                title="Imprimir comprovante"
-              >
-                <FaPrint />
-                <span className="hidden sm:inline">Imprimir</span>
-              </button>
               <button
                 onClick={handleClose}
                 className="p-2 rounded-lg text-slate-600 hover:bg-slate-50"
@@ -302,7 +213,7 @@ const OrderDetailsModal = ({ orderId, isOpen, onClose, isAdmin = false }) => {
           {/* Cabeçalho do comprovante */}
           <div className="text-center border-b border-slate-200 pb-4">
             <h3 className="text-lg font-bold text-slate-900">HelpNet</h3>
-            <p className="text-sm text-slate-600">Comprovante de Compra</p>
+            <p className="text-sm text-slate-600">Detalhes da Compra</p>
             <p className="text-sm font-medium text-slate-900">Pedido {formattedOrder.id}</p>
           </div>
 
