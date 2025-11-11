@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import VendorLayout from '../../layouts/VendorLayout';
 import { FiPlus, FiEdit, FiTrash2, FiCopy, FiSearch, FiFilter } from 'react-icons/fi';
 import { FaTicketAlt, FaPercent, FaTruck } from 'react-icons/fa';
+import { useNotifications } from '../../hooks/useNotifications';
 
 function VendorCuponsPage() {
   const [coupons, setCoupons] = useState([]);
@@ -10,6 +11,7 @@ function VendorCuponsPage() {
   const [editingCoupon, setEditingCoupon] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const { showSuccess } = useNotifications();
 
   // Load coupons from API
   useEffect(() => {
@@ -230,8 +232,21 @@ function VendorCuponsPage() {
     }
   };
 
-  const copyToClipboard = (code) => {
-    navigator.clipboard.writeText(code);
+  const copyToClipboard = async (code) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      showSuccess('Código do cupom copiado para a área de transferência!');
+    } catch (error) {
+      console.error('Erro ao copiar código:', error);
+      // Fallback para browsers que não suportam clipboard API
+      const textArea = document.createElement('textarea');
+      textArea.value = code;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      showSuccess('Código do cupom copiado para a área de transferência!');
+    }
   };
 
   const formatDiscount = (coupon) => {
@@ -251,26 +266,28 @@ function VendorCuponsPage() {
 
   return (
     <VendorLayout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div className="flex flex-col gap-4 mb-6 sm:mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Gerenciar Cupons</h1>
-            <p className="mt-2 text-gray-600">Crie e gerencie cupons de desconto para seus clientes</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Gerenciar Cupons</h1>
+            <p className="mt-2 text-gray-600 text-sm sm:text-base">Crie e gerencie cupons de desconto para seus clientes</p>
           </div>
-          <button
-            onClick={handleCreateCoupon}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <FiPlus />
-            <span>Criar Cupom</span>
-          </button>
+          <div className="flex justify-end">
+            <button
+              onClick={handleCreateCoupon}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors w-full sm:w-auto"
+            >
+              <FiPlus />
+              <span>Criar Cupom</span>
+            </button>
+          </div>
         </div>
 
         {/* Filters */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6 mb-8">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
+        <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 mb-8">
+          <div className="flex flex-col gap-4">
+            <div className="w-full">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Buscar Cupom
               </label>
@@ -285,7 +302,7 @@ function VendorCuponsPage() {
                 />
               </div>
             </div>
-            <div className="sm:w-48">
+            <div className="w-full sm:w-48">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Status
               </label>
@@ -304,7 +321,8 @@ function VendorCuponsPage() {
 
         {/* Coupons List */}
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
@@ -335,7 +353,7 @@ function VendorCuponsPage() {
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => (
                     <tr key={i}>
-                      <td colSpan="6" className="px-6 py-4">
+                      <td colSpan="7" className="px-6 py-4">
                         <div className="animate-pulse flex items-center space-x-4">
                           <div className="w-8 h-8 bg-gray-200 rounded"></div>
                           <div className="flex-1">
@@ -419,13 +437,118 @@ function VendorCuponsPage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
                       Nenhum cupom encontrado com os filtros aplicados.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden">
+            {loading ? (
+              <div className="p-4 space-y-4">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="bg-gray-50 rounded-lg p-4 animate-pulse">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="w-8 h-8 bg-gray-200 rounded"></div>
+                      <div className="w-16 h-6 bg-gray-200 rounded"></div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                      <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredCoupons.length > 0 ? (
+              <div className="divide-y divide-gray-200">
+                {filteredCoupons.map((coupon) => (
+                  <div key={coupon.id} className="p-4 hover:bg-gray-50">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <FaTicketAlt className="text-blue-600 text-lg" />
+                        <div>
+                          <div className="font-medium text-gray-900 flex items-center gap-2">
+                            {coupon.code}
+                            <button
+                              onClick={() => copyToClipboard(coupon.code)}
+                              className="text-gray-400 hover:text-gray-600"
+                              title="Copiar código"
+                            >
+                              <FiCopy className="w-4 h-4" />
+                            </button>
+                          </div>
+                          <div className="text-sm text-gray-500">{coupon.description}</div>
+                        </div>
+                      </div>
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(coupon.active)}`}>
+                        {getStatusText(coupon.active)}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mb-3 text-sm">
+                      <div>
+                        <span className="text-gray-500">Tipo:</span>
+                        <div className="font-medium text-gray-900">{formatDiscount(coupon)}</div>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Distribuição:</span>
+                        <div className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full mt-1 ${
+                          coupon.tipoDistribuicao === 'PUBLICO'
+                            ? 'text-blue-700 bg-blue-100'
+                            : 'text-purple-700 bg-purple-100'
+                        }`}>
+                          {coupon.tipoDistribuicao === 'PUBLICO' ? 'Público' : 'Clientes Específicos'}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Uso:</span>
+                        <div className="font-medium text-gray-900">
+                          {coupon.usageCount || 0}/{coupon.usageLimit || '∞'}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Validade:</span>
+                        <div className="font-medium text-gray-900">
+                          {coupon.validUntil ? new Date(coupon.validUntil).toLocaleDateString('pt-BR') : 'Sem expiração'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-200">
+                      <button
+                        onClick={() => handleEditCoupon(coupon)}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                        title="Editar"
+                      >
+                        <FiEdit className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleToggleStatus(coupon.id)}
+                        className={`p-2 hover:bg-gray-50 rounded-lg ${coupon.active ? 'text-green-600' : 'text-red-600'}`}
+                        title={coupon.active ? 'Desativar' : 'Ativar'}
+                      >
+                        {coupon.active ? '✓' : '✗'}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCoupon(coupon.id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                        title="Excluir"
+                      >
+                        <FiTrash2 className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center text-gray-500">
+                Nenhum cupom encontrado com os filtros aplicados.
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -470,16 +593,16 @@ function CouponModal({ coupon, onSave, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-slate-200">
-          <h2 className="text-xl font-semibold text-slate-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-4 sm:p-6 border-b border-slate-200">
+          <h2 className="text-lg sm:text-xl font-semibold text-slate-900">
             {coupon ? 'Editar Cupom' : 'Criar Novo Cupom'}
           </h2>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
+          <div className="grid grid-cols-1 gap-4">
+            <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Código do Cupom
               </label>
@@ -599,7 +722,7 @@ function CouponModal({ coupon, onSave, onClose }) {
               />
             </div>
 
-            <div className="md:col-span-2">
+            <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Descrição
               </label>
@@ -613,7 +736,7 @@ function CouponModal({ coupon, onSave, onClose }) {
               />
             </div>
 
-            <div className="md:col-span-2">
+            <div>
               <label className="flex items-center">
                 <input
                   type="checkbox"
@@ -626,17 +749,17 @@ function CouponModal({ coupon, onSave, onClose }) {
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-slate-200">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg"
+              className="px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg order-2 sm:order-1"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 order-1 sm:order-2"
             >
               {coupon ? 'Salvar Alterações' : 'Criar Cupom'}
             </button>

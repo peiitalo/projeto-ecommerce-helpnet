@@ -10,6 +10,7 @@ export default function vendorScope(req, res, next) {
       tipoPessoa: user?.tipoPessoa,
       empresaId: user?.empresaId || user?.EmpresaID,
       vendedorId: user?.vendedorId || user?.VendedorID || user?.vendorId,
+      allKeys: user ? Object.keys(user) : 'no user',
       url: req.url,
       method: req.method,
       headers: req.headers.authorization ? 'Bearer token present' : 'No auth header'

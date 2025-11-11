@@ -26,7 +26,8 @@ router.use('/vendedor', vendorRoutes);
 router.use(authMiddleware); // Todas as rotas abaixo requerem autenticação
 
 // Gestão de cupons por clientes (clientes)
-router.get('/disponiveis', cupomController.listarCuponsDisponiveis);
+router.get('/', cupomController.listarCuponsPublicos); // Novo endpoint principal
+router.get('/disponiveis', cupomController.listarCuponsDisponiveis); // Manter para compatibilidade
 router.post('/resgatar', cupomController.resgatarCupom);
 router.get('/meus', cupomController.listarMeusCupons);
 

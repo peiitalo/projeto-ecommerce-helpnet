@@ -1,8 +1,114 @@
 import prisma from '../config/prisma.js';
 
+// Função auxiliar para distribuir cupons PUBLICOS de forma assíncrona
+const distribuirCupomPublicoAsync = async (cupomID, dataExpiracao) => {
+  try {
+    console.log(`Iniciando distribuição assíncrona do cupom ${cupomID}...`);
+
+    // Buscar todos os clientes pessoa física ativos
+    const clientesFisicos = await prisma.cliente.findMany({
+      where: {
+        TipoPessoa: 'Física',
+        Ativo: true
+      },
+      select: { ClienteID: true }
+    });
+
+    console.log(`Encontrados ${clientesFisicos.length} clientes pessoa física para distribuição`);
+
+    if (clientesFisicos.length === 0) {
+      console.log('Nenhum cliente pessoa física encontrado para distribuição');
+      return;
+    }
+
+    // Dividir em lotes de 100 para evitar sobrecarga
+    const loteSize = 100;
+    const lotes = [];
+    for (let i = 0; i < clientesFisicos.length; i += loteSize) {
+      lotes.push(clientesFisicos.slice(i, i + loteSize));
+    }
+
+    console.log(`Distribuindo em ${lotes.length} lotes...`);
+
+    // Processar cada lote
+    for (let i = 0; i < lotes.length; i++) {
+      const lote = lotes[i];
+      console.log(`Processando lote ${i + 1}/${lotes.length} com ${lote.length} clientes...`);
+
+      try {
+        const cuponsClienteParaCriar = lote.map(cliente => ({
+          CupomID: cupomID,
+          ClienteID: cliente.ClienteID,
+          DisponivelParaResgate: true,
+          DataExpiracaoCliente: dataExpiracao ? new Date(dataExpiracao) : null
+        }));
+
+        await prisma.cupomCliente.createMany({
+          data: cuponsClienteParaCriar,
+          skipDuplicates: true
+        });
+
+        // Pequena pausa entre lotes para não sobrecarregar
+        if (i < lotes.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+      } catch (error) {
+        console.error(`Erro ao processar lote ${i + 1}:`, error.message);
+        // Continua com o próximo lote
+      }
+    }
+
+    console.log(`Distribuição assíncrona do cupom ${cupomID} concluída com sucesso`);
+
+  } catch (error) {
+    console.error('Erro geral na distribuição assíncrona do cupom:', error);
+  }
+};
+
+// Função auxiliar para distribuir cupons VENDEDOR_ESPECIFICO de forma assíncrona
+const distribuirCupomVendedorAsync = async (cupomID, vendedorID, dataExpiracao) => {
+  try {
+    console.log(`Iniciando distribuição assíncrona do cupom ${cupomID} para clientes do vendedor ${vendedorID}...`);
+
+    // Buscar todos os clientes associados ao vendedor
+    const clientesVendedor = await prisma.clienteVendedor.findMany({
+      where: { VendedorID: vendedorID },
+      select: { ClienteID: true }
+    });
+
+    console.log(`Encontrados ${clientesVendedor.length} clientes do vendedor para distribuição`);
+
+    if (clientesVendedor.length === 0) {
+      console.log('Nenhum cliente encontrado para este vendedor');
+      return;
+    }
+
+    // Criar entradas na tabela CupomCliente
+    const cuponsClienteParaCriar = clientesVendedor.map(cliente => ({
+      CupomID: cupomID,
+      ClienteID: cliente.ClienteID,
+      DisponivelParaResgate: true,
+      DataExpiracaoCliente: dataExpiracao ? new Date(dataExpiracao) : null
+    }));
+
+    await prisma.cupomCliente.createMany({
+      data: cuponsClienteParaCriar,
+      skipDuplicates: true
+    });
+
+    console.log(`Distribuição assíncrona do cupom ${cupomID} para vendedor concluída com sucesso`);
+
+  } catch (error) {
+    console.error('Erro geral na distribuição assíncrona do cupom para vendedor:', error);
+  }
+};
+
 // Criar cupom
 const criarCupom = async (req, res) => {
   try {
+    console.log('Iniciando criação de cupom:', req.body);
+
     const {
       codigo,
       descricao,
@@ -22,33 +128,10 @@ const criarCupom = async (req, res) => {
     } = req.body;
 
     const vendedorID = req.vendorId;
+    console.log('VendedorID:', vendedorID);
 
-    // Se for VENDEDOR_ESPECIFICO, buscar clientes do vendedor e definir limiteUso baseado no número de clientes
-    let limiteUsoFinal = limiteUso ? parseInt(limiteUso) : null;
-    let clientesElegiveisFinal = clientesElegiveis || [];
-
-    if (tipoDistribuicao === 'VENDEDOR_ESPECIFICO') {
-      // Buscar todos os clientes associados ao vendedor
-      const clientesVendedor = await prisma.clienteVendedor.findMany({
-        where: { VendedorID: vendedorID },
-        select: { ClienteID: true }
-      });
-
-      const clienteIDs = clientesVendedor.map(cv => cv.ClienteID.toString());
-
-      // Se não especificou clientes elegíveis, usar todos os clientes do vendedor
-      if (!clientesElegiveis || clientesElegiveis.length === 0) {
-        clientesElegiveisFinal = clienteIDs;
-      } else {
-        // Filtrar apenas clientes que são do vendedor
-        clientesElegiveisFinal = clientesElegiveis.filter(id => clienteIDs.includes(id));
-      }
-
-      // Definir limite de uso baseado no número de clientes elegíveis
-      if (!limiteUsoFinal) {
-        limiteUsoFinal = clientesElegiveisFinal.length;
-      }
-    }
+    // Simplificar: apenas criar cupom básico sem lógica de distribuição complexa
+    console.log('Criando cupom básico...');
 
     const cupom = await prisma.cupom.create({
       data: {
@@ -57,12 +140,12 @@ const criarCupom = async (req, res) => {
         TipoDesconto: tipoDesconto,
         ValorDesconto: parseFloat(valorDesconto),
         ValorMinimo: valorMinimo ? parseFloat(valorMinimo) : 0,
-        LimiteUso: limiteUsoFinal,
+        LimiteUso: limiteUso ? parseInt(limiteUso) : null,
         DataExpiracao: dataExpiracao ? new Date(dataExpiracao) : null,
         VendedorID: vendedorID,
         AplicavelProdutos: aplicavelProdutos || false,
         AplicavelCategorias: aplicavelCategorias || false,
-        ClientesElegiveis: clientesElegiveisFinal,
+        ClientesElegiveis: clientesElegiveis || [],
         TipoCliente: tipoCliente,
         ProdutosElegiveis: produtosElegiveis || [],
         CategoriasElegiveis: categoriasElegiveis || [],
@@ -71,6 +154,15 @@ const criarCupom = async (req, res) => {
       }
     });
 
+    console.log('Cupom criado com sucesso:', cupom.CupomID);
+
+    // Distribuir cupons de forma assíncrona
+    if (tipoDistribuicao === 'PUBLICO') {
+      distribuirCupomPublicoAsync(cupom.CupomID, dataExpiracao);
+    } else if (tipoDistribuicao === 'VENDEDOR_ESPECIFICO') {
+      distribuirCupomVendedorAsync(cupom.CupomID, vendedorID, dataExpiracao);
+    }
+
     res.status(201).json({
       success: true,
       message: 'Cupom criado com sucesso',
@@ -78,6 +170,7 @@ const criarCupom = async (req, res) => {
     });
   } catch (error) {
     console.error('Erro ao criar cupom:', error);
+    console.error('Stack trace:', error.stack);
     if (error.code === 'P2002') {
       return res.status(400).json({
         success: false,
@@ -86,7 +179,7 @@ const criarCupom = async (req, res) => {
     }
     res.status(500).json({
       success: false,
-      message: 'Erro interno do servidor'
+      message: 'Erro interno do servidor: ' + error.message
     });
   }
 };
@@ -231,6 +324,29 @@ const atualizarCupom = async (req, res) => {
       if (!limiteUsoFinal) {
         limiteUsoFinal = clientesElegiveisFinal.length;
       }
+    } else if (tipoDistribuicao === 'PUBLICO') {
+      // Para cupons PUBLICOS, buscar todos os clientes pessoa física
+      try {
+        const clientesFisicos = await prisma.cliente.findMany({
+          where: {
+            TipoPessoa: 'Física', // Usar exatamente o valor que está no banco
+            Ativo: true
+          },
+          select: { ClienteID: true }
+        });
+
+        clientesElegiveisFinal = clientesFisicos.map(c => c.ClienteID.toString());
+
+        // Definir limite de uso baseado no número de clientes elegíveis
+        if (!limiteUsoFinal) {
+          limiteUsoFinal = clientesElegiveisFinal.length;
+        }
+      } catch (error) {
+        console.error('Erro ao buscar clientes físicos:', error);
+        // Fallback: definir lista vazia
+        clientesElegiveisFinal = [];
+        limiteUsoFinal = limiteUso || 100;
+      }
     }
 
     const cupomAtualizado = await prisma.cupom.update({
@@ -253,6 +369,15 @@ const atualizarCupom = async (req, res) => {
         TipoDistribuicao: tipoDistribuicao || cupom.TipoDistribuicao
       }
     });
+
+    // Redistribuir se necessário (apenas se o tipo mudou ou foi reativado)
+    if (ativo && tipoDistribuicao !== cupom.TipoDistribuicao) {
+      if (tipoDistribuicao === 'PUBLICO') {
+        distribuirCupomPublicoAsync(cupomAtualizado.CupomID, dataExpiracao);
+      } else if (tipoDistribuicao === 'VENDEDOR_ESPECIFICO') {
+        distribuirCupomVendedorAsync(cupomAtualizado.CupomID, vendedorID, dataExpiracao);
+      }
+    }
 
     res.json({
       success: true,
@@ -374,7 +499,132 @@ const distribuirCupom = async (req, res) => {
   }
 };
 
-// Listar cupons disponíveis para resgate (cliente)
+// Listar cupons disponíveis para o usuário logado (nova lógica)
+const listarCuponsPublicos = async (req, res) => {
+  try {
+    const clienteID = req.user.id;
+    const { search, vendedor } = req.query;
+
+    // Verificar se o usuário é pessoa física
+    const cliente = await prisma.cliente.findUnique({
+      where: { ClienteID: clienteID },
+      select: { TipoPessoa: true, Ativo: true }
+    });
+
+    if (!cliente || !cliente.Ativo || cliente.TipoPessoa !== 'Física') {
+      return res.json({
+        success: true,
+        data: []
+      });
+    }
+
+    // Buscar vendedores com os quais o usuário já fez pedidos
+    const vendedoresComPedidos = await prisma.pedido.findMany({
+      where: { ClienteID: clienteID },
+      select: {
+        itensPedido: {
+          select: {
+            produto: {
+              select: {
+                VendedorID: true
+              }
+            }
+          },
+          distinct: ['produto.VendedorID']
+        }
+      }
+    });
+
+    // Extrair IDs únicos dos vendedores
+    const vendedorIDs = [...new Set(
+      vendedoresComPedidos
+        .flatMap(pedido => pedido.itensPedido)
+        .map(item => item.produto?.VendedorID)
+        .filter(id => id)
+    )];
+
+    console.log('Vendedores com pedidos do cliente:', vendedorIDs);
+
+    // Construir query para cupons
+    let whereCondition = {
+      Ativo: true,
+      OR: [
+        { DataExpiracao: null },
+        { DataExpiracao: { gt: new Date() } }
+      ],
+      OR: [
+        { TipoDistribuicao: 'PUBLICO' },
+        {
+          TipoDistribuicao: 'VENDEDOR_ESPECIFICO',
+          VendedorID: { in: vendedorIDs }
+        }
+      ]
+    };
+
+    // Adicionar filtros de busca
+    if (search) {
+      whereCondition.AND = {
+        OR: [
+          { Codigo: { contains: search, mode: 'insensitive' } },
+          { Descricao: { contains: search, mode: 'insensitive' } }
+        ]
+      };
+    }
+
+    if (vendedor) {
+      whereCondition.VendedorID = parseInt(vendedor);
+    }
+
+    const cupons = await prisma.cupom.findMany({
+      where: whereCondition,
+      include: {
+        vendedor: {
+          select: {
+            Nome: true,
+            EmpresaID: true,
+            empresa: {
+              select: {
+                Nome: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { CriadoEm: 'desc' }
+    });
+
+    // Formatar resposta
+    const cuponsFormatados = cupons.map(cupom => ({
+      id: cupom.CupomID,
+      codigo: cupom.Codigo,
+      tipo: cupom.TipoDistribuicao,
+      desconto: cupom.ValorDesconto,
+      tipoDesconto: cupom.TipoDesconto,
+      dataExpiracao: cupom.DataExpiracao,
+      descricao: cupom.Descricao,
+      valorMinimo: cupom.ValorMinimo,
+      vendedor: {
+        id: cupom.VendedorID,
+        nome: cupom.vendedor?.Nome || 'Vendedor',
+        empresa: cupom.vendedor?.empresa?.Nome || null
+      }
+    }));
+
+    res.json({
+      success: true,
+      data: cuponsFormatados
+    });
+
+  } catch (error) {
+    console.error('Erro ao listar cupons públicos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro interno do servidor'
+    });
+  }
+};
+
+// Manter o endpoint antigo para compatibilidade
 const listarCuponsDisponiveis = async (req, res) => {
   try {
     const clienteID = req.user.id;
