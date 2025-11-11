@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { clienteService } from '../../services/api';
 import OrderDetailsModal from '../../components/OrderDetailsModal';
+import ProductDetailsModal from '../../components/ProductDetailsModal';
 
 // Constantes do vendedor
 const VENDOR_INFO = {
@@ -64,6 +65,8 @@ function OrdersPage() {
   const [selectedSeller, setSelectedSeller] = useState(null);
   const [orderModalId, setOrderModalId] = useState(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
+  const [productModalId, setProductModalId] = useState(null);
+  const [showProductModal, setShowProductModal] = useState(false);
   const { logout } = useAuth();
 
   // Logo configuration
@@ -119,7 +122,8 @@ function OrdersPage() {
           parcelas: pedido.Parcelas || 1,
           valorParcela: pedido.Parcelas ? (totalFinal / pedido.Parcelas) : totalFinal,
           items: pedido.itensPedido?.map(item => ({
-            id: item.ItemPedidoID,
+            id: item.produto?.ProdutoID || item.ItemPedidoID,
+            itemId: item.ItemPedidoID,
             name: item.produto?.Nome || 'Produto não informado',
             sku: item.produto?.SKU || '',
             quantity: item.Quantidade || 0,
@@ -503,7 +507,15 @@ function OrdersPage() {
                                         }}
                                       />
                                       <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-slate-900 truncate">{item.name}</p>
+                                        <button
+                                          onClick={() => {
+                                            setProductModalId(item.id);
+                                            setShowProductModal(true);
+                                          }}
+                                          className="text-sm font-medium text-blue-600 hover:text-blue-800 truncate block text-left"
+                                        >
+                                          {item.name}
+                                        </button>
                                         <p className="text-xs text-slate-600">Qtd: {item.quantity} • {formatPrice(item.price * item.quantity)}</p>
                                       </div>
                                     </div>
@@ -550,7 +562,17 @@ function OrdersPage() {
                         </div>
                         <div>
                           <p className="font-medium text-slate-900 mb-1">Método de pagamento</p>
-                          <p className="text-slate-600">{order.paymentMethods?.[0]?.metodo || 'Não informado'}</p>
+                          {order.paymentMethods && order.paymentMethods.length > 0 ? (
+                            <div className="space-y-1">
+                              {order.paymentMethods.map((method, index) => (
+                                <p key={index} className="text-slate-600 text-sm">
+                                  {method.metodo} - {formatPrice(method.valor)}
+                                </p>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-slate-600">Não informado</p>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -625,6 +647,16 @@ function OrdersPage() {
         onClose={() => {
           setShowOrderModal(false);
           setOrderModalId(null);
+        }}
+      />
+
+      {/* Product Details Modal */}
+      <ProductDetailsModal
+        productId={productModalId}
+        isOpen={showProductModal}
+        onClose={() => {
+          setShowProductModal(false);
+          setProductModalId(null);
         }}
       />
 

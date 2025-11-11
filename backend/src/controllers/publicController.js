@@ -1,6 +1,7 @@
 // backend/src/controllers/publicController.js
 import prisma from "../config/prisma.js";
 import { logger } from '../utils/logger.js';
+import removerAcentos from "remove-accents";
 
 const logControllerError = (operation, error, req) => {
   logger.error(`public_controller_${operation}_error`, {
@@ -78,12 +79,15 @@ export const obterDepoimentos = async (req, res) => {
     });
 
     // Formatar para o frontend
-    const depoimentosFormatados = depoimentos.map(dep => ({
-      nome: dep.cliente.NomeCompleto,
-      comentario: dep.Comentario,
-      estrelas: 5,
-      tipo: dep.cliente.TipoPessoa === 'JURIDICA' ? 'Pessoa Jurídica' : 'Pessoa Física'
-    }));
+    const depoimentosFormatados = depoimentos.map(dep => {
+      const tipoPessoaNorm = removerAcentos((dep.cliente.TipoPessoa || '')).toUpperCase();
+      return {
+        nome: dep.cliente.NomeCompleto,
+        comentario: dep.Comentario,
+        estrelas: 5,
+        tipo: tipoPessoaNorm === 'JURIDICA' ? 'Pessoa Jurídica' : 'Pessoa Física'
+      };
+    });
 
     // Se não houver depoimentos, retornar mensagem padrão
     if (depoimentosFormatados.length === 0) {
