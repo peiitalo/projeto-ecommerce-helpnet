@@ -16,9 +16,6 @@ vendorRoutes.get('/:id', cupomController.buscarCupomPorId);
 vendorRoutes.put('/:id', cupomController.atualizarCupom);
 vendorRoutes.delete('/:id', cupomController.deletarCupom);
 
-// Distribuição de cupons (vendedores)
-vendorRoutes.post('/distribuir', cupomController.distribuirCupom);
-
 // Aplicar rotas de vendedor
 router.use('/vendedor', vendorRoutes);
 

@@ -437,35 +437,35 @@ model PasswordResetToken {
 
 model Cupom {
   CupomID           Int           @id @default(autoincrement())
-  Codigo            String        @unique
-  Descricao         String?
-  TipoDesconto      TipoDesconto
-  ValorDesconto     Float
-  ValorMinimo       Float?        @default(0)
-  LimiteUso         Int?
-  UsosAtuais        Int           @default(0)
-  DataExpiracao     DateTime?
-  Ativo             Boolean       @default(true)
-  VendedorID        Int
-  CriadoEm          DateTime      @default(now())
-  // Novos campos para regras avançadas
-  AplicavelProdutos Boolean       @default(false) // Se aplica apenas a produtos específicos
-  AplicavelCategorias Boolean    @default(false) // Se aplica apenas a categorias específicas
-  ClientesElegiveis String[]     @default([]) // Lista de ClienteIDs elegíveis (vazio = todos)
-  TipoCliente       String?       // 'NOVO', 'ANIVERSARIANTE', etc.
-  ProdutosElegiveis Int[]         @default([]) // Lista de ProdutoIDs
-  CategoriasElegiveis Int[]       @default([]) // Lista de CategoriaIDs
-  LimiteUsoPorCliente Int?        @default(1) // Máximo de usos por cliente
-  TipoDistribuicao  TipoDistribuicao @default(PUBLICO) // PUBLICO ou VENDEDOR_ESPECIFICO
+  // Campos básicos
+  Nome               String        // Nome do cupom (ex: "Desconto de Frete")
+  Codigo             String        @unique // Código único (ex: FRETE50)
+  Tipo               String        @default("publico") // "publico" ou "especifico"
+  DescontoTipo       String        // "porcentagem", "valor_fixo", "frete_gratis"
+  DescontoValor      Float         // Valor do desconto
+  DataInicio         DateTime      @default(now()) // Quando o cupom começa a valer
+  DataExpiracao      DateTime?     // Quando expira
+  LimiteUso          Int?          // Quantas vezes pode ser usado no total
+  UsoPorCliente      Int?          @default(1) // Quantas vezes cada cliente pode usar
+  Ativo              Boolean       @default(true) // Se está ativo
+  CriadoPor          Int           // ID do vendedor que criou
+  CriadoEm           DateTime      @default(now())
 
-  vendedor      Vendedor      @relation(fields: [VendedorID], references: [VendedorID])
-  cuponsCliente CupomCliente[]
-  pedidos       Pedido[]      // Pedidos que usaram este cupom
+  // Sistema de restrições (objeto JSON)
+  Restricoes         Json?         // Objeto com todas as restrições configuráveis
 
-  @@index([VendedorID])
+  // Controle de uso
+  UsosAtuais         Int           @default(0) // Contador total de usos
+
+  // Relações
+  vendedor           Vendedor      @relation(fields: [CriadoPor], references: [VendedorID])
+  cuponsCliente      CupomCliente[]
+  pedidos            Pedido[]      // Pedidos que usaram este cupom
+
+  @@index([CriadoPor])
   @@index([Ativo])
   @@index([DataExpiracao])
-  @@index([TipoDistribuicao])
+  @@index([Tipo])
   @@map("Cupom")
 }
 
@@ -473,16 +473,16 @@ model CupomCliente {
   CupomClienteID Int      @id @default(autoincrement())
   CupomID        Int
   ClienteID      Int
-  // Controle de distribuição e resgate
-  DisponivelParaResgate Boolean   @default(false) // Se o cupom está disponível para este cliente resgatar
-  Resgatado             Boolean   @default(false) // Se o cliente já resgatou o cupom
-  DataResgate           DateTime? // Quando o cliente resgatou
-  DataExpiracaoCliente  DateTime? // Quando expira especificamente para este cliente
+  // Controle de distribuição
+  RecebidoEm     DateTime @default(now()) // Quando o cliente recebeu o cupom
+  // Controle de resgate
+  Resgatado      Boolean  @default(false) // Se o cliente já resgatou o cupom
+  DataResgate    DateTime? // Quando o cliente resgatou
   // Controle de uso
-  Usado                 Boolean   @default(false)
-  DataUso               DateTime?
-  PedidoID              Int?
-  UsosCliente           Int      @default(0) // Contador de usos por cliente para este cupom
+  Usado          Boolean  @default(false) // Se já foi usado
+  DataUso        DateTime? // Quando foi usado
+  PedidoID       Int?     // Pedido onde foi usado
+  UsosCliente    Int      @default(0) // Contador de usos por cliente
 
   cupom    Cupom   @relation(fields: [CupomID], references: [CupomID])
   cliente  Cliente @relation(fields: [ClienteID], references: [ClienteID])
@@ -492,9 +492,8 @@ model CupomCliente {
   @@index([CupomID])
   @@index([ClienteID])
   @@index([PedidoID])
-  @@index([DisponivelParaResgate])
   @@index([Resgatado])
-  @@index([DataExpiracaoCliente])
+  @@index([Usado])
   @@map("CupomCliente")
 }
 
