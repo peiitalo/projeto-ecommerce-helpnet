@@ -11,7 +11,7 @@ function VendorCuponsPage() {
   const [editingCoupon, setEditingCoupon] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const { showSuccess } = useNotifications();
+  const { showSuccess, showError } = useNotifications();
 
   // Load coupons from API
   useEffect(() => {
@@ -135,12 +135,13 @@ function VendorCuponsPage() {
 
         if (response.ok) {
           setCoupons(prev => prev.filter(c => c.id !== couponId));
+          showSuccess('Cupom excluído com sucesso!');
         } else {
-          alert('Erro ao excluir cupom');
+          showError('Erro ao excluir cupom');
         }
       } catch (error) {
         console.error('Erro ao excluir cupom:', error);
-        alert('Erro ao excluir cupom');
+        showError('Erro ao excluir cupom');
       }
     }
   };
@@ -167,12 +168,13 @@ function VendorCuponsPage() {
         setCoupons(prev => prev.map(c =>
           c.id === couponId ? { ...c, active: !c.active } : c
         ));
+        showSuccess(`Cupom ${coupon.active ? 'desativado' : 'ativado'} com sucesso!`);
       } else {
-        alert('Erro ao alterar status do cupom');
+        showError('Erro ao alterar status do cupom');
       }
     } catch (error) {
       console.error('Erro ao alterar status:', error);
-      alert('Erro ao alterar status do cupom');
+      showError('Erro ao alterar status do cupom');
     }
   };
 
@@ -220,15 +222,16 @@ function VendorCuponsPage() {
           await loadCoupons(); // Recarregar lista
           setShowCreateModal(false);
           setEditingCoupon(null);
+          showSuccess(editingCoupon ? 'Cupom atualizado com sucesso!' : 'Cupom criado com sucesso!');
         } else {
-          alert('Erro: ' + result.message);
+          showError('Erro: ' + result.message);
         }
       } else {
-        alert('Erro ao salvar cupom');
+        showError('Erro ao salvar cupom');
       }
     } catch (error) {
       console.error('Erro ao salvar cupom:', error);
-      alert('Erro ao salvar cupom');
+      showError('Erro ao salvar cupom');
     }
   };
 

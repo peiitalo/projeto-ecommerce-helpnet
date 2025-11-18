@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCounters } from '../../context/CountersContext';
-import { useCart } from '../../context/CartContext';
 import { useNotifications } from '../../hooks/useNotifications';
 import {
   FaUser,
@@ -37,9 +36,8 @@ function MeusCuponsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const { favoritesCount, notificationsCount, cartCount } = useCounters();
-  const { applyCoupon } = useCart();
   const { showSuccess, showError } = useNotifications();
   const navigate = useNavigate();
 
@@ -62,78 +60,49 @@ function MeusCuponsPage() {
     { label: 'Configurações', to: '/configuracoes', icon: <FiSettings className="text-slate-500" /> },
   ];
 
-  // Carregar cupons disponíveis e resgatados
+  // Carregar cupons recebidos
   useEffect(() => {
     const loadCoupons = async () => {
       try {
         const token = localStorage.getItem('accessToken');
         console.log('Frontend Debug - Token:', token ? 'present' : 'missing');
 
-        // Buscar cupons disponíveis para resgate
-        const availableResponse = await fetch('/api/cupons/disponiveis', {
+        // Buscar TODOS os cupons do cliente (disponíveis E resgatados)
+        const meusCuponsResponse = await fetch('/api/cupons/meus', {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
         });
 
-        let availableCoupons = [];
-        if (availableResponse.ok) {
-          const data = await availableResponse.json();
-          console.log('Frontend Debug - Available coupons response:', data);
-          if (data.success) {
-            availableCoupons = data.data.map(cupomCliente => ({
-              id: cupomCliente.CupomClienteID,
-              code: cupomCliente.cupom.Codigo,
-              discount: cupomCliente.cupom.ValorDesconto,
-              type: cupomCliente.cupom.TipoDesconto === 'PERCENTUAL' ? 'percentage' :
-                    cupomCliente.cupom.TipoDesconto === 'FRETE_GRATIS' ? 'free_shipping' : 'fixed',
-              description: cupomCliente.cupom.Descricao,
-              validUntil: cupomCliente.DataExpiracaoCliente || cupomCliente.cupom.DataExpiracao,
-              used: false, // Cupons disponíveis não foram usados ainda
-              minValue: cupomCliente.cupom.ValorMinimo,
-              status: 'available', // Disponível para resgate
-              canRedeem: !cupomCliente.Resgatado
+        let allCoupons = [];
+        if (meusCuponsResponse.ok) {
+          const data = await meusCuponsResponse.json();
+          console.log('Frontend Debug - Meus cupons response:', data);
+          if (data.success && data.data.length > 0) {
+            allCoupons = data.data.map(cupomCliente => ({
+              id: cupomCliente.id,
+              code: cupomCliente.code,
+              discount: cupomCliente.discount,
+              type: cupomCliente.type,
+              description: cupomCliente.description,
+              validUntil: cupomCliente.validUntil,
+              used: cupomCliente.used,
+              minValue: cupomCliente.minValue,
+              status: cupomCliente.status,
+              redeemedAt: cupomCliente.redeemedAt,
+              usedAt: cupomCliente.usedAt,
+              canRedeem: cupomCliente.canRedeem,
+              vendedor: cupomCliente.vendedor,
+              restricoes: cupomCliente.restricoes
             }));
           }
         } else {
-          console.log('Frontend Debug - Available coupons failed:', availableResponse.status, await availableResponse.text());
+          console.log('Frontend Debug - Meus cupons failed:', meusCuponsResponse.status, await meusCuponsResponse.text());
         }
 
-        // Buscar cupons já resgatados (usados ou não)
-        const redeemedResponse = await fetch('/api/cupons/meus', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        let redeemedCoupons = [];
-        if (redeemedResponse.ok) {
-          const data = await redeemedResponse.json();
-          console.log('Frontend Debug - Redeemed coupons response:', data);
-          if (data.success) {
-            redeemedCoupons = data.data.map(cupomCliente => ({
-              id: cupomCliente.CupomClienteID,
-              code: cupomCliente.cupom.Codigo,
-              discount: cupomCliente.cupom.ValorDesconto,
-              type: cupomCliente.cupom.TipoDesconto === 'PERCENTUAL' ? 'percentage' :
-                    cupomCliente.cupom.TipoDesconto === 'FRETE_GRATIS' ? 'free_shipping' : 'fixed',
-              description: cupomCliente.cupom.Descricao,
-              validUntil: cupomCliente.DataExpiracaoCliente || cupomCliente.cupom.DataExpiracao,
-              used: cupomCliente.Usado,
-              minValue: cupomCliente.cupom.ValorMinimo,
-              status: cupomCliente.Usado ? 'used' : 'redeemed', // Resgatado mas não usado ainda
-              redeemedAt: cupomCliente.DataResgate,
-              usedAt: cupomCliente.DataUso
-            }));
-          }
-        } else {
-          console.log('Frontend Debug - Redeemed coupons failed:', redeemedResponse.status, await redeemedResponse.text());
-        }
-
-        // Combinar e ordenar cupons
-        const allCoupons = [...availableCoupons, ...redeemedCoupons].sort((a, b) => {
+        // Ordenar cupons
+        const sortedCoupons = allCoupons.sort((a, b) => {
           // Ordenar por status: disponíveis primeiro, depois resgatados, depois usados
           const statusOrder = { 'available': 0, 'redeemed': 1, 'used': 2 };
           if (statusOrder[a.status] !== statusOrder[b.status]) {
@@ -143,7 +112,8 @@ function MeusCuponsPage() {
           return new Date(a.validUntil) - new Date(b.validUntil);
         });
 
-        setCoupons(allCoupons);
+        console.log('Frontend Debug - Final coupons array:', sortedCoupons);
+        setCoupons(sortedCoupons);
       } catch (error) {
         console.error('Erro ao carregar cupons:', error);
         // Fallback para dados mock se a API falhar
@@ -196,6 +166,9 @@ function MeusCuponsPage() {
         const data = await response.json();
         if (data.success) {
           showSuccess('Cupom resgatado com sucesso!');
+          // Copiar código para área de transferência
+          navigator.clipboard.writeText(data.data.cupom.Codigo);
+          showSuccess('Código copiado para a área de transferência!');
           // Recarregar cupons
           window.location.reload();
         } else {
@@ -213,6 +186,9 @@ function MeusCuponsPage() {
   const formatDiscount = (coupon) => {
     if (coupon.type === 'free_shipping') {
       return 'Frete Grátis';
+    }
+    if (coupon.type === 'fixed') {
+      return `R$ ${coupon.discount} OFF`;
     }
     return `${coupon.discount}% OFF`;
   };
@@ -415,23 +391,16 @@ function MeusCuponsPage() {
                 {coupons.map((coupon) => (
                   <div
                     key={coupon.id}
-                    className={`bg-white border rounded-lg p-6 transition-all ${
-                      coupon.used || isExpired(coupon.validUntil)
-                        ? 'border-slate-200 opacity-60'
-                        : 'border-slate-200 hover:border-blue-300 hover:shadow-sm'
-                    }`}
+                    className="bg-white border border-slate-200 rounded-lg p-6 hover:border-blue-300 hover:shadow-sm transition-all"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <FaTicketAlt className={`text-lg ${
-                            coupon.used || isExpired(coupon.validUntil) ? 'text-slate-400' : 'text-blue-600'
-                          }`} />
-                          <h3 className={`font-semibold text-lg ${
-                            coupon.used || isExpired(coupon.validUntil) ? 'text-slate-500' : 'text-slate-900'
-                          }`}>
+                          <FaTicketAlt className="text-lg text-blue-600" />
+                          <h3 className="font-semibold text-lg text-slate-900">
                             {formatDiscount(coupon)}
                           </h3>
+                        <div className="flex gap-2">
                           {coupon.status === 'used' && (
                             <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full">
                               Utilizado
@@ -453,58 +422,59 @@ function MeusCuponsPage() {
                             </span>
                           )}
                         </div>
-                        <p className={`text-sm mb-2 ${
-                          coupon.used || isExpired(coupon.validUntil) ? 'text-slate-400' : 'text-slate-600'
-                        }`}>
+                        </div>
+                        <p className="text-sm mb-2 text-slate-600">
                           {coupon.description}
                         </p>
-                        <div className="flex items-center gap-4 text-sm text-slate-500">
-                          <span className="flex items-center gap-1">
+                        <div className="flex flex-col gap-1 text-sm text-slate-500">
+                          <div className="flex items-center gap-1">
                             <FaCalendarAlt />
                             Válido até {new Date(coupon.validUntil).toLocaleDateString('pt-BR')}
-                          </span>
+                          </div>
                           {coupon.minValue > 0 && (
-                            <span>Compra mínima: R$ {coupon.minValue}</span>
+                            <div>Compra mínima: R$ {coupon.minValue}</div>
+                          )}
+                          {coupon.restricoes?.quantidade_minima_itens && (
+                            <div>Mínimo {coupon.restricoes.quantidade_minima_itens} itens</div>
+                          )}
+                          {coupon.restricoes?.frete_gratis_acima && (
+                            <div>Frete grátis acima de R$ {coupon.restricoes.frete_gratis_acima}</div>
                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 ml-4">
-                        <span className={`font-mono text-lg font-bold px-3 py-2 rounded border ${
-                          coupon.used || isExpired(coupon.validUntil)
-                            ? 'border-slate-200 text-slate-400 bg-slate-50'
-                            : 'border-blue-200 text-blue-700 bg-blue-50'
-                        }`}>
+                        <span className="font-mono text-lg font-bold px-3 py-2 rounded border border-blue-200 text-blue-700 bg-blue-50">
                           {coupon.code}
                         </span>
-                        {coupon.status === 'available' && !isExpired(coupon.validUntil) && (
+                      {coupon.status === 'available' && !isExpired(coupon.validUntil) && (
+                        <button
+                          onClick={() => redeemCoupon(coupon.id)}
+                          className="px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                          title="Resgatar cupom"
+                        >
+                          Resgatar
+                        </button>
+                      )}
+                      {coupon.status === 'redeemed' && !coupon.used && !isExpired(coupon.validUntil) && (
+                        <div className="flex gap-2">
                           <button
-                            onClick={() => redeemCoupon(coupon.id)}
-                            className="px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
-                            title="Resgatar cupom"
+                            onClick={() => copyToClipboard(coupon.code)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Copiar código"
                           >
-                            Resgatar
+                            <FaCopy />
                           </button>
-                        )}
-                        {coupon.status === 'redeemed' && !coupon.used && !isExpired(coupon.validUntil) && (
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => copyToClipboard(coupon.code)}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                              title="Copiar código"
-                            >
-                              <FaCopy />
-                            </button>
-                            <button
-                              onClick={() => {
-                                navigate('/carrinho');
-                              }}
-                              className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-                              title="Usar no carrinho"
-                            >
-                              Usar
-                            </button>
-                          </div>
-                        )}
+                          <button
+                            onClick={() => {
+                              navigate('/carrinho');
+                            }}
+                            className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                            title="Usar no carrinho"
+                          >
+                            Usar
+                          </button>
+                        </div>
+                      )}
                       </div>
                     </div>
                   </div>
