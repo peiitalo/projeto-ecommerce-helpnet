@@ -224,10 +224,12 @@ export function CartProvider({ children }) {
       return;
     }
 
-    // Verificar se todos os produtos têm frete grátis
-    const todosFreteGratis = itemsParaCalculo.every(item => item.freeShipping);
-    
-    if (todosFreteGratis) {
+    // Filtrar apenas produtos que NÃO têm frete grátis para cálculo
+    const produtosQuePagamFrete = itemsParaCalculo.filter(item => !item.freeShipping);
+    const idsProdutosQuePagamFrete = produtosQuePagamFrete.map(item => item.id);
+
+    // Se nenhum produto paga frete (todos têm frete grátis), mostrar frete grátis
+    if (produtosQuePagamFrete.length === 0) {
       const freteGratisOption = {
         id: 'frete-gratis',
         nome: 'Frete Grátis',
@@ -243,11 +245,12 @@ export function CartProvider({ children }) {
       return;
     }
 
+    // Se alguns produtos têm frete grátis, calcular apenas para os que pagam
     setFreightLoading(true);
     setFreightError(null);
 
     try {
-      const freteResult = await freteService.calcular(user.id, enderecoId, idsParaCalculo);
+      const freteResult = await freteService.calcular(user.id, enderecoId, idsProdutosQuePagamFrete);
 
       const options = freteResult.opcoes || [];
       setFreightOptions(options);
@@ -269,7 +272,17 @@ export function CartProvider({ children }) {
   };
 
   const count = useMemo(() => items.length, [items]); // Conta itens únicos
-  const subtotal = useMemo(() => items.reduce((sum, i) => sum + (i.price * (i.quantity || 0)), 0), [items]);
+
+  // Calcular subtotal considerando descontos por produto
+  const subtotal = useMemo(() => {
+    return items.reduce((sum, i) => {
+      const price = i.price || 0;
+      const discount = i.discount || 0;
+      const discountedPrice = price * (1 - discount / 100); // Aplicar desconto percentual
+      return sum + (discountedPrice * (i.quantity || 0));
+    }, 0);
+  }, [items]);
+
   const freight = useMemo(() => selectedFreight || { valor: 0, prazo: '', nome: '' }, [selectedFreight]);
   
   // Aplicar cupom

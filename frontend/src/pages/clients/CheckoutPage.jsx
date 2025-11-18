@@ -337,9 +337,13 @@ function CheckoutPage() {
     const method = paymentMethods.find(m => m.id === methodId);
     if (!method || discountApplied[methodId]) return;
 
-    const cashPrice = calculateCashPrice(method.amount);
+    const originalAmount = method.amount;
+    const cashPrice = calculateCashPrice(originalAmount);
+
+    // Aplicar o desconto diretamente no método de pagamento
     updatePaymentAmount(methodId, cashPrice.final);
     setDiscountApplied(prev => ({ ...prev, [methodId]: true }));
+
     showSuccess(`Desconto de ${cashPrice.discountPercent}% aplicado! Preço à vista: R$ ${cashPrice.final.toFixed(2)}`);
   };
 
@@ -404,7 +408,7 @@ function CheckoutPage() {
     });
   };
 
-  // Calcular total dos pagamentos
+  // Calcular total dos pagamentos (os valores já incluem descontos aplicados)
   const calcularTotalPagamentos = () => {
     return paymentMethods.reduce((total, method) => total + method.amount, 0);
   };
@@ -446,23 +450,21 @@ function CheckoutPage() {
 
     if (endereco) {
       const selectedItemIds = getSelectedItems();
-      // Calcular frete usando apenas os itens selecionados
       await calculateFreight(endereco.EnderecoID, selectedItemIds);
 
-      // Recalcular dados do pedido
+      // Recalcular dados do pedido usando os valores calculados do CartContext
       const selectedItems = items.filter(item => selectedItemIds.includes(item.id));
-      const selectedSubtotal = selectedItems.reduce((total, item) => total + (item.price * item.quantity), 0);
 
       setOrderData({
         items: selectedItems,
-        subtotal: selectedSubtotal,
+        subtotal: subtotal, // Usar o subtotal calculado do CartContext (com descontos aplicados)
         frete: freight.valor,
-        total: selectedSubtotal + freight.valor
+        total: total // Usar o total calculado do CartContext
       });
 
       // Ajustar valor do pagamento para o novo total (se apenas 1 método ativo)
       if (paymentMethods.length === 1) {
-        setPaymentMethods(prev => prev.map(method => ({ ...method, amount: selectedSubtotal + freight.valor })));
+        setPaymentMethods(prev => prev.map(method => ({ ...method, amount: total })));
       }
     }
   };
@@ -512,9 +514,10 @@ function CheckoutPage() {
         })),
         metodosPagamento: metodosComValor.map(method => ({
           tipo: method.type,
-          valor: method.amount
+          valor: method.amount, // Já inclui desconto à vista se aplicado
+          descontoAplicado: discountApplied[method.id] || false
         })),
-        frete: selectedFreight ? selectedFreight.valor : 0,
+        frete: selectedFreight ? selectedFreight.valor : 0, // O frete já é calculado apenas para produtos que não têm frete grátis
         observacoes: '',
         cupomCodigo: couponApplied?.Codigo
       };
@@ -877,23 +880,52 @@ function CheckoutPage() {
                         <div className="flex-1">
                           <h3 className="font-medium text-slate-900">{item.name}</h3>
                           <p className="text-sm text-slate-600">Quantidade: {item.quantity}</p>
+                          {/* Mostrar desconto e/ou frete gratis */}
+                          {(() => {
+                            const discountValue = Number(item.discount) || 0;
+                            const hasFreeShipping = Boolean(item.freeShipping);
+
+                            if (discountValue > 0 && hasFreeShipping) {
+                              return <p className="text-sm text-purple-600 font-medium">frete e desconto</p>;
+                            } else if (discountValue > 0) {
+                              return <p className="text-sm text-green-600 font-medium">Desconto {discountValue}%</p>;
+                            } else if (hasFreeShipping) {
+                              return <p className="text-sm text-blue-600 font-medium">frete gratis</p>;
+                            }
+                            return null;
+                          })()}
                         </div>
                         <div className="text-right">
-                          {item.discount > 0 ? (
-                            <div>
-                              <p className="font-semibold text-green-600">{formatPrice(item.price * item.quantity)}</p>
-                              <p className="text-sm text-slate-400 line-through">{formatPrice(item.originalPrice * item.quantity)}</p>
-                              <p className="text-xs text-green-600">{item.discount}% OFF</p>
-                            </div>
-                          ) : (
-                            <div>
-                              <p className="font-semibold text-slate-900">{formatPrice(item.price * item.quantity)}</p>
-                              <p className="text-sm text-slate-600">{formatPrice(item.price)} cada</p>
-                            </div>
-                          )}
-                          {item.freeShipping && (
-                            <p className="text-xs text-blue-600 font-medium">Frete Grátis</p>
-                          )}
+                          {(() => {
+                            const discountValue = Number(item.discount) || 0;
+                            const itemPrice = item.price || 0;
+                            const quantity = item.quantity || 1;
+
+                            if (discountValue > 0) {
+                              // Calcular preço com desconto aplicado
+                              const discountedPrice = itemPrice * (1 - discountValue / 100);
+                              const totalDiscounted = discountedPrice * quantity;
+                              // Preço original é o preço sem desconto
+                              const originalPrice = itemPrice / (1 - discountValue / 100);
+                              const originalTotal = originalPrice * quantity;
+
+                              return (
+                                <div>
+                                  <p className="text-sm text-slate-500">De: {formatPrice(originalTotal)}</p>
+                                  <p className="font-semibold text-green-600">Por: {formatPrice(totalDiscounted)}</p>
+                                  <p className="text-sm text-green-600">{formatPrice(discountedPrice)} cada</p>
+                                </div>
+                              );
+                            } else {
+                              const totalPrice = itemPrice * quantity;
+                              return (
+                                <div>
+                                  <p className="font-semibold text-slate-900">{formatPrice(totalPrice)}</p>
+                                  <p className="text-sm text-slate-600">{formatPrice(itemPrice)} cada</p>
+                                </div>
+                              );
+                            }
+                          })()}
                         </div>
                       </div>
                     ))}
@@ -952,6 +984,9 @@ function CheckoutPage() {
                             <FaTruck className="text-blue-600" />
                             <span className="text-sm font-medium text-blue-900">Opções de Frete</span>
                           </div>
+
+
+                          {/* Mostrar opções de frete */}
                           {freightOptions.map((option) => (
                             <div
                               key={option.id}
@@ -1225,6 +1260,12 @@ function CheckoutPage() {
                       <span className="text-slate-600">Total dos pagamentos:</span>
                       <span className="font-medium">{formatPrice(calcularTotalPagamentos())}</span>
                     </div>
+                    {/* Mostrar descontos aplicados */}
+                    {Object.values(discountApplied).some(applied => applied) && (
+                      <div className="text-xs text-green-600 mb-2">
+                        Descontos à vista aplicados nos métodos selecionados
+                      </div>
+                    )}
                     <div className="flex justify-between text-sm font-medium">
                       <span className={calcularValorRestante() > 0 ? 'text-red-600' : 'text-green-600'}>
                         {calcularValorRestante() > 0 ? 'Valor restante:' : 'Valor coberto:'}

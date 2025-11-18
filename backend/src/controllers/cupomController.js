@@ -974,6 +974,7 @@ export default {
   atualizarCupom,
   deletarCupom,
   distribuirCupom,
+  listarCuponsPublicos,
   listarCuponsDisponiveis,
   resgatarCupom,
   listarMeusCupons,

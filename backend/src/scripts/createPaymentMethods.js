@@ -38,15 +38,12 @@ async function createPaymentMethods() {
 
 export default createPaymentMethods;
 
-// Executar se chamado diretamente
-if (import.meta.url === `file://${process.argv[1]}`) {
-  createPaymentMethods()
-    .then(() => {
-      logger.info('script_completed');
-      process.exit(0);
-    })
-    .catch((error) => {
-      logger.error('script_failed', { error: error.message });
-      process.exit(1);
-    });
-}
+createPaymentMethods()
+  .then(() => {
+    logger.info('script_completed');
+    console.log('Payment methods created successfully!');
+  })
+  .catch((error) => {
+    logger.error('script_failed', { error: error.message });
+    console.error('Error creating payment methods:', error.message);
+  });

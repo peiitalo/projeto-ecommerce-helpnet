@@ -230,48 +230,49 @@ const sampleVendors = [
 const sampleProducts = [
   // For Vendor 1: Casa e Decoração, Moda e Acessórios, Beleza e Saúde, Livros e Entretenimento, Eletrônicos
   [
-    { Nome: 'Vaso Decorativo', Descricao: 'Vaso para decoração elegante', Preco: 49.90, Estoque: 20, SKU: 'CASA-ABC-001', CategoriaNome: 'Casa e Decoração', Imagens: ['https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400'] },
-    { Nome: 'Camiseta Básica', Descricao: 'Camiseta confortável de algodão', Preco: 29.90, Estoque: 100, SKU: 'MODA-ABC-001', CategoriaNome: 'Moda e Acessórios', Imagens: ['https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400'] },
-    { Nome: 'Creme Hidratante', Descricao: 'Creme para pele facial', Preco: 25.00, Estoque: 80, SKU: 'BEA-ABC-001', CategoriaNome: 'Beleza e Saúde', Imagens: ['https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400'] },
-    { Nome: 'Livro de Ficção', Descricao: 'Romance emocionante best-seller', Preco: 39.90, Estoque: 30, SKU: 'LIV-ABC-001', CategoriaNome: 'Livros e Entretenimento', Imagens: ['https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'] },
-    { Nome: 'Smartphone XYZ', Descricao: 'Smartphone de última geração', Preco: 1500.00, Estoque: 50, SKU: 'ELE-ABC-001', CategoriaNome: 'Eletrônicos', Imagens: ['https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=400'] }
+    { Nome: 'Vaso Decorativo', Descricao: 'Vaso para decoração elegante', Preco: 49.90, Estoque: 20, SKU: 'CASA-ABC-001', CategoriaNome: 'Casa e Decoração', Imagens: ['https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400'], Desconto: 10, FreteGratis: false },
+    { Nome: 'Camiseta Básica', Descricao: 'Camiseta confortável de algodão', Preco: 29.90, Estoque: 100, SKU: 'MODA-ABC-001', CategoriaNome: 'Moda e Acessórios', Imagens: ['https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400'], Desconto: 0, FreteGratis: false },
+    { Nome: 'Creme Hidratante', Descricao: 'Creme para pele facial', Preco: 25.00, Estoque: 80, SKU: 'BEA-ABC-001', CategoriaNome: 'Beleza e Saúde', Imagens: ['https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400'], Desconto: 15, FreteGratis: true },
+    { Nome: 'Livro de Ficção', Descricao: 'Romance emocionante best-seller', Preco: 39.90, Estoque: 30, SKU: 'LIV-ABC-001', CategoriaNome: 'Livros e Entretenimento', Imagens: ['https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'], Desconto: 0, FreteGratis: false },
+    { Nome: 'Smartphone XYZ', Descricao: 'Smartphone de última geração', Preco: 1500.00, Estoque: 50, SKU: 'ELE-ABC-001', CategoriaNome: 'Eletrônicos', Imagens: ['https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=400'], Desconto: 5, FreteGratis: false }
   ],
   // Vendor 2: Beleza e Saúde, Eletrônicos, Livros e Entretenimento, Casa e Decoração, Moda e Acessórios
   [
-    { Nome: 'Vitamina C', Descricao: 'Suplemento vitamínico natural', Preco: 45.00, Estoque: 70, SKU: 'BEA-TECH-001', CategoriaNome: 'Beleza e Saúde', Imagens: ['https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400'] },
-    { Nome: 'Fone de Ouvido', Descricao: 'Fone sem fio Bluetooth', Preco: 199.90, Estoque: 45, SKU: 'ELE-TECH-001', CategoriaNome: 'Eletrônicos', Imagens: ['https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400'] },
-    { Nome: 'Livro Técnico', Descricao: 'Livro sobre programação avançada', Preco: 59.90, Estoque: 25, SKU: 'LIV-TECH-001', CategoriaNome: 'Livros e Entretenimento', Imagens: ['https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400'] },
-    { Nome: 'Jogo de Talheres', Descricao: 'Talheres inox premium', Preco: 39.90, Estoque: 60, SKU: 'CASA-TECH-001', CategoriaNome: 'Casa e Decoração', Imagens: ['https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400'] },
-    { Nome: 'Calça Jeans', Descricao: 'Calça jeans confortável', Preco: 89.90, Estoque: 80, SKU: 'MODA-TECH-001', CategoriaNome: 'Moda e Acessórios', Imagens: ['https://images.unsplash.com/photo-1542272604-787c3835535d?w=400'] }
+    { Nome: 'Vitamina C', Descricao: 'Suplemento vitamínico natural', Preco: 45.00, Estoque: 70, SKU: 'BEA-TECH-001', CategoriaNome: 'Beleza e Saúde', Imagens: ['https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400'], Desconto: 20, FreteGratis: false },
+    { Nome: 'Fone de Ouvido', Descricao: 'Fone sem fio Bluetooth', Preco: 199.90, Estoque: 45, SKU: 'ELE-TECH-001', CategoriaNome: 'Eletrônicos', Imagens: ['https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400'], Desconto: 0, FreteGratis: true },
+    { Nome: 'Livro Técnico', Descricao: 'Livro sobre programação avançada', Preco: 59.90, Estoque: 25, SKU: 'LIV-TECH-001', CategoriaNome: 'Livros e Entretenimento', Imagens: ['https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400'], Desconto: 10, FreteGratis: false },
+    { Nome: 'Jogo de Talheres', Descricao: 'Talheres inox premium', Preco: 39.90, Estoque: 60, SKU: 'CASA-TECH-001', CategoriaNome: 'Casa e Decoração', Imagens: ['https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400'], Desconto: 0, FreteGratis: false },
+    { Nome: 'Calça Jeans', Descricao: 'Calça jeans confortável', Preco: 89.90, Estoque: 80, SKU: 'MODA-TECH-001', CategoriaNome: 'Moda e Acessórios', Imagens: ['https://images.unsplash.com/photo-1542272604-787c3835535d?w=400'], Desconto: 25, FreteGratis: false }
   ],
   // Vendor 3: Livros e Entretenimento, Casa e Decoração, Eletrônicos, Beleza e Saúde, Moda e Acessórios
   [
-    { Nome: 'E-book', Descricao: 'Livro digital interativo', Preco: 9.90, Estoque: 500, SKU: 'LIV-GERAL-001', CategoriaNome: 'Livros e Entretenimento', Imagens: ['https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400'] },
-    { Nome: 'Cortina', Descricao: 'Cortina para janela moderna', Preco: 69.90, Estoque: 25, SKU: 'CASA-GERAL-001', CategoriaNome: 'Casa e Decoração', Imagens: ['https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400'] },
-    { Nome: 'Tablet', Descricao: 'Tablet Android de alta performance', Preco: 899.90, Estoque: 35, SKU: 'ELE-GERAL-001', CategoriaNome: 'Eletrônicos', Imagens: ['https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=400'] },
-    { Nome: 'Shampoo', Descricao: 'Shampoo para cabelos secos', Preco: 12.90, Estoque: 120, SKU: 'BEA-GERAL-001', CategoriaNome: 'Beleza e Saúde', Imagens: ['https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400'] },
-    { Nome: 'Vestido', Descricao: 'Vestido elegante para festas', Preco: 149.90, Estoque: 40, SKU: 'MODA-GERAL-001', CategoriaNome: 'Moda e Acessórios', Imagens: ['https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=400'] }
+    { Nome: 'E-book', Descricao: 'Livro digital interativo', Preco: 9.90, Estoque: 500, SKU: 'LIV-GERAL-001', CategoriaNome: 'Livros e Entretenimento', Imagens: ['https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400'], Desconto: 0, FreteGratis: true },
+    { Nome: 'Cortina', Descricao: 'Cortina para janela moderna', Preco: 69.90, Estoque: 25, SKU: 'CASA-GERAL-001', CategoriaNome: 'Casa e Decoração', Imagens: ['https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400'], Desconto: 30, FreteGratis: false },
+    { Nome: 'Tablet', Descricao: 'Tablet Android de alta performance', Preco: 899.90, Estoque: 35, SKU: 'ELE-GERAL-001', CategoriaNome: 'Eletrônicos', Imagens: ['https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=400'], Desconto: 15, FreteGratis: false },
+    { Nome: 'Shampoo', Descricao: 'Shampoo para cabelos secos', Preco: 12.90, Estoque: 120, SKU: 'BEA-GERAL-001', CategoriaNome: 'Beleza e Saúde', Imagens: ['https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400'], Desconto: 0, FreteGratis: false },
+    { Nome: 'Vestido', Descricao: 'Vestido elegante para festas', Preco: 149.90, Estoque: 40, SKU: 'MODA-GERAL-001', CategoriaNome: 'Moda e Acessórios', Imagens: ['https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=400'], Desconto: 20, FreteGratis: true }
   ],
   // Vendor 4: Eletrônicos, Beleza e Saúde, Casa e Decoração, Livros e Entretenimento, Moda e Acessórios
   [
-    { Nome: 'Mouse Gamer', Descricao: 'Mouse óptico para jogos', Preco: 79.90, Estoque: 60, SKU: 'ELE-XYZ-001', CategoriaNome: 'Eletrônicos', Imagens: ['https://images.unsplash.com/photo-1527814050087-3793815479db?w=400'] },
-    { Nome: 'Termômetro', Descricao: 'Termômetro digital infravermelho', Preco: 29.90, Estoque: 50, SKU: 'BEA-XYZ-001', CategoriaNome: 'Beleza e Saúde', Imagens: ['https://images.unsplash.com/photo-1585435557343-3b092031e2bb?w=400'] },
-    { Nome: 'Almofada Decorativa', Descricao: 'Almofada para sofá', Preco: 34.90, Estoque: 75, SKU: 'CASA-XYZ-001', CategoriaNome: 'Casa e Decoração', Imagens: ['https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400'] },
-    { Nome: 'Revista de Moda', Descricao: 'Revista mensal de moda', Preco: 19.90, Estoque: 200, SKU: 'LIV-XYZ-001', CategoriaNome: 'Livros e Entretenimento', Imagens: ['https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400'] },
-    { Nome: 'Óculos de Sol', Descricao: 'Óculos de sol estilosos', Preco: 99.90, Estoque: 30, SKU: 'MODA-XYZ-001', CategoriaNome: 'Moda e Acessórios', Imagens: ['https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=400'] }
+    { Nome: 'Mouse Gamer', Descricao: 'Mouse óptico para jogos', Preco: 79.90, Estoque: 60, SKU: 'ELE-XYZ-001', CategoriaNome: 'Eletrônicos', Imagens: ['https://images.unsplash.com/photo-1527814050087-3793815479db?w=400'], Desconto: 5, FreteGratis: false },
+    { Nome: 'Termômetro', Descricao: 'Termômetro digital infravermelho', Preco: 29.90, Estoque: 50, SKU: 'BEA-XYZ-001', CategoriaNome: 'Beleza e Saúde', Imagens: ['https://images.unsplash.com/photo-1585435557343-3b092031e2bb?w=400'], Desconto: 0, FreteGratis: true },
+    { Nome: 'Almofada Decorativa', Descricao: 'Almofada para sofá', Preco: 34.90, Estoque: 75, SKU: 'CASA-XYZ-001', CategoriaNome: 'Casa e Decoração', Imagens: ['https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400'], Desconto: 10, FreteGratis: false },
+    { Nome: 'Revista de Moda', Descricao: 'Revista mensal de moda', Preco: 19.90, Estoque: 200, SKU: 'LIV-XYZ-001', CategoriaNome: 'Livros e Entretenimento', Imagens: ['https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400'], Desconto: 0, FreteGratis: false },
+    { Nome: 'Óculos de Sol', Descricao: 'Óculos de sol estilosos', Preco: 99.90, Estoque: 30, SKU: 'MODA-XYZ-001', CategoriaNome: 'Moda e Acessórios', Imagens: ['https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=400'], Desconto: 15, FreteGratis: false }
   ],
   // Vendor 5: Moda e Acessórios, Eletrônicos, Beleza e Saúde, Casa e Decoração, Livros e Entretenimento
   [
-    { Nome: 'Bolsa Feminina', Descricao: 'Bolsa de couro sintético', Preco: 129.90, Estoque: 25, SKU: 'MODA-DIG-001', CategoriaNome: 'Moda e Acessórios', Imagens: ['https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400'] },
-    { Nome: 'Carregador Portátil', Descricao: 'Power bank de 10000mAh', Preco: 89.90, Estoque: 40, SKU: 'ELE-DIG-001', CategoriaNome: 'Eletrônicos', Imagens: ['https://images.unsplash.com/photo-1609594040184-41ac6e0351a0?w=400'] },
-    { Nome: 'Máscara Facial', Descricao: 'Máscara de hidratação profunda', Preco: 15.90, Estoque: 150, SKU: 'BEA-DIG-001', CategoriaNome: 'Beleza e Saúde', Imagens: ['https://images.unsplash.com/photo-1570194065650-d99fb4bedf0a?w=400'] },
-    { Nome: 'Quadro Decorativo', Descricao: 'Quadro abstrato para parede', Preco: 79.90, Estoque: 15, SKU: 'CASA-DIG-001', CategoriaNome: 'Casa e Decoração', Imagens: ['https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400'] },
-    { Nome: 'Jogo de Tabuleiro', Descricao: 'Jogo de estratégia familiar', Preco: 49.90, Estoque: 35, SKU: 'LIV-DIG-001', CategoriaNome: 'Livros e Entretenimento', Imagens: ['https://images.unsplash.com/photo-1610890716171-6b1bb98ffd09?w=400'] }
+    { Nome: 'Bolsa Feminina', Descricao: 'Bolsa de couro sintético', Preco: 129.90, Estoque: 25, SKU: 'MODA-DIG-001', CategoriaNome: 'Moda e Acessórios', Imagens: ['https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400'], Desconto: 25, FreteGratis: false },
+    { Nome: 'Carregador Portátil', Descricao: 'Power bank de 10000mAh', Preco: 89.90, Estoque: 40, SKU: 'ELE-DIG-001', CategoriaNome: 'Eletrônicos', Imagens: ['https://images.unsplash.com/photo-1609594040184-41ac6e0351a0?w=400'], Desconto: 0, FreteGratis: true },
+    { Nome: 'Máscara Facial', Descricao: 'Máscara de hidratação profunda', Preco: 15.90, Estoque: 150, SKU: 'BEA-DIG-001', CategoriaNome: 'Beleza e Saúde', Imagens: ['https://images.unsplash.com/photo-1570194065650-d99fb4bedf0a?w=400'], Desconto: 10, FreteGratis: false },
+    { Nome: 'Quadro Decorativo', Descricao: 'Quadro abstrato para parede', Preco: 79.90, Estoque: 15, SKU: 'CASA-DIG-001', CategoriaNome: 'Casa e Decoração', Imagens: ['https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400'], Desconto: 0, FreteGratis: false },
+    { Nome: 'Jogo de Tabuleiro', Descricao: 'Jogo de estratégia familiar', Preco: 49.90, Estoque: 35, SKU: 'LIV-DIG-001', CategoriaNome: 'Livros e Entretenimento', Imagens: ['https://images.unsplash.com/photo-1610890716171-6b1bb98ffd09?w=400'], Desconto: 20, FreteGratis: true }
   ]
 ];
 
 async function createSampleData() {
   console.log('🚀 Iniciando criação de dados de exemplo...');
+  console.log('Database URL:', process.env.DATABASE_URL ? 'Set' : 'Not set');
 
   try {
     // Create categories
@@ -475,7 +476,10 @@ async function createSampleData() {
               CategoriaID: categoria.CategoriaID,
               VendedorID: vendedor.VendedorID,
               SKU: productData.SKU,
-              Ativo: true
+              Ativo: true,
+              Desconto: productData.Desconto,
+              FreteGratis: productData.FreteGratis,
+              Imagens: productData.Imagens
             }
           });
 
@@ -510,9 +514,6 @@ async function createSampleData() {
   }
 }
 
-// Executar se chamado diretamente
-if (import.meta.url === `file://${process.argv[1]}`) {
-  createSampleData();
-}
+createSampleData();
 
 export default createSampleData;

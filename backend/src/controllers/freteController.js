@@ -106,10 +106,11 @@ const calcularFrete = async (req, res) => {
       return res.status(404).json({ erro: "Nenhum produto encontrado" });
     }
 
-    // Verificar se todos os produtos têm frete grátis
-    const todosFreteGratis = produtos.every(p => p.FreteGratis);
+    // Filtrar apenas produtos que NÃO têm frete grátis para cálculo
+    const produtosQuePagamFrete = produtos.filter(p => !p.FreteGratis);
 
-    if (todosFreteGratis) {
+    // Se nenhum produto paga frete (todos têm frete grátis), retornar frete grátis
+    if (produtosQuePagamFrete.length === 0) {
       logger.info('frete_calculado_gratis', { clienteId, enderecoId, produtoIds });
       return res.json({
         opcoes: [{
@@ -129,8 +130,10 @@ const calcularFrete = async (req, res) => {
       });
     }
 
-    // Para MVP, assumimos que todos os produtos são do mesmo vendedor
-    const primeiroProduto = produtos[0];
+    // Usar apenas os produtos que pagam frete para determinar o vendedor/empresa
+    const primeiroProduto = produtosQuePagamFrete[0];
+
+    // Para MVP, assumimos que todos os produtos que pagam frete são do mesmo vendedor
     if (!primeiroProduto.VendedorID) {
       return res.status(400).json({ erro: "Produto não possui vendedor associado" });
     }
