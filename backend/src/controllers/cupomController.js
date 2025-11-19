@@ -1,4 +1,4 @@
-stimport prisma from '../config/prisma.js';
+import prisma from '../config/prisma.js';
 
 // Função auxiliar para distribuir cupons PUBLICOS de forma assíncrona
 const distribuirCupomPublicoAsync = async (cupomID, dataExpiracao) => {
@@ -965,7 +965,6 @@ export default {
   buscarCupomPorId,
   atualizarCupom,
   deletarCupom,
-  distribuirCupom,
   listarCuponsPublicos,
   listarCuponsDisponiveis,
   resgatarCupom,

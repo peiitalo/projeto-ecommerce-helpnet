@@ -51,7 +51,7 @@ echo "   - Frontend React (porta 5173)"
 echo ""
 
 # Construir e iniciar os containers
-docker-compose up --build -d
+docker compose up --build -d
 
 # Aguardar um pouco para os serviços iniciarem
 echo "⏳ Aguardando serviços iniciarem..."
@@ -60,7 +60,7 @@ sleep 10
 # Verificar status dos containers
 echo ""
 echo "📊 Status dos containers:"
-docker-compose ps
+docker compose ps
 
 echo ""
 echo "🎉 Projeto iniciado com sucesso!"
