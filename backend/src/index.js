@@ -28,7 +28,7 @@ import vendorRoutes from './routes/vendorRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import publicRoutes from './routes/publicRoutes.js';
-import cupomRoutes from './routes/cupomRoutes.js';
+import cupomRoutes, { publicRouter as cupomPublicRoutes } from './routes/cupomRoutes.js';
 import suporteRoutes from './routes/suporteRoutes.js';
 import adminSuporteRoutes from './routes/adminSuporteRoutes.js';
 import parceriaRoutes from './routes/parceriaRoutes.js';
@@ -175,7 +175,8 @@ app.use('/api/vendedor', vendorRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/public', publicRoutes);
-app.use('/api/cupons', cupomRoutes);
+// app.use('/api/cupons', cupomRoutes); // Moved to vendor scope
+app.use('/api/cupons', cupomPublicRoutes);
 app.use('/api/suporte', suporteRoutes);
 app.use('/api/admin/suporte', adminSuporteRoutes);
 app.use('/api/vendedor/parcerias', parceriaRoutes);

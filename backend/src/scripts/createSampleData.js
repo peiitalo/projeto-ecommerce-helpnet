@@ -474,6 +474,7 @@ async function createSampleData() {
               Preco: productData.Preco,
               Estoque: productData.Estoque,
               CategoriaID: categoria.CategoriaID,
+              EmpresaID: vendedor.EmpresaID,
               VendedorID: vendedor.VendedorID,
               SKU: productData.SKU,
               Ativo: true,

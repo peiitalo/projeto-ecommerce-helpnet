@@ -276,9 +276,10 @@ export function CartProvider({ children }) {
   // Calcular subtotal considerando descontos por produto
   const subtotal = useMemo(() => {
     return items.reduce((sum, i) => {
-      const price = i.price || 0;
+      // Usar preço base original para calcular desconto
+      const basePrice = i.originalPrice || i.price || 0;
       const discount = i.discount || 0;
-      const discountedPrice = price * (1 - discount / 100); // Aplicar desconto percentual
+      const discountedPrice = basePrice * (1 - discount / 100); // Aplicar desconto percentual
       return sum + (discountedPrice * (i.quantity || 0));
     }, 0);
   }, [items]);

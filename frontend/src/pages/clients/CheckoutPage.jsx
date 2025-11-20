@@ -56,8 +56,15 @@ function CheckoutPage() {
   const [receiptData, setReceiptData] = useState(null);
   const [cardDetails, setCardDetails] = useState({});
   const [installments, setInstallments] = useState({});
-  const [cashDiscount, setCashDiscount] = useState(0.05); // 5% de desconto à vista
-  const [discountApplied, setDiscountApplied] = useState({}); // Controla se desconto foi aplicado por método
+  const CASH_DISCOUNT_PERCENTAGE = 5; // Desconto fixo de 5% para pagamentos à vista
+
+  // Calcular desconto atual baseado nos métodos de pagamento selecionados
+  const getCurrentDiscountPercentage = () => {
+    const hasCashPayment = paymentMethods.some(method =>
+      (method.type === 'pix' || method.type === 'debito') && method.amount > 0
+    );
+    return hasCashPayment ? CASH_DISCOUNT_PERCENTAGE : 0;
+  };
   const [couponCode, setCouponCode] = useState(''); // Código do cupom
   const [couponApplied, setCouponApplied] = useState(null); // Cupom aplicado
   const [couponLoading, setCouponLoading] = useState(false); // Loading do cupom
@@ -110,33 +117,40 @@ function CheckoutPage() {
     }
   };
 
-  // Atualizar orderData sempre que freight mudar (já que subtotal é baseado nos itens selecionados)
+  // Atualizar orderData sempre que freight ou discountPercentage mudar
   useEffect(() => {
     if (orderData) {
       const selectedItemIds = getSelectedItems();
       const selectedItems = items.filter(item => selectedItemIds.includes(item.id));
-      const selectedSubtotal = selectedItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+      const selectedSubtotal = selectedItems.reduce((total, item) => {
+        const discountValue = Number(item.discount) || 0;
+        const basePrice = item.originalPrice || item.price || 0;
+        const finalPrice = discountValue > 0 ? basePrice * (1 - discountValue / 100) : basePrice;
+        return total + (finalPrice * item.quantity);
+      }, 0);
 
+      const currentDiscountPercentage = getCurrentDiscountPercentage();
+      const discountAmount = selectedSubtotal * (currentDiscountPercentage / 100);
       const dadosAtualizados = {
         items: selectedItems,
         subtotal: selectedSubtotal,
+        discountAmount: discountAmount,
         frete: freight.valor,
-        total: selectedSubtotal + freight.valor
+        total: selectedSubtotal - discountAmount + freight.valor
       };
       setOrderData(dadosAtualizados);
 
-      console.log(`[DEBUG] Order total updated: R$ ${dadosAtualizados.total.toFixed(2)} (subtotal: R$ ${dadosAtualizados.subtotal.toFixed(2)}, freight: R$ ${dadosAtualizados.frete.toFixed(2)})`);
+      console.log(`[DEBUG] Order total updated: R$ ${dadosAtualizados.total.toFixed(2)} (subtotal: R$ ${dadosAtualizados.subtotal.toFixed(2)}, discount: R$ ${dadosAtualizados.discountAmount.toFixed(2)}, freight: R$ ${dadosAtualizados.frete.toFixed(2)})`);
 
-      // Atualizar valores dos métodos de pagamento baseado no novo total
-      setPaymentMethods(prev => prev.map(method => {
-        if (method.type === 'pix' || method.type === 'debito') {
-          // PIX e Débito: pagamento total imediato
-          console.log(`[DEBUG] Updating ${method.type} method ${method.id} to full amount: R$ ${dadosAtualizados.total.toFixed(2)}`);
-          return { ...method, amount: dadosAtualizados.total };
+      // Atualizar valores dos métodos de pagamento baseado no novo total apenas se houver apenas 1 método
+      setPaymentMethods(prev => {
+        if (prev.length === 1) {
+          // Se há apenas 1 método, definir o valor total
+          return prev.map(method => ({ ...method, amount: dadosAtualizados.total }));
         }
-        // Outros métodos mantêm o valor atual, mas podem ser ajustados se necessário
-        return method;
-      }));
+        // Se há múltiplos métodos, manter os valores atuais (usuário pode ajustar manualmente)
+        return prev;
+      });
     }
   }, [freight.valor, items]);
 
@@ -160,15 +174,25 @@ function CheckoutPage() {
         await calculateFreight(enderecos[0].EnderecoID, selectedItemIds);
       }
 
-      // Calcular subtotal apenas dos itens selecionados
-      const selectedSubtotal = selectedItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+      // Calcular subtotal apenas dos itens selecionados (já com descontos de produto aplicados)
+      const selectedSubtotal = selectedItems.reduce((total, item) => {
+        const discountValue = Number(item.discount) || 0;
+        const basePrice = item.originalPrice || item.price || 0;
+        const finalPrice = discountValue > 0 ? basePrice * (1 - discountValue / 100) : basePrice;
+        return total + (finalPrice * item.quantity);
+      }, 0);
+
+      // Calcular desconto à vista
+      const currentDiscountPercentage = getCurrentDiscountPercentage();
+      const discountAmount = selectedSubtotal * (currentDiscountPercentage / 100);
 
       // Preparar dados do pedido usando valores calculados
       const dadosPedido = {
         items: selectedItems,
         subtotal: selectedSubtotal,
+        discountAmount: discountAmount,
         frete: freight.valor,
-        total: selectedSubtotal + freight.valor
+        total: selectedSubtotal - discountAmount + freight.valor
       };
 
       setOrderData(dadosPedido);
@@ -267,12 +291,6 @@ function CheckoutPage() {
   const updatePaymentAmount = (id, amount) => {
     const numericAmount = parseFloat(amount) || 0;
     setPaymentMethods(prev => prev.map(method => {
-      // Para débito, forçar pagamento total imediato
-      if (method.type === 'debito') {
-        const totalPedido = orderData?.total || 0;
-        console.log(`[DEBUG] Débito method ${id}: Forçando pagamento total imediato de R$ ${totalPedido.toFixed(2)}`);
-        return { ...method, amount: totalPedido };
-      }
       return method.id === id ? { ...method, amount: numericAmount } : method;
     }));
   };
@@ -313,49 +331,12 @@ function CheckoutPage() {
     return installments;
   };
 
-  // Calcular preço à vista com desconto
-  const calculateCashPrice = (amount) => {
-    const discount = amount * cashDiscount;
-    return {
-      original: amount,
-      discount: discount,
-      final: amount - discount,
-      discountPercent: (cashDiscount * 100).toFixed(0)
-    };
-  };
-
   // Atualizar parcelas para um método de pagamento
   const updateInstallments = (methodId, installments) => {
     setInstallments(prev => ({
       ...prev,
       [methodId]: installments
     }));
-  };
-
-  // Aplicar desconto à vista
-  const applyCashDiscount = (methodId) => {
-    const method = paymentMethods.find(m => m.id === methodId);
-    if (!method || discountApplied[methodId]) return;
-
-    const originalAmount = method.amount;
-    const cashPrice = calculateCashPrice(originalAmount);
-
-    // Aplicar o desconto diretamente no método de pagamento
-    updatePaymentAmount(methodId, cashPrice.final);
-    setDiscountApplied(prev => ({ ...prev, [methodId]: true }));
-
-    showSuccess(`Desconto de ${cashPrice.discountPercent}% aplicado! Preço à vista: R$ ${cashPrice.final.toFixed(2)}`);
-  };
-
-  // Remover desconto à vista
-  const removeCashDiscount = (methodId) => {
-    const method = paymentMethods.find(m => m.id === methodId);
-    if (!method || !discountApplied[methodId]) return;
-
-    const originalAmount = method.amount / (1 - cashDiscount);
-    updatePaymentAmount(methodId, originalAmount);
-    setDiscountApplied(prev => ({ ...prev, [methodId]: false }));
-    showSuccess(`Desconto removido! Valor original: R$ ${originalAmount.toFixed(2)}`);
   };
 
   // Adicionar método de pagamento
@@ -376,13 +357,6 @@ function CheckoutPage() {
 
     const newMethod = { ...methodTemplate, active: true };
 
-    // Para débito, definir valor total imediato
-    if (type === 'debito') {
-      const totalPedido = orderData?.total || 0;
-      newMethod.amount = totalPedido;
-      console.log(`[DEBUG] Débito adicionado com valor total: R$ ${totalPedido.toFixed(2)}`);
-    }
-
     setPaymentMethods(prev => [...prev, newMethod]);
   };
 
@@ -400,12 +374,6 @@ function CheckoutPage() {
       return newCardDetails;
     });
 
-    // Limpar estado do desconto aplicado
-    setDiscountApplied(prev => {
-      const newDiscountApplied = { ...prev };
-      delete newDiscountApplied[id];
-      return newDiscountApplied;
-    });
   };
 
   // Calcular total dos pagamentos (os valores já incluem descontos aplicados)
@@ -455,11 +423,22 @@ function CheckoutPage() {
       // Recalcular dados do pedido usando os valores calculados do CartContext
       const selectedItems = items.filter(item => selectedItemIds.includes(item.id));
 
+      // Recalcular subtotal com descontos de produto
+      const recalculatedSubtotal = selectedItems.reduce((total, item) => {
+        const discountValue = Number(item.discount) || 0;
+        const basePrice = item.originalPrice || item.price || 0;
+        const finalPrice = discountValue > 0 ? basePrice * (1 - discountValue / 100) : basePrice;
+        return total + (finalPrice * item.quantity);
+      }, 0);
+
+      const currentDiscountPercentage = getCurrentDiscountPercentage();
+      const discountAmount = recalculatedSubtotal * (currentDiscountPercentage / 100);
       setOrderData({
         items: selectedItems,
-        subtotal: subtotal, // Usar o subtotal calculado do CartContext (com descontos aplicados)
+        subtotal: recalculatedSubtotal,
+        discountAmount: discountAmount,
         frete: freight.valor,
-        total: total // Usar o total calculado do CartContext
+        total: recalculatedSubtotal - discountAmount + freight.valor
       });
 
       // Ajustar valor do pagamento para o novo total (se apenas 1 método ativo)
@@ -510,14 +489,17 @@ function CheckoutPage() {
         enderecoId: selectedAddress.EnderecoID,
         itens: selectedItems.map(item => ({
           produtoId: item.id,
-          quantidade: item.quantity
+          quantidade: item.quantity,
+          precoUnitario: item.price * (1 - (item.discount || 0) / 100) // Send discounted price
         })),
         metodosPagamento: metodosComValor.map(method => ({
           tipo: method.type,
-          valor: method.amount, // Já inclui desconto à vista se aplicado
-          descontoAplicado: discountApplied[method.id] || false
+          valor: method.amount,
+          descontoAplicado: method.type === 'pix' || method.type === 'debito'
         })),
         frete: selectedFreight ? selectedFreight.valor : 0, // O frete já é calculado apenas para produtos que não têm frete grátis
+        descontoVista: getCurrentDiscountPercentage(),
+        valorDescontoVista: orderData.discountAmount || 0,
         observacoes: '',
         cupomCodigo: couponApplied?.Codigo
       };
@@ -886,11 +868,11 @@ function CheckoutPage() {
                             const hasFreeShipping = Boolean(item.freeShipping);
 
                             if (discountValue > 0 && hasFreeShipping) {
-                              return <p className="text-sm text-purple-600 font-medium">frete e desconto</p>;
+                              return <p className="text-sm text-green-600 font-medium">Frete grátis e Desconto {discountValue}%</p>;
                             } else if (discountValue > 0) {
                               return <p className="text-sm text-green-600 font-medium">Desconto {discountValue}%</p>;
                             } else if (hasFreeShipping) {
-                              return <p className="text-sm text-blue-600 font-medium">frete gratis</p>;
+                              return <p className="text-sm text-green-600 font-medium">Frete gratis</p>;
                             }
                             return null;
                           })()}
@@ -898,30 +880,30 @@ function CheckoutPage() {
                         <div className="text-right">
                           {(() => {
                             const discountValue = Number(item.discount) || 0;
-                            const itemPrice = item.price || 0;
+                            // Garantir que usamos o preço base original do produto
+                            const basePrice = item.originalPrice || item.price || 0;
                             const quantity = item.quantity || 1;
 
                             if (discountValue > 0) {
-                              // Calcular preço com desconto aplicado
-                              const discountedPrice = itemPrice * (1 - discountValue / 100);
+                              // Calcular preço com desconto aplicado ao preço base
+                              const discountedPrice = basePrice * (1 - discountValue / 100);
                               const totalDiscounted = discountedPrice * quantity;
-                              // Preço original é o preço sem desconto
-                              const originalPrice = itemPrice / (1 - discountValue / 100);
-                              const originalTotal = originalPrice * quantity;
+                              // Preço original total
+                              const originalTotal = basePrice * quantity;
 
                               return (
                                 <div>
-                                  <p className="text-sm text-slate-500">De: {formatPrice(originalTotal)}</p>
-                                  <p className="font-semibold text-green-600">Por: {formatPrice(totalDiscounted)}</p>
-                                  <p className="text-sm text-green-600">{formatPrice(discountedPrice)} cada</p>
+                                  <p className="font-semibold text-green-600">{formatPrice(totalDiscounted)}</p>
+                                  <p className="text-sm text-slate-400 line-through">{formatPrice(originalTotal)}</p>
+                                  <p className="text-sm text-slate-600">{formatPrice(discountedPrice)} cada</p>
                                 </div>
                               );
                             } else {
-                              const totalPrice = itemPrice * quantity;
+                              const totalPrice = basePrice * quantity;
                               return (
                                 <div>
                                   <p className="font-semibold text-slate-900">{formatPrice(totalPrice)}</p>
-                                  <p className="text-sm text-slate-600">{formatPrice(itemPrice)} cada</p>
+                                  <p className="text-sm text-slate-600">{formatPrice(basePrice)} cada</p>
                                 </div>
                               );
                             }
@@ -1171,78 +1153,37 @@ function CheckoutPage() {
                               value={method.amount || ''}
                               onChange={(e) => updatePaymentAmount(method.id, e.target.value)}
                               placeholder="0,00"
-                              disabled={method.type === 'debito'} // Débito sempre paga o total imediato
-                              className={`flex-1 px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm ${
-                                method.type === 'debito' ? 'bg-slate-50 cursor-not-allowed' : ''
-                              }`}
+                              className="flex-1 px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
                             />
-                            {method.type === 'debito' && (
-                              <span className="text-xs text-blue-600 font-medium ml-2">Pagamento total imediato</span>
-                            )}
                           </div>
 
 
 
-                          {/* Opções de parcelas e preço à vista */}
-                          {method.amount > 0 && (
+                          {/* Opções de parcelas */}
+                          {method.amount > 0 && method.type === 'cartao' && (
                             <div className="space-y-3 p-3 bg-slate-50 rounded-lg">
-                              {/* Preço à vista com desconto */}
-                              <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-                                <div>
-                                  <p className="text-sm font-medium text-green-800">Preço à vista</p>
-                                  <p className="text-xs text-green-600">
-                                    {calculateCashPrice(method.amount).discountPercent}% de desconto
-                                  </p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-lg font-bold text-green-800">
-                                    R$ {calculateCashPrice(method.amount).final.toFixed(2)}
-                                  </p>
-                                  {!discountApplied[method.id] ? (
+                              {/* Parcelas para cartão de crédito */}
+                              <div>
+                                <h4 className="text-sm font-medium text-slate-900 mb-2">Parcelas</h4>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {calculateInstallments(method.amount).slice(0, 6).map((installment, index) => (
                                     <button
-                                      onClick={() => applyCashDiscount(method.id)}
-                                      className="text-xs text-green-600 hover:text-green-800 underline"
+                                      key={index}
+                                      onClick={() => {
+                                        updateInstallments(method.id, installment.installments);
+                                        showInfo(`Parcelamento em ${installment.installments}x selecionado`);
+                                      }}
+                                      className={`p-2 text-xs border rounded-lg transition-colors ${
+                                        installments[method.id] === installment.installments
+                                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                          : 'border-slate-200 hover:border-slate-300 text-slate-700'
+                                      }`}
                                     >
-                                      Aplicar desconto
+                                      {installment.label}
                                     </button>
-                                  ) : (
-                                    <button
-                                      onClick={() => removeCashDiscount(method.id)}
-                                      className="text-xs text-red-600 hover:text-red-800 underline"
-                                    >
-                                      Remover desconto
-                                    </button>
-                                  )}
+                                  ))}
                                 </div>
                               </div>
-
-                              {/* Parcelas para cartão de crédito */}
-                              {method.type === 'cartao' && (
-                                <div>
-                                  <h4 className="text-sm font-medium text-slate-900 mb-2">Parcelas</h4>
-                                  <div className="grid grid-cols-2 gap-2">
-                                    {calculateInstallments(method.amount).slice(0, 6).map((installment, index) => (
-                                      <button
-                                        key={index}
-                                        onClick={() => {
-                                          updateInstallments(method.id, installment.installments);
-                                          showInfo(`Parcelamento em ${installment.installments}x selecionado`);
-                                        }}
-                                        className={`p-2 text-xs border rounded-lg transition-colors ${
-                                          installments[method.id] === installment.installments
-                                            ? 'border-blue-500 bg-blue-50 text-blue-700'
-                                            : 'border-slate-200 hover:border-slate-300 text-slate-700'
-                                        }`}
-                                      >
-                                        {installment.label}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-
-                              
-                              
                             </div>
                           )}
                         </div>
@@ -1260,12 +1201,6 @@ function CheckoutPage() {
                       <span className="text-slate-600">Total dos pagamentos:</span>
                       <span className="font-medium">{formatPrice(calcularTotalPagamentos())}</span>
                     </div>
-                    {/* Mostrar descontos aplicados */}
-                    {Object.values(discountApplied).some(applied => applied) && (
-                      <div className="text-xs text-green-600 mb-2">
-                        Descontos à vista aplicados nos métodos selecionados
-                      </div>
-                    )}
                     <div className="flex justify-between text-sm font-medium">
                       <span className={calcularValorRestante() > 0 ? 'text-red-600' : 'text-green-600'}>
                         {calcularValorRestante() > 0 ? 'Valor restante:' : 'Valor coberto:'}
@@ -1286,7 +1221,7 @@ function CheckoutPage() {
                   <div className="space-y-3 mb-6">
                     <div className="flex justify-between text-sm">
                       <span className="text-slate-600">Subtotal ({orderData?.items?.length || 0} itens)</span>
-                      <span className="font-medium">{formatPrice(orderData?.subtotal || 0)}</span>
+                      <span className="font-medium">{formatPrice((orderData?.subtotal || 0) - (orderData?.discountAmount || 0))}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-slate-600">Frete</span>

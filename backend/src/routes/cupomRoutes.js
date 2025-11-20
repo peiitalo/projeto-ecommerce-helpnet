@@ -1,35 +1,41 @@
 import express from 'express';
-const router = express.Router();
-import cupomController from '../controllers/cupomController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
-import vendorScope from '../middleware/vendorScope.js';
+import {
+  listarCupons,
+  buscarCupomPorId,
+  criarCupom,
+  atualizarCupom,
+  excluirCupom,
+  toggleCupomStatus,
+  listarClientesParaCupom,
+  listarCuponsDisponiveisCliente,
+  validarCupom
+} from '../controllers/cupomController.js';
 
-// Rotas que requerem autenticação de vendedor
-const vendorRoutes = express.Router();
-vendorRoutes.use(authMiddleware);
-vendorRoutes.use(vendorScope);
+const router = express.Router();
 
-// CRUD de cupons (vendedores)
-vendorRoutes.post('/', cupomController.criarCupom);
-vendorRoutes.get('/', cupomController.listarCupons);
-vendorRoutes.get('/:id', cupomController.buscarCupomPorId);
-vendorRoutes.put('/:id', cupomController.atualizarCupom);
-vendorRoutes.delete('/:id', cupomController.deletarCupom);
+// Rotas públicas para clientes (com authMiddleware)
+const publicRouter = express.Router();
+publicRouter.use(authMiddleware);
 
-// Aplicar rotas de vendedor
-router.use('/vendedor', vendorRoutes);
+// Middlewares já aplicados no vendorRoutes.js (authMiddleware e vendorScope)
 
-// Rotas públicas para clientes (requerem apenas autenticação básica)
-router.use(authMiddleware); // Todas as rotas abaixo requerem autenticação
+// Rotas para cupons
+router.get('/', listarCupons);
+router.get('/:id', buscarCupomPorId);
+router.post('/', criarCupom);
+router.put('/:id', atualizarCupom);
+router.delete('/:id', excluirCupom);
 
-// Gestão de cupons por clientes (clientes)
-router.get('/', cupomController.listarCuponsPublicos); // Novo endpoint principal
-router.get('/disponiveis', cupomController.listarCuponsDisponiveis); // Manter para compatibilidade
-router.post('/resgatar', cupomController.resgatarCupom);
-router.get('/meus', cupomController.listarMeusCupons);
+// Rota para ativar/desativar cupom
+router.patch('/:id/toggle-status', toggleCupomStatus);
 
-// Validação e cálculo de desconto (clientes)
-router.post('/validar', cupomController.validarCupom);
-router.post('/calcular-desconto', cupomController.calcularDesconto);
+// Rota para listar clientes disponíveis para cupons específicos
+router.get('/clientes/disponiveis', listarClientesParaCupom);
 
+// Rotas públicas para clientes
+publicRouter.get('/meus', listarCuponsDisponiveisCliente);
+publicRouter.post('/validar', validarCupom);
+
+export { publicRouter };
 export default router;

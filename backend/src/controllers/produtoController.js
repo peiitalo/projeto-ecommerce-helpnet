@@ -369,12 +369,15 @@ export const criarProduto = async (req, res) => {
     if (!categoria)
       return res.status(400).json({ erro: "Categoria não encontrada" });
 
+    let empresaId = null;
     if (vendedorId) {
       const vendedor = await prisma.vendedor.findUnique({
         where: { VendedorID: parseInt(vendedorId) },
+        select: { VendedorID: true, EmpresaID: true }
       });
       if (!vendedor)
         return res.status(400).json({ erro: "Vendedor não encontrado" });
+      empresaId = vendedor.EmpresaID;
     }
 
     const estoqueValue = parseInt(estoque) || 0;
@@ -387,6 +390,7 @@ export const criarProduto = async (req, res) => {
         PrecoOriginal: precoOriginal ? parseFloat(precoOriginal) : null,
         Estoque: estoqueValue,
         CategoriaID: parseInt(categoriaId),
+        EmpresaID: empresaId,
         VendedorID: vendedorId ? parseInt(vendedorId) : null,
         CodBarras:
           codBarras || `${Date.now()}${Math.floor(Math.random() * 1000)}`,
@@ -455,13 +459,18 @@ export const atualizarProduto = async (req, res) => {
         return res.status(400).json({ erro: "Categoria não encontrada" });
     }
 
+    let empresaId = produtoExistente.EmpresaID; // Keep existing EmpresaID by default
     if (data.vendedorId !== undefined) {
       if (data.vendedorId) {
         const vendedor = await prisma.vendedor.findUnique({
           where: { VendedorID: parseInt(data.vendedorId) },
+          select: { VendedorID: true, EmpresaID: true }
         });
         if (!vendedor)
           return res.status(400).json({ erro: "Vendedor não encontrado" });
+        empresaId = vendedor.EmpresaID;
+      } else {
+        empresaId = null; // If removing vendedor, also remove empresa
       }
     }
 
@@ -480,6 +489,7 @@ export const atualizarProduto = async (req, res) => {
         ...(data.estoque !== undefined && { Estoque: parseInt(data.estoque) }),
         ...(data.categoriaId && { CategoriaID: parseInt(data.categoriaId) }),
         ...(data.vendedorId !== undefined && { VendedorID: data.vendedorId ? parseInt(data.vendedorId) : null }),
+        EmpresaID: empresaId, // Always update EmpresaID based on VendedorID changes
         ...(data.codBarras && { CodBarras: data.codBarras }),
         ...(data.sku && { SKU: data.sku }),
         ...(data.peso !== undefined && { Peso: data.peso }),

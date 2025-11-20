@@ -3,6 +3,7 @@ import express from 'express';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import * as vendorController from '../controllers/vendorController.js';
 import { buscarPerfilVendedor, atualizarPerfilVendedor } from '../controllers/vendedorController.js';
+import cupomRoutes from './cupomRoutes.js';
 
 const router = express.Router();
 
@@ -23,5 +24,8 @@ router.delete('/enderecos/:enderecoId', vendorController.excluirEndereco);
 
 // Vendor financial data
 router.get('/financeiro', vendorController.getFinanceiro);
+
+// Vendor coupons
+router.use('/cupons', cupomRoutes);
 
 export default router;

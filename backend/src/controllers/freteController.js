@@ -188,8 +188,11 @@ const calcularFrete = async (req, res) => {
 const getCepEmpresaPadrao = (empresaId) => {
   // Mapeamento de empresas para CEPs padrão (em produção, cada empresa teria endereço real)
   const cepPorEmpresa = {
-    1: '01000000', // São Paulo
-    // Adicionar outros mapeamentos conforme necessário
+    1: '01000000', // São Paulo - Empresa ABC Ltda
+    2: '20000000', // Rio de Janeiro - Tech Solutions S.A.
+    3: '30000000', // Belo Horizonte - Comércio Geral Ltda
+    4: '40000000', // Salvador - Indústria XYZ Ltda
+    5: '80000000', // Curitiba - Serviços Digitais Ltda
   };
 
   return cepPorEmpresa[empresaId] || '01000000'; // CEP padrão de São Paulo

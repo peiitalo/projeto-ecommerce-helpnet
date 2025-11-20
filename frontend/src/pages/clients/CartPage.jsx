@@ -144,10 +144,14 @@ export default function CartPage() {
 
   // Subtotal baseado em itens selecionados
   const subtotal = useMemo(() => {
+    // Filtrar apenas itens selecionados e calcular subtotal com desconto
     return selectedItems.reduce((acc, id) => {
       const item = items.find((i) => i.id === id);
       if (!item) return acc;
-      return acc + item.price * item.quantity;
+      const basePrice = item.originalPrice || item.price || 0;
+      const discount = item.discount || 0;
+      const discountedPrice = basePrice * (1 - discount / 100);
+      return acc + (discountedPrice * (item.quantity || 1));
     }, 0);
   }, [selectedItems, items]);
 
@@ -287,9 +291,30 @@ export default function CartPage() {
                     <p className="text-xs text-slate-500">SKU: {item.sku}</p>
                   )}
                   <div className="mt-2 flex items-center gap-3">
-                    <span className="text-blue-700 font-semibold">
-                      {formatPrice(item.price)}
-                    </span>
+                    {(() => {
+                      const discountValue = Number(item.discount) || 0;
+                      const basePrice = item.originalPrice || item.price || 0;
+
+                      if (discountValue > 0) {
+                        const discountedPrice = basePrice * (1 - discountValue / 100);
+                        return (
+                          <div className="flex flex-col">
+                            <span className="text-green-700 font-semibold">
+                              {formatPrice(discountedPrice)}
+                            </span>
+                            <span className="text-xs text-slate-400 line-through">
+                              {formatPrice(basePrice)}
+                            </span>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <span className="text-blue-700 font-semibold">
+                            {formatPrice(basePrice)}
+                          </span>
+                        );
+                      }
+                    })()}
                     {typeof item.estoque === 'number' && (
                       <span className="text-xs text-slate-500">
                         Estoque: {item.estoque}

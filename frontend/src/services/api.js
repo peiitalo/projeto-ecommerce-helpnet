@@ -410,6 +410,57 @@ export const clienteService = {
     return apiRequest('/clientes/avaliacoes');
   },
 
+  // Listar cupons disponíveis para o cliente
+  listarMeusCupons: async () => {
+    return apiRequest('/cupons/meus');
+  },
+
+  // Validar cupom
+  validarCupom: async (codigo, itensCarrinho, valorTotal) => {
+    return apiRequest('/cupons/validar', {
+      method: 'POST',
+      body: JSON.stringify({
+        codigo,
+        itensCarrinho,
+        valorTotal
+      }),
+    });
+  },
+
+  // Aplicar cupom ao carrinho (helper function)
+  aplicarCupomCarrinho: async (codigo, itensCarrinho, valorTotal) => {
+    try {
+      const validacao = await apiRequest('/cupons/validar', {
+        method: 'POST',
+        body: JSON.stringify({
+          codigo,
+          itensCarrinho,
+          valorTotal
+        }),
+      });
+
+      if (validacao.valido) {
+        return {
+          sucesso: true,
+          cupom: validacao.cupom,
+          desconto: validacao.desconto,
+          valorFinal: validacao.valorFinal,
+          mensagem: 'Cupom aplicado com sucesso!'
+        };
+      } else {
+        return {
+          sucesso: false,
+          mensagem: validacao.error || 'Cupom inválido'
+        };
+      }
+    } catch (error) {
+      return {
+        sucesso: false,
+        mensagem: error.message || 'Erro ao aplicar cupom'
+      };
+    }
+  },
+
   // Buscar pedido por ID
   buscarPedido: async (id) => {
     return apiRequest(`/pedidos/${id}`);

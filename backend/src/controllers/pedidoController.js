@@ -13,6 +13,8 @@ export const criarPedido = async (req, res) => {
       itens,
       metodosPagamento,
       frete = 0,
+      descontoVista = 0,
+      valorDescontoVista = 0,
       observacoes,
       cupomCodigo
     } = req.body;
@@ -156,7 +158,8 @@ export const criarPedido = async (req, res) => {
         });
       }
 
-      const precoUnitario = produto.Preco;
+      // Use the discounted price sent from frontend
+      const precoUnitario = item.precoUnitario || produto.Preco;
       const subtotal = precoUnitario * item.quantidade;
       totalItens += subtotal;
 
@@ -245,7 +248,7 @@ export const criarPedido = async (req, res) => {
 
     // Calcular total dos pagamentos
     const totalPagamentos = metodosPagamento.reduce((total, metodo) => total + parseFloat(metodo.valor), 0);
-    const totalPedido = totalItens + valorFrete - descontoCupom;
+    const totalPedido = totalItens + valorFrete - descontoCupom - valorDescontoVista;
 
     logger.info('criar_pedido_calculos', {
       clienteId: user.id,
@@ -355,7 +358,8 @@ export const criarPedido = async (req, res) => {
           TotalPago: 0,
           // Adicionar campos do cupom se aplicável
           CupomID: cupomAplicado ? cupomAplicado.CupomID : null,
-          DescontoCupom: descontoCupom
+          DescontoCupom: descontoCupom,
+          DescontoVista: valorDescontoVista
         }
       });
 

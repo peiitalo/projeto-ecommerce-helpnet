@@ -33,4 +33,7 @@ router.put('/perfil', vendedorController.atualizarPerfilVendedor);
 // Buscar vendedor por CNPJ ou email
 router.get('/buscar', vendedorController.buscarPorCnpjEmail);
 
+// Listar vendedores (para parcerias)
+router.get('/vendedores', vendedorController.listarVendedores);
+
 export default router;

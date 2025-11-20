@@ -1,975 +1,700 @@
-stimport prisma from '../config/prisma.js';
+// backend/src/controllers/cupomController.js
+import prisma from "../config/prisma.js";
+import { logControllerError, logger } from "../utils/logger.js";
 
-// Função auxiliar para distribuir cupons PUBLICOS de forma assíncrona
-const distribuirCupomPublicoAsync = async (cupomID, dataExpiracao) => {
+/**
+ * Lista cupons do vendedor com filtros opcionais
+ * @param {Object} req - Requisição Express
+ * @param {Object} req.query - Query parameters: status, busca, pagina, limit
+ * @param {Object} res - Resposta Express
+ * @returns {Object} JSON com cupons e total
+ */
+export const listarCupons = async (req, res) => {
   try {
-    console.log(`Iniciando distribuição assíncrona do cupom ${cupomID}...`);
+    const { status, busca, pagina = 1, limit = 10 } = req.query;
+    const skip = (pagina - 1) * limit;
+    const vendedorId = req.user?.vendedorId;
 
-    // Buscar TODOS os clientes ativos pessoa física
-    const todosClientes = await prisma.cliente.findMany({
-      where: {
-        TipoPessoa: 'FISICA' // Apenas pessoa física
-      },
-      select: { ClienteID: true }
-    });
-
-    console.log(`Encontrados ${todosClientes.length} clientes pessoa física ativos para distribuição`);
-
-    if (todosClientes.length === 0) {
-      console.log('Nenhum cliente pessoa física ativo encontrado para distribuição');
-      return;
+    if (!vendedorId) {
+      return res.status(401).json({ error: "Vendedor não autenticado" });
     }
 
-    // Dividir em lotes de 100 para evitar sobrecarga
-    const loteSize = 100;
-    const lotes = [];
-    for (let i = 0; i < todosClientes.length; i += loteSize) {
-      lotes.push(todosClientes.slice(i, i + loteSize));
+    const where = {
+      CriadoPor: vendedorId
+    };
+
+    if (status === "ativo") where.Ativo = true;
+    else if (status === "inativo") where.Ativo = false;
+
+    if (busca) {
+      where.OR = [
+        { Nome: { contains: busca, mode: "insensitive" } },
+        { Codigo: { contains: busca, mode: "insensitive" } },
+      ];
     }
 
-    console.log(`Distribuindo em ${lotes.length} lotes...`);
-
-    // Processar cada lote
-    for (let i = 0; i < lotes.length; i++) {
-      const lote = lotes[i];
-      console.log(`Processando lote ${i + 1}/${lotes.length} com ${lote.length} clientes...`);
-
-      try {
-        const cuponsClienteParaCriar = lote.map(cliente => ({
-          CupomID: cupomID,
-          ClienteID: cliente.ClienteID,
-          DisponivelParaResgate: true,
-          DataExpiracaoCliente: dataExpiracao ? new Date(dataExpiracao) : null
-        }));
-
-        await prisma.cupomCliente.createMany({
-          data: cuponsClienteParaCriar,
-          skipDuplicates: true
-        });
-
-        // Criar notificações para os clientes do lote
-        const notificacoesParaCriar = lote.map(cliente => ({
-          Titulo: 'Novo Cupom Disponível!',
-          Mensagem: `Você recebeu um novo cupom público. Confira seus cupons disponíveis!`,
-          Tipo: 'success',
-          ClienteID: cliente.ClienteID
-        }));
-
-        await prisma.notificacao.createMany({
-          data: notificacoesParaCriar,
-          skipDuplicates: true
-        });
-
-        // Pequena pausa entre lotes para não sobrecarregar
-        if (i < lotes.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-
-      } catch (error) {
-        console.error(`Erro ao processar lote ${i + 1}:`, error.message);
-        // Continua com o próximo lote
-      }
-    }
-
-    console.log(`Distribuição assíncrona do cupom ${cupomID} concluída com sucesso`);
-
-  } catch (error) {
-    console.error('Erro geral na distribuição assíncrona do cupom:', error);
-  }
-};
-
-// Função auxiliar para distribuir cupons VENDEDOR_ESPECIFICO de forma assíncrona
-const distribuirCupomVendedorAsync = async (cupomID, vendedorID, dataExpiracao) => {
-  try {
-    console.log(`Iniciando distribuição assíncrona do cupom ${cupomID} para clientes do vendedor ${vendedorID}...`);
-
-    // Buscar clientes pessoa física que já fizeram pedidos deste vendedor
-    const pedidosVendedor = await prisma.pedido.findMany({
-      where: {
-        itensPedido: {
-          some: {
-            produto: {
-              VendedorID: vendedorID
+    const [cupons, total] = await prisma.$transaction([
+      prisma.cupom.findMany({
+        where,
+        select: {
+          CupomID: true,
+          Nome: true,
+          Codigo: true,
+          Tipo: true,
+          DescontoTipo: true,
+          DescontoValor: true,
+          DataInicio: true,
+          DataExpiracao: true,
+          LimiteUso: true,
+          UsoPorCliente: true,
+          Ativo: true,
+          UsosAtuais: true,
+          CriadoEm: true,
+          _count: {
+            select: {
+              cuponsCliente: true,
+              pedidos: true
             }
           }
         },
-        cliente: {
-          TipoPessoa: 'FISICA' // Apenas pessoa física
-        }
-      },
-      select: { ClienteID: true },
-      distinct: ['ClienteID']
-    });
+        orderBy: { CriadoEm: "desc" },
+        skip,
+        take: parseInt(limit),
+      }),
+      prisma.cupom.count({ where }),
+    ]);
 
-    console.log(`Encontrados ${pedidosVendedor.length} clientes pessoa física que já compraram do vendedor para distribuição`);
-
-    if (pedidosVendedor.length === 0) {
-      console.log('Nenhum cliente pessoa física com pedidos encontrado para este vendedor');
-      return;
-    }
-
-    // Criar entradas na tabela CupomCliente
-    const cuponsClienteParaCriar = pedidosVendedor.map(pedido => ({
-      CupomID: cupomID,
-      ClienteID: pedido.ClienteID,
-      DisponivelParaResgate: true,
-      DataExpiracaoCliente: dataExpiracao ? new Date(dataExpiracao) : null
-    }));
-
-    await prisma.cupomCliente.createMany({
-      data: cuponsClienteParaCriar,
-      skipDuplicates: true
-    });
-
-    // Criar notificações para os clientes do vendedor
-    const notificacoesParaCriar = pedidosVendedor.map(pedido => ({
-      Titulo: 'Novo Cupom Disponível!',
-      Mensagem: `Você recebeu um novo cupom exclusivo do seu vendedor. Confira seus cupons disponíveis!`,
-      Tipo: 'success',
-      ClienteID: pedido.ClienteID
-    }));
-
-    await prisma.notificacao.createMany({
-      data: notificacoesParaCriar,
-      skipDuplicates: true
-    });
-
-    console.log(`Distribuição assíncrona do cupom ${cupomID} para vendedor concluída com sucesso`);
-
+    logger.info('listar_cupons_ok', { total, filtros: req.query });
+    res.json({ cupons, total });
   } catch (error) {
-    console.error('Erro geral na distribuição assíncrona do cupom para vendedor:', error);
+    logControllerError('listar_cupons_error', error, req);
+    res.status(500).json({ error: "Erro ao listar cupons" });
   }
 };
 
-
-// Criar cupom
-const criarCupom = async (req, res) => {
+/**
+ * Busca cupom por ID
+ * @param {Object} req - Requisição Express
+ * @param {Object} res - Resposta Express
+ * @returns {Object} JSON com dados do cupom
+ */
+export const buscarCupomPorId = async (req, res) => {
   try {
-    console.log('Iniciando criação de cupom:', req.body);
+    const { id } = req.params;
+    const vendedorId = req.user?.vendedorId;
 
+    if (!vendedorId) {
+      return res.status(401).json({ error: "Vendedor não autenticado" });
+    }
+
+    const cupom = await prisma.cupom.findFirst({
+      where: {
+        CupomID: parseInt(id),
+        CriadoPor: vendedorId
+      },
+      include: {
+        cuponsCliente: {
+          include: {
+            cliente: {
+              select: {
+                ClienteID: true,
+                NomeCompleto: true,
+                Email: true
+              }
+            }
+          }
+        },
+        pedidos: {
+          select: {
+            PedidoID: true,
+            DataPedido: true,
+            Total: true,
+            cliente: {
+              select: {
+                NomeCompleto: true
+              }
+            }
+          },
+          take: 5
+        }
+      }
+    });
+
+    if (!cupom) {
+      logger.warn('cupom_nao_encontrado', { id });
+      return res.status(404).json({ error: "Cupom não encontrado" });
+    }
+
+    logger.info('buscar_cupom_ok', { id });
+    res.json(cupom);
+  } catch (error) {
+    logControllerError('buscar_cupom_error', error, req);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+};
+
+/**
+ * Cria um novo cupom
+ * @param {Object} req - Requisição Express
+ * @param {Object} res - Resposta Express
+ * @returns {Object} JSON com cupom criado
+ */
+export const criarCupom = async (req, res) => {
+  try {
     const {
+      nome,
       codigo,
-      descricao,
-      tipoDesconto,
-      valorDesconto,
-      valorMinimo,
-      limiteUso,
+      tipo,
+      descontoTipo,
+      descontoValor,
+      dataInicio,
       dataExpiracao,
-      aplicavelProdutos,
-      aplicavelCategorias,
-      clientesElegiveis,
-      tipoCliente,
-      produtosElegiveis,
-      categoriasElegiveis,
-      limiteUsoPorCliente,
-      tipoDistribuicao
+      limiteUso,
+      usoPorCliente,
+      clientesEspecificos,
+      restricoes
     } = req.body;
 
-    const vendedorID = req.vendorId;
-    console.log('VendedorID:', vendedorID);
+    const vendedorId = req.user?.vendedorId;
 
-    // Validar campos obrigatórios
-    if (!codigo || !tipoDistribuicao) {
+    if (!vendedorId) {
+      return res.status(401).json({ error: "Vendedor não autenticado" });
+    }
+
+    if (!nome || !codigo || !descontoTipo || descontoValor === undefined) {
       return res.status(400).json({
-        success: false,
-        message: 'Campos obrigatórios: codigo, tipoDistribuicao'
+        error: "Campos obrigatórios: nome, codigo, descontoTipo, descontoValor"
       });
     }
 
-    // Validar tipoDistribuicao
-    if (!['PUBLICO', 'VENDEDOR_ESPECIFICO'].includes(tipoDistribuicao)) {
-      return res.status(400).json({
-        success: false,
-        message: 'tipoDistribuicao deve ser "PUBLICO" ou "VENDEDOR_ESPECIFICO"'
-      });
+    // Validar código único
+    const codigoExistente = await prisma.cupom.findUnique({
+      where: { Codigo: codigo }
+    });
+    if (codigoExistente) {
+      return res.status(400).json({ error: "Código do cupom já existe" });
     }
+
+    // Validar tipo de desconto
+    const tiposValidos = ['porcentagem', 'valor_fixo', 'frete_gratis'];
+    if (!tiposValidos.includes(descontoTipo)) {
+      return res.status(400).json({ error: "Tipo de desconto inválido" });
+    }
+
+    // Validar tipo de distribuição
+    const tiposDistribuicao = ['publico', 'especifico'];
+    const tipoCupom = tiposDistribuicao.includes(tipo) ? tipo : 'publico';
+
+    // Se específico, validar clientes
+    if (tipoCupom === 'especifico' && (!clientesEspecificos || !Array.isArray(clientesEspecificos))) {
+      return res.status(400).json({ error: "Para cupons específicos, deve fornecer lista de clientes" });
+    }
+
+    // Preparar restrições
+    const restricoesObj = {};
+    if (restricoes?.categoriaId) restricoesObj.categoriaId = parseInt(restricoes.categoriaId);
+    if (restricoes?.valorMinimo) restricoesObj.valorMinimo = parseFloat(restricoes.valorMinimo);
 
     const cupom = await prisma.cupom.create({
       data: {
-        Codigo: codigo.toUpperCase(),
-        Descricao: descricao,
-        TipoDesconto: tipoDesconto || 'PERCENTUAL',
-        ValorDesconto: parseFloat(valorDesconto) || 0,
-        ValorMinimo: valorMinimo ? parseFloat(valorMinimo) : 0,
-        LimiteUso: limiteUso ? parseInt(limiteUso) : null,
+        Nome: nome,
+        Codigo: codigo,
+        Tipo: tipoCupom,
+        DescontoTipo: descontoTipo,
+        DescontoValor: parseFloat(descontoValor),
+        DataInicio: dataInicio ? new Date(dataInicio) : new Date(),
         DataExpiracao: dataExpiracao ? new Date(dataExpiracao) : null,
-        VendedorID: vendedorID,
-        AplicavelProdutos: aplicavelProdutos || false,
-        AplicavelCategorias: aplicavelCategorias || false,
-        ClientesElegiveis: clientesElegiveis || [],
-        TipoCliente: tipoCliente,
-        ProdutosElegiveis: produtosElegiveis || [],
-        CategoriasElegiveis: categoriasElegiveis || [],
-        LimiteUsoPorCliente: limiteUsoPorCliente ? parseInt(limiteUsoPorCliente) : 1,
-        TipoDistribuicao: tipoDistribuicao || 'PUBLICO',
-        Ativo: true
+        LimiteUso: limiteUso ? parseInt(limiteUso) : null,
+        UsoPorCliente: usoPorCliente ? parseInt(usoPorCliente) : 1,
+        Ativo: true,
+        CriadoPor: vendedorId,
+        Restricoes: Object.keys(restricoesObj).length > 0 ? restricoesObj : null
       }
     });
 
-    console.log('Cupom criado com sucesso:', cupom.CupomID);
+    // Se específico, criar relações com clientes
+    if (tipoCupom === 'especifico' && clientesEspecificos.length > 0) {
+      const cuponsCliente = clientesEspecificos.map(clienteId => ({
+        CupomID: cupom.CupomID,
+        ClienteID: parseInt(clienteId)
+      }));
 
-    // Distribuir cupons de forma assíncrona - SEM await para não bloquear resposta
-    try {
-      if (tipoDistribuicao === 'PUBLICO') {
-        console.log('Iniciando distribuição pública para pessoas físicas...');
-        distribuirCupomPublicoAsync(cupom.CupomID, dataExpiracao);
-      } else if (tipoDistribuicao === 'VENDEDOR_ESPECIFICO') {
-        console.log('Iniciando distribuição específica do vendedor para pessoas físicas...');
-        distribuirCupomVendedorAsync(cupom.CupomID, vendedorID, dataExpiracao);
-      }
-    } catch (distError) {
-      console.error('Erro ao iniciar distribuição:', distError);
-      // Não falhar a criação do cupom por causa da distribuição
-    }
-
-    // Agendar expiração automática se dataExpiracao foi definida
-    if (dataExpiracao) {
-      const expiracaoDate = new Date(dataExpiracao);
-      const now = new Date();
-
-      if (expiracaoDate > now) {
-        // Calcular delay em milissegundos
-        const delay = expiracaoDate.getTime() - now.getTime();
-
-        setTimeout(async () => {
-          try {
-            console.log(`Expirando cupom ${cupom.CupomID} automaticamente...`);
-
-            // Desativar cupom
-            await prisma.cupom.update({
-              where: { CupomID: cupom.CupomID },
-              data: { Ativo: false }
-            });
-
-            // Remover distribuições dos clientes
-            await prisma.cupomCliente.deleteMany({
-              where: { CupomID: cupom.CupomID }
-            });
-
-            console.log(`Cupom ${cupom.CupomID} expirado automaticamente`);
-          } catch (error) {
-            console.error('Erro ao expirar cupom automaticamente:', error);
-          }
-        }, delay);
-      }
-    }
-
-    res.status(201).json({
-      success: true,
-      message: 'Cupom criado com sucesso',
-      data: cupom
-    });
-  } catch (error) {
-    console.error('Erro ao criar cupom:', error);
-    console.error('Stack trace:', error.stack);
-    if (error.code === 'P2002') {
-      return res.status(400).json({
-        success: false,
-        message: 'Código do cupom já existe'
+      await prisma.cupomCliente.createMany({
+        data: cuponsCliente,
+        skipDuplicates: true
       });
     }
-    res.status(500).json({
-      success: false,
-      message: 'Erro interno do servidor: ' + error.message
-    });
-  }
-};
 
-// Listar cupons do vendedor
-const listarCupons = async (req, res) => {
-  try {
-    const vendedorID = req.vendorId;
-    const { page = 1, limit = 10, ativo } = req.query;
-
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    const where = {
-      VendedorID: vendedorID
-    };
-
-    if (ativo !== undefined) {
-      where.Ativo = ativo === 'true';
-    }
-
-    const [cupons, total] = await Promise.all([
-      prisma.cupom.findMany({
-        where,
-        skip,
-        take: parseInt(limit),
-        orderBy: { CriadoEm: 'desc' }
-      }),
-      prisma.cupom.count({ where })
-    ]);
-
-    res.json({
-      success: true,
-      data: cupons,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / parseInt(limit))
-      }
-    });
+    logger.info('criar_cupom_ok', { id: cupom.CupomID, codigo: cupom.Codigo });
+    res.status(201).json(cupom);
   } catch (error) {
-    console.error('Erro ao listar cupons:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erro interno do servidor'
-    });
+    logControllerError('criar_cupom_error', error, req);
+
+    if (error.code === "P2002") {
+      return res.status(400).json({ error: "Código do cupom já existe" });
+    }
+    res.status(500).json({ error: "Erro interno do servidor" });
   }
 };
 
-// Buscar cupom por ID
-const buscarCupomPorId = async (req, res) => {
+/**
+ * Atualiza um cupom existente
+ * @param {Object} req - Requisição Express
+ * @param {Object} res - Resposta Express
+ * @returns {Object} JSON com cupom atualizado
+ */
+export const atualizarCupom = async (req, res) => {
   try {
     const { id } = req.params;
-    const vendedorID = req.vendorId;
+    const data = req.body;
+    const vendedorId = req.user?.vendedorId;
 
-    const cupom = await prisma.cupom.findFirst({
+    if (!vendedorId) {
+      return res.status(401).json({ error: "Vendedor não autenticado" });
+    }
+
+    const cupomExistente = await prisma.cupom.findFirst({
       where: {
         CupomID: parseInt(id),
-        CriadoPor: vendedorID
+        CriadoPor: vendedorId
       }
     });
 
-    if (!cupom) {
-      return res.status(404).json({
-        success: false,
-        message: 'Cupom não encontrado'
+    if (!cupomExistente) {
+      return res.status(404).json({ error: "Cupom não encontrado" });
+    }
+
+    // Validar código único se estiver sendo alterado
+    if (data.codigo && data.codigo !== cupomExistente.Codigo) {
+      const codigoExistente = await prisma.cupom.findUnique({
+        where: { Codigo: data.codigo }
       });
-    }
-
-    res.json({
-      success: true,
-      data: cupom
-    });
-  } catch (error) {
-    console.error('Erro ao buscar cupom:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erro interno do servidor'
-    });
-  }
-};
-
-// Atualizar cupom
-const atualizarCupom = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const vendedorID = req.vendorId;
-    const {
-      descricao,
-      tipoDesconto,
-      valorDesconto,
-      valorMinimo,
-      limiteUso,
-      dataExpiracao,
-      ativo,
-      aplicavelProdutos,
-      aplicavelCategorias,
-      clientesElegiveis,
-      tipoCliente,
-      produtosElegiveis,
-      categoriasElegiveis,
-      limiteUsoPorCliente,
-      tipoDistribuicao
-    } = req.body;
-
-    const cupom = await prisma.cupom.findFirst({
-      where: {
-        CupomID: parseInt(id),
-        VendedorID: vendedorID
-      }
-    });
-
-    if (!cupom) {
-      return res.status(404).json({
-        success: false,
-        message: 'Cupom não encontrado'
-      });
-    }
-
-    // Preparar dados para atualização - usar valores existentes se não fornecidos
-    const updateData = {};
-
-    // Só atualizar campos que foram fornecidos
-    if (ativo !== undefined) updateData.Ativo = ativo;
-    if (descricao !== undefined) updateData.Descricao = descricao;
-    if (tipoDesconto !== undefined) updateData.TipoDesconto = tipoDesconto;
-    if (valorDesconto !== undefined) updateData.ValorDesconto = parseFloat(valorDesconto);
-    if (valorMinimo !== undefined) updateData.ValorMinimo = parseFloat(valorMinimo) || 0;
-    if (dataExpiracao !== undefined) updateData.DataExpiracao = dataExpiracao ? new Date(dataExpiracao) : null;
-    if (aplicavelProdutos !== undefined) updateData.AplicavelProdutos = aplicavelProdutos;
-    if (aplicavelCategorias !== undefined) updateData.AplicavelCategorias = aplicavelCategorias;
-    if (tipoCliente !== undefined) updateData.TipoCliente = tipoCliente;
-    if (produtosElegiveis !== undefined) updateData.ProdutosElegiveis = produtosElegiveis;
-    if (categoriasElegiveis !== undefined) updateData.CategoriasElegiveis = categoriasElegiveis;
-    if (limiteUsoPorCliente !== undefined) updateData.LimiteUsoPorCliente = parseInt(limiteUsoPorCliente) || 1;
-    if (limiteUso !== undefined) updateData.LimiteUso = parseInt(limiteUso) || null;
-
-    // Lidar com mudanças de tipo de distribuição
-    const tipoDistribuicaoFinal = tipoDistribuicao || cupom.TipoDistribuicao;
-    const tipoMudou = tipoDistribuicao && tipoDistribuicao !== cupom.TipoDistribuicao;
-
-    if (tipoDistribuicao !== undefined) {
-      updateData.TipoDistribuicao = tipoDistribuicaoFinal;
-    }
-
-    // Para cupons PUBLICOS, manter ClientesElegiveis vazio (distribuição automática)
-    if (tipoDistribuicaoFinal === 'PUBLICO') {
-      updateData.ClientesElegiveis = [];
-    } else if (tipoDistribuicaoFinal === 'VENDEDOR_ESPECIFICO') {
-      // Para cupons VENDEDOR_ESPECIFICO, manter ClientesElegiveis vazio (distribuição automática)
-      updateData.ClientesElegiveis = [];
-    } else {
-      // Para outros tipos, usar valores fornecidos se especificados
-      if (clientesElegiveis !== undefined) {
-        updateData.ClientesElegiveis = clientesElegiveis;
+      if (codigoExistente) {
+        return res.status(400).json({ error: "Código do cupom já existe" });
       }
     }
 
-    const cupomAtualizado = await prisma.cupom.update({
+    // Validar tipo de desconto se estiver sendo alterado
+    if (data.descontoTipo) {
+      const tiposValidos = ['porcentagem', 'valor_fixo', 'frete_gratis'];
+      if (!tiposValidos.includes(data.descontoTipo)) {
+        return res.status(400).json({ error: "Tipo de desconto inválido" });
+      }
+    }
+
+    const cupom = await prisma.cupom.update({
       where: { CupomID: parseInt(id) },
-      data: updateData
+      data: {
+        ...(data.nome && { Nome: data.nome }),
+        ...(data.codigo && { Codigo: data.codigo }),
+        ...(data.tipo && { Tipo: data.tipo }),
+        ...(data.descontoTipo && { DescontoTipo: data.descontoTipo }),
+        ...(data.descontoValor !== undefined && { DescontoValor: parseFloat(data.descontoValor) }),
+        ...(data.dataInicio && { DataInicio: new Date(data.dataInicio) }),
+        ...(data.dataExpiracao !== undefined && {
+          DataExpiracao: data.dataExpiracao ? new Date(data.dataExpiracao) : null
+        }),
+        ...(data.limiteUso !== undefined && {
+          LimiteUso: data.limiteUso ? parseInt(data.limiteUso) : null
+        }),
+        ...(data.usoPorCliente !== undefined && {
+          UsoPorCliente: data.usoPorCliente ? parseInt(data.usoPorCliente) : 1
+        }),
+        ...(data.ativo !== undefined && { Ativo: data.ativo }),
+        ...(data.restricoes !== undefined && {
+          Restricoes: data.restricoes && Object.keys(data.restricoes).length > 0 ? data.restricoes : null
+        })
+      }
     });
 
-    // Se o cupom foi desativado, remover das distribuições dos clientes
-    if (ativo === false) {
+    // Se tipo mudou para específico, adicionar clientes
+    if (data.tipo === 'especifico' && data.clientesEspecificos && Array.isArray(data.clientesEspecificos)) {
+      // Primeiro, remover relações existentes
       await prisma.cupomCliente.deleteMany({
         where: { CupomID: parseInt(id) }
       });
+
+      // Adicionar novas relações
+      if (data.clientesEspecificos.length > 0) {
+        const cuponsCliente = data.clientesEspecificos.map(clienteId => ({
+          CupomID: parseInt(id),
+          ClienteID: parseInt(clienteId)
+        }));
+
+        await prisma.cupomCliente.createMany({
+          data: cuponsCliente,
+          skipDuplicates: true
+        });
+      }
     }
 
-    res.json({
-      success: true,
-      message: 'Cupom atualizado com sucesso',
-      data: cupomAtualizado
-    });
+    logger.info('atualizar_cupom_ok', { id: cupom.CupomID });
+    res.json(cupom);
   } catch (error) {
-    console.error('Erro ao atualizar cupom:', error);
-    console.error('Stack trace:', error.stack);
-    res.status(500).json({
-      success: false,
-      message: 'Erro interno do servidor: ' + error.message
-    });
+    logControllerError('atualizar_cupom_error', error, req);
+    if (error.code === "P2002") {
+      return res.status(400).json({ error: "Código do cupom já existe" });
+    }
+    res.status(500).json({ error: "Erro interno do servidor" });
   }
 };
 
-// Deletar cupom
-const deletarCupom = async (req, res) => {
+/**
+ * Exclui um cupom
+ * @param {Object} req - Requisição Express
+ * @param {Object} res - Resposta Express
+ * @returns {Object} JSON com mensagem de sucesso
+ */
+export const excluirCupom = async (req, res) => {
   try {
     const { id } = req.params;
-    const vendedorID = req.vendorId;
+    const vendedorId = req.user?.vendedorId;
+
+    if (!vendedorId) {
+      return res.status(401).json({ error: "Vendedor não autenticado" });
+    }
 
     const cupom = await prisma.cupom.findFirst({
       where: {
         CupomID: parseInt(id),
-        VendedorID: vendedorID
+        CriadoPor: vendedorId
       }
     });
 
     if (!cupom) {
-      return res.status(404).json({
-        success: false,
-        message: 'Cupom não encontrado'
+      return res.status(404).json({ error: "Cupom não encontrado" });
+    }
+
+    // Verificar se o cupom já foi usado
+    const temUso = await prisma.pedido.findFirst({
+      where: { CupomID: parseInt(id) }
+    });
+
+    if (temUso) {
+      return res.status(400).json({
+        error: "Não é possível excluir cupom que já foi utilizado em pedidos"
       });
     }
 
-    // Remover todas as distribuições do cupom antes de deletar
+    // Excluir relações primeiro
     await prisma.cupomCliente.deleteMany({
       where: { CupomID: parseInt(id) }
     });
 
-    // Deletar o cupom
+    // Excluir cupom
     await prisma.cupom.delete({
       where: { CupomID: parseInt(id) }
     });
 
-    res.json({
-      success: true,
-      message: 'Cupom deletado com sucesso'
-    });
+    logger.info('excluir_cupom_ok', { id });
+    res.json({ message: "Cupom excluído com sucesso" });
   } catch (error) {
-    console.error('Erro ao deletar cupom:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erro interno do servidor'
-    });
+    logControllerError('excluir_cupom_error', error, req);
+    res.status(500).json({ error: "Erro interno do servidor" });
   }
 };
 
-
-// Endpoint removido - agora cupons são distribuídos automaticamente
-const listarCuponsPublicos = async (req, res) => {
-  // Este endpoint não é mais necessário pois cupons são distribuídos automaticamente
-  // Os clientes veem apenas os cupons que receberam via /meus
-  res.json({
-    success: true,
-    data: [],
-    message: 'Cupons são distribuídos automaticamente. Use /meus para ver seus cupons.'
-  });
-};
-
-// Endpoint para listar cupons disponíveis no carrinho (compatibilidade)
-const listarCuponsDisponiveis = async (req, res) => {
+/**
+ * Ativa/desativa um cupom
+ * @param {Object} req - Requisição Express
+ * @param {Object} res - Resposta Express
+ * @returns {Object} JSON com cupom atualizado
+ */
+export const toggleCupomStatus = async (req, res) => {
   try {
-    const clienteID = req.user.id;
+    const { id } = req.params;
+    const vendedorId = req.user?.vendedorId;
 
-    // Verificar se o cliente é pessoa física
-    const cliente = await prisma.cliente.findUnique({
-      where: { ClienteID: clienteID },
-      select: { TipoPessoa: true }
-    });
-
-    if (!cliente || cliente.TipoPessoa !== 'FISICA') {
-      return res.json({
-        success: true,
-        data: []
-      });
+    if (!vendedorId) {
+      return res.status(401).json({ error: "Vendedor não autenticado" });
     }
 
-    // Buscar cupons recebidos que estão ativos e não expiraram
-    const cuponsDisponiveis = await prisma.cupomCliente.findMany({
+    const cupom = await prisma.cupom.findFirst({
       where: {
-        ClienteID: clienteID,
-        cupom: {
-          Ativo: true,
-          OR: [
-            { DataExpiracao: null },
-            { DataExpiracao: { gt: new Date() } }
-          ]
-        }
-      },
-      include: {
-        cupom: {
-          include: {
-            vendedor: {
-              select: {
-                Nome: true,
-                EmpresaID: true,
-                empresa: {
-                  select: {
-                    Nome: true
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      orderBy: { RecebidoEm: 'desc' }
-    });
-
-    // Formatar resposta para compatibilidade
-    const cuponsFormatados = cuponsDisponiveis.map(cupomCliente => ({
-      id: cupomCliente.CupomClienteID,
-      codigo: cupomCliente.cupom.Codigo,
-      nome: cupomCliente.cupom.Nome,
-      tipo: cupomCliente.cupom.Tipo,
-      descontoTipo: cupomCliente.cupom.DescontoTipo,
-      descontoValor: cupomCliente.cupom.DescontoValor,
-      dataExpiracao: cupomCliente.cupom.DataExpiracao,
-      restricoes: cupomCliente.cupom.Restricoes || {},
-      vendedor: {
-        nome: cupomCliente.cupom.vendedor?.Nome || 'Vendedor',
-        empresa: cupomCliente.cupom.vendedor?.empresa?.Nome || null
-      },
-      status: cupomCliente.Usado ? 'used' : (cupomCliente.Resgatado ? 'redeemed' : 'available'),
-      usosCliente: cupomCliente.UsosCliente,
-      usoPorCliente: cupomCliente.cupom.UsoPorCliente
-    }));
-
-    res.json({
-      success: true,
-      data: cuponsFormatados
-    });
-  } catch (error) {
-    console.error('Erro ao listar cupons disponíveis:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erro interno do servidor'
-    });
-  }
-};
-
-// Resgatar cupom (cliente)
-const resgatarCupom = async (req, res) => {
-  try {
-    const { cupomClienteID } = req.body;
-    const clienteID = req.user.id;
-
-    // Buscar distribuição do cupom
-    const cupomCliente = await prisma.cupomCliente.findFirst({
-      where: {
-        CupomClienteID: parseInt(cupomClienteID),
-        ClienteID: clienteID,
-        Resgatado: false
-      },
-      include: {
-        cupom: true
+        CupomID: parseInt(id),
+        CriadoPor: vendedorId
       }
-    });
-
-    if (!cupomCliente) {
-      return res.status(404).json({
-        success: false,
-        message: 'Cupom não encontrado ou já resgatado'
-      });
-    }
-
-    // Verificar se cupom ainda está ativo e não expirou
-    if (!cupomCliente.cupom.Ativo) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cupom inativo'
-      });
-    }
-
-    if (cupomCliente.cupom.DataExpiracao && new Date() > cupomCliente.cupom.DataExpiracao) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cupom expirado'
-      });
-    }
-
-    // Marcar como resgatado
-    await prisma.cupomCliente.update({
-      where: { CupomClienteID: parseInt(cupomClienteID) },
-      data: {
-        Resgatado: true,
-        DataResgate: new Date()
-      }
-    });
-
-    res.json({
-      success: true,
-      message: 'Cupom resgatado com sucesso!',
-      data: {
-        cupom: cupomCliente.cupom,
-        codigo: cupomCliente.cupom.Codigo
-      }
-    });
-  } catch (error) {
-    console.error('Erro ao resgatar cupom:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erro interno do servidor'
-    });
-  }
-};
-
-// Validar cupom para uso (cliente)
-const validarCupom = async (req, res) => {
-  try {
-    const { codigo, clienteID, produtos = [], subtotal, frete } = req.body;
-
-    const cupom = await prisma.cupom.findUnique({
-      where: { Codigo: codigo.toUpperCase() }
     });
 
     if (!cupom) {
-      return res.status(404).json({
-        success: false,
-        message: 'Cupom não encontrado'
-      });
+      return res.status(404).json({ error: "Cupom não encontrado" });
     }
 
-    // Verificar se cupom está ativo
-    if (!cupom.Ativo) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cupom inativo'
-      });
-    }
-
-    // Verificar se está dentro do período válido
-    const now = new Date();
-    if (cupom.DataInicio && now < cupom.DataInicio) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cupom ainda não está disponível'
-      });
-    }
-
-    // Verificar expiração
-    if (cupom.DataExpiracao && now > cupom.DataExpiracao) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cupom expirado'
-      });
-    }
-
-    // Verificar limite de uso global
-    if (cupom.LimiteUso && cupom.UsosAtuais >= cupom.LimiteUso) {
-      return res.status(400).json({
-        success: false,
-        message: 'Limite de uso do cupom atingido'
-      });
-    }
-
-    // Verificar se o cliente é pessoa física
-    const cliente = await prisma.cliente.findUnique({
-      where: { ClienteID: clienteID },
-      select: { TipoPessoa: true }
+    const cupomAtualizado = await prisma.cupom.update({
+      where: { CupomID: parseInt(id) },
+      data: { Ativo: !cupom.Ativo }
     });
 
-    if (!cliente || cliente.TipoPessoa !== 'FISICA') {
-      return res.status(400).json({
-        success: false,
-        message: 'Cupons disponíveis apenas para pessoas físicas'
-      });
+    logger.info('toggle_cupom_status_ok', { id, ativo: cupomAtualizado.Ativo });
+    res.json(cupomAtualizado);
+  } catch (error) {
+    logControllerError('toggle_cupom_status_error', error, req);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+};
+
+/**
+ * Lista clientes do vendedor para seleção em cupons específicos
+ * @param {Object} req - Requisição Express
+ * @param {Object} res - Resposta Express
+ * @returns {Object} JSON com lista de clientes
+ */
+export const listarClientesParaCupom = async (req, res) => {
+  try {
+    const vendedorId = req.user?.vendedorId;
+
+    if (!vendedorId) {
+      return res.status(401).json({ error: "Vendedor não autenticado" });
     }
 
-    // Verificar se cliente recebeu o cupom
-    const cupomCliente = await prisma.cupomCliente.findUnique({
+    // Buscar clientes que compraram do vendedor
+    const clientes = await prisma.clienteVendedor.findMany({
+      where: { VendedorID: vendedorId },
+      include: {
+        cliente: {
+          select: {
+            ClienteID: true,
+            NomeCompleto: true,
+            Email: true,
+            DataCadastro: true
+          }
+        }
+      },
+      orderBy: { UltimoPedidoEm: 'desc' }
+    });
+
+    const clientesFormatados = clientes.map(cv => ({
+      ClienteID: cv.cliente.ClienteID,
+      NomeCompleto: cv.cliente.NomeCompleto,
+      Email: cv.cliente.Email,
+      DataCadastro: cv.cliente.DataCadastro,
+      UltimoPedidoEm: cv.UltimoPedidoEm,
+      TotalPedidos: cv.TotalPedidos,
+      ValorTotal: cv.ValorTotal
+    }));
+
+    logger.info('listar_clientes_cupom_ok', { total: clientesFormatados.length });
+    res.json({ clientes: clientesFormatados });
+  } catch (error) {
+    logControllerError('listar_clientes_cupom_error', error, req);
+    res.status(500).json({ error: "Erro ao listar clientes" });
+  }
+};
+
+/**
+ * Lista cupons disponíveis para um cliente (públicos + atribuídos especificamente)
+ * @param {Object} req - Requisição Express
+ * @param {Object} res - Resposta Express
+ * @returns {Object} JSON com cupons disponíveis
+ */
+export const listarCuponsDisponiveisCliente = async (req, res) => {
+  try {
+    const clienteId = req.user?.id;
+
+    if (!clienteId) {
+      return res.status(401).json({ error: "Cliente não autenticado" });
+    }
+
+    // Buscar cupons públicos ativos + cupons específicos atribuídos ao cliente
+    const cupons = await prisma.cupom.findMany({
       where: {
-        CupomID_ClienteID: {
-          CupomID: cupom.CupomID,
-          ClienteID: clienteID
+        Ativo: true,
+        OR: [
+          {
+            Tipo: 'publico',
+            OR: [
+              { DataExpiracao: { gte: new Date() } },
+              { DataExpiracao: null }
+            ]
+          },
+          {
+            Tipo: 'especifico',
+            cuponsCliente: {
+              some: {
+                ClienteID: clienteId,
+                Resgatado: false
+              }
+            },
+            OR: [
+              { DataExpiracao: { gte: new Date() } },
+              { DataExpiracao: null }
+            ]
+          }
+        ]
+      },
+      select: {
+        CupomID: true,
+        Nome: true,
+        Codigo: true,
+        Tipo: true,
+        DescontoTipo: true,
+        DescontoValor: true,
+        DataExpiracao: true,
+        LimiteUso: true,
+        UsoPorCliente: true,
+        Restricoes: true,
+        UsosAtuais: true,
+        cuponsCliente: {
+          where: { ClienteID: clienteId },
+          select: {
+            Resgatado: true,
+            Usado: true,
+            UsosCliente: true
+          }
+        }
+      },
+      orderBy: { CriadoEm: 'desc' }
+    });
+
+    // Filtrar cupons que ainda podem ser usados pelo cliente
+    const cuponsDisponiveis = cupons.filter(cupom => {
+      // Verificar limite total de uso
+      if (cupom.LimiteUso && cupom.UsosAtuais >= cupom.LimiteUso) {
+        return false;
+      }
+
+      // Para cupons específicos, verificar uso individual
+      if (cupom.Tipo === 'especifico' && cupom.cuponsCliente.length > 0) {
+        const usoCliente = cupom.cuponsCliente[0];
+        if (usoCliente.Usado || (cupom.UsoPorCliente && usoCliente.UsosCliente >= cupom.UsoPorCliente)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    // Formatar resposta
+    const cuponsFormatados = cuponsDisponiveis.map(cupom => ({
+      CupomID: cupom.CupomID,
+      Nome: cupom.Nome,
+      Codigo: cupom.Codigo,
+      Tipo: cupom.Tipo,
+      DescontoTipo: cupom.DescontoTipo,
+      DescontoValor: cupom.DescontoValor,
+      DataExpiracao: cupom.DataExpiracao,
+      Restricoes: cupom.Restricoes,
+      UsosRestantes: cupom.LimiteUso ? cupom.LimiteUso - cupom.UsosAtuais : null,
+      UsosClienteRestantes: cupom.Tipo === 'especifico' && cupom.cuponsCliente.length > 0
+        ? (cupom.UsoPorCliente ? cupom.UsoPorCliente - cupom.cuponsCliente[0].UsosCliente : null)
+        : null
+    }));
+
+    logger.info('listar_cupons_cliente_ok', { total: cuponsFormatados.length });
+    res.json({ cupons: cuponsFormatados });
+  } catch (error) {
+    logControllerError('listar_cupons_cliente_error', error, req);
+    res.status(500).json({ error: "Erro ao listar cupons disponíveis" });
+  }
+};
+
+/**
+ * Valida e aplica cupom a um carrinho/pedido
+ * @param {Object} req - Requisição Express
+ * @param {Object} res - Resposta Express
+ * @returns {Object} JSON com resultado da validação
+ */
+export const validarCupom = async (req, res) => {
+  try {
+    const { codigo, itensCarrinho, valorTotal } = req.body;
+    const clienteId = req.user?.id;
+
+    if (!clienteId) {
+      return res.status(401).json({ error: "Cliente não autenticado" });
+    }
+
+    if (!codigo) {
+      return res.status(400).json({ error: "Código do cupom é obrigatório" });
+    }
+
+    // Buscar cupom por código
+    const cupom = await prisma.cupom.findFirst({
+      where: {
+        Codigo: codigo,
+        Ativo: true,
+        OR: [
+          { DataExpiracao: null },
+          { DataExpiracao: { gte: new Date() } }
+        ]
+      },
+      include: {
+        cuponsCliente: {
+          where: { ClienteID: clienteId }
         }
       }
     });
 
-    if (!cupomCliente) {
-      return res.status(400).json({
-        success: false,
-        message: 'Você não possui este cupom'
-      });
+    if (!cupom) {
+      return res.status(404).json({ error: "Cupom não encontrado ou expirado" });
     }
 
-    // Verificar se já foi usado o limite por cliente
-    if (cupomCliente.UsosCliente >= cupom.UsoPorCliente) {
-      return res.status(400).json({
-        success: false,
-        message: 'Limite de uso por cliente atingido'
-      });
+    // Verificar se o cliente pode usar este cupom
+    if (cupom.Tipo === 'especifico') {
+      if (cupom.cuponsCliente.length === 0) {
+        return res.status(403).json({ error: "Este cupom não está disponível para você" });
+      }
+
+      const usoCliente = cupom.cuponsCliente[0];
+      if (usoCliente.Usado || (cupom.UsoPorCliente && usoCliente.UsosCliente >= cupom.UsoPorCliente)) {
+        return res.status(403).json({ error: "Você já usou este cupom o máximo permitido" });
+      }
     }
 
-    // Aplicar restrições configuráveis
-    const restricoes = cupom.Restricoes || {};
-
-    // Verificar valor mínimo da compra
-    if (restricoes.valor_minimo_compra && subtotal < restricoes.valor_minimo_compra) {
-      return res.status(400).json({
-        success: false,
-        message: `Valor mínimo para uso do cupom: R$ ${restricoes.valor_minimo_compra.toFixed(2)}`
-      });
+    // Verificar limite total de uso
+    if (cupom.LimiteUso && cupom.UsosAtuais >= cupom.LimiteUso) {
+      return res.status(403).json({ error: "Este cupom atingiu o limite de uso" });
     }
 
-    // Verificar frete grátis acima de valor
-    if (restricoes.frete_gratis_acima && frete > 0 && subtotal >= restricoes.frete_gratis_acima) {
-      // Frete grátis automático se subtotal >= valor configurado
-    }
+    // Validar restrições
+    if (cupom.Restricoes) {
+      // Restrição de categoria
+      if (cupom.Restricoes.categoriaId && itensCarrinho) {
+        const temCategoria = itensCarrinho.some(item =>
+          item.categoriaId === cupom.Restricoes.categoriaId
+        );
+        if (!temCategoria) {
+          return res.status(403).json({
+            error: "Este cupom é válido apenas para produtos de uma categoria específica"
+          });
+        }
+      }
 
-    // Verificar quantidade mínima de itens
-    if (restricoes.quantidade_minima_itens && produtos.length < restricoes.quantidade_minima_itens) {
-      return res.status(400).json({
-        success: false,
-        message: `Quantidade mínima de itens: ${restricoes.quantidade_minima_itens}`
-      });
-    }
-
-    // Verificar categoria restrita
-    if (restricoes.categoria_restrita) {
-      const categoriasIds = produtos.map(p => p.CategoriaID);
-      const temCategoriaElegivel = categoriasIds.includes(restricoes.categoria_restrita);
-
-      if (!temCategoriaElegivel) {
-        return res.status(400).json({
-          success: false,
-          message: 'Cupom não aplicável à categoria selecionada'
+      // Restrição de valor mínimo
+      if (cupom.Restricoes.valorMinimo && valorTotal < cupom.Restricoes.valorMinimo) {
+        return res.status(403).json({
+          error: `Este cupom requer um valor mínimo de compra de R$ ${cupom.Restricoes.valorMinimo.toFixed(2)}`
         });
       }
     }
 
-    res.json({
-      success: true,
-      message: 'Cupom válido',
-      data: {
-        cupom,
-        valido: true,
-        restricoes: restricoes
-      }
-    });
-  } catch (error) {
-    console.error('Erro ao validar cupom:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erro interno do servidor'
-    });
-  }
-};
-
-// Calcular desconto
-const calcularDesconto = async (req, res) => {
-  try {
-    const { codigo, subtotal, frete, produtos = [] } = req.body;
-
-    const cupom = await prisma.cupom.findUnique({
-      where: { Codigo: codigo.toUpperCase() }
-    });
-
-    if (!cupom) {
-      return res.status(404).json({
-        success: false,
-        message: 'Cupom não encontrado'
-      });
-    }
-
+    // Calcular desconto
     let desconto = 0;
-    let freteGratis = false;
-
-    // Aplicar restrições
-    const restricoes = cupom.Restricoes || {};
-
-    // Verificar valor mínimo da compra
-    if (restricoes.valor_minimo_compra && subtotal < restricoes.valor_minimo_compra) {
-      return res.status(400).json({
-        success: false,
-        message: `Valor mínimo para uso do cupom: R$ ${restricoes.valor_minimo_compra.toFixed(2)}`
-      });
+    if (cupom.DescontoTipo === 'porcentagem') {
+      desconto = (valorTotal * cupom.DescontoValor) / 100;
+    } else if (cupom.DescontoTipo === 'valor_fixo') {
+      desconto = Math.min(cupom.DescontoValor, valorTotal);
+    } else if (cupom.DescontoTipo === 'frete_gratis') {
+      // Desconto de frete será calculado no checkout
+      desconto = 0;
     }
 
-    // Verificar frete grátis acima de valor
-    if (restricoes.frete_gratis_acima && frete > 0 && subtotal >= restricoes.frete_gratis_acima) {
-      freteGratis = true;
-      desconto = frete;
-    }
-
-    // Calcular desconto baseado no tipo
-    switch (cupom.DescontoTipo) {
-      case 'valor_fixo':
-        desconto = cupom.DescontoValor;
-        break;
-
-      case 'porcentagem':
-        // Aplicar desconto apenas nos produtos elegíveis se houver restrição de categoria
-        if (restricoes.categoria_restrita) {
-          const produtosElegiveis = produtos.filter(p =>
-            p.CategoriaID === restricoes.categoria_restrita
-          );
-          const subtotalProdutos = produtosElegiveis.reduce((sum, p) =>
-            sum + (p.PrecoUnitario * p.Quantidade), 0
-          );
-          desconto = subtotalProdutos * (cupom.DescontoValor / 100);
-        } else {
-          desconto = subtotal * (cupom.DescontoValor / 100);
-        }
-        break;
-
-      case 'frete_gratis':
-        freteGratis = true;
-        desconto = frete;
-        break;
-    }
-
-    const totalComDesconto = subtotal + frete - desconto;
-
-    res.json({
-      success: true,
-      data: {
-        desconto: parseFloat(desconto.toFixed(2)),
-        freteGratis,
-        totalComDesconto: parseFloat(totalComDesconto.toFixed(2)),
-        cupom,
-        restricoes: restricoes
-      }
-    });
-  } catch (error) {
-    console.error('Erro ao calcular desconto:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erro interno do servidor'
-    });
-  }
-};
-
-// Listar cupons do cliente (cupons recebidos via distribuição)
-const listarMeusCupons = async (req, res) => {
-  try {
-    const clienteID = req.user.id;
-
-    // Verificar se o cliente é pessoa física
-    const cliente = await prisma.cliente.findUnique({
-      where: { ClienteID: clienteID },
-      select: { TipoPessoa: true }
-    });
-
-    if (!cliente || cliente.TipoPessoa !== 'FISICA') {
-      return res.json({
-        success: true,
-        data: []
-      });
-    }
-
-    const cuponsCliente = await prisma.cupomCliente.findMany({
-      where: { ClienteID: clienteID },
-      include: {
-        cupom: {
-          include: {
-            vendedor: {
-              select: {
-                Nome: true,
-                EmpresaID: true,
-                empresa: {
-                  select: {
-                    Nome: true
-                  }
-                }
-              }
-            }
-          }
-        }
+    const resultado = {
+      cupom: {
+        CupomID: cupom.CupomID,
+        Codigo: cupom.Codigo,
+        Nome: cupom.Nome,
+        DescontoTipo: cupom.DescontoTipo,
+        DescontoValor: cupom.DescontoValor
       },
-      orderBy: { RecebidoEm: 'desc' }
-    });
+      desconto: desconto,
+      valorFinal: Math.max(0, valorTotal - desconto),
+      valido: true
+    };
 
-    const cuponsFormatados = cuponsCliente.map(cupomCliente => ({
-      id: cupomCliente.CupomClienteID,
-      code: cupomCliente.cupom.Codigo,
-      discount: cupomCliente.cupom.DescontoValor,
-      type: cupomCliente.cupom.DescontoTipo === 'porcentagem' ? 'percentage' :
-            cupomCliente.cupom.DescontoTipo === 'frete_gratis' ? 'free_shipping' : 'fixed',
-      description: cupomCliente.cupom.Nome,
-      validUntil: cupomCliente.cupom.DataExpiracao,
-      used: cupomCliente.Usado,
-      status: cupomCliente.Usado ? 'used' : (cupomCliente.Resgatado ? 'redeemed' : 'available'),
-      redeemedAt: cupomCliente.DataResgate,
-      usedAt: cupomCliente.DataUso,
-      minValue: cupomCliente.cupom.Restricoes?.valor_minimo_compra || 0,
-      canRedeem: !cupomCliente.Resgatado && !cupomCliente.Usado,
-      vendedor: {
-        nome: cupomCliente.cupom.vendedor?.Nome || 'Vendedor',
-        empresa: cupomCliente.cupom.vendedor?.empresa?.Nome || null
-      },
-      restricoes: cupomCliente.cupom.Restricoes || {}
-    }));
-
-    res.json({
-      success: true,
-      data: cuponsFormatados
-    });
+    logger.info('validar_cupom_ok', { codigo: cupom.Codigo, clienteId });
+    res.json(resultado);
   } catch (error) {
-    console.error('Erro ao listar meus cupons:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erro interno do servidor'
-    });
+    logControllerError('validar_cupom_error', error, req);
+    res.status(500).json({ error: "Erro ao validar cupom" });
   }
-};
-
-export default {
-  criarCupom,
-  listarCupons,
-  buscarCupomPorId,
-  atualizarCupom,
-  deletarCupom,
-  distribuirCupom,
-  listarCuponsPublicos,
-  listarCuponsDisponiveis,
-  resgatarCupom,
-  listarMeusCupons,
-  validarCupom,
-  calcularDesconto
 };

@@ -186,6 +186,7 @@ model Pedido {
   // Campos para cupom
   CupomID          Int?                  // ID do cupom aplicado
   DescontoCupom    Float                 @default(0) // Valor do desconto aplicado
+  DescontoVista    Float                 @default(0) // Valor do desconto à vista
   itensPedido      ItensPedido[]
   pagamentosPedido PagamentosPedido[]
   distribuicoes    DistribuicaoPagamentoPedido[]
