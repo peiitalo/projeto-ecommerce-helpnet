@@ -1,6 +1,10 @@
+<<<<<<< HEAD
 // backend/src/controllers/cupomController.js
 import prisma from "../config/prisma.js";
 import { logControllerError, logger } from "../utils/logger.js";
+=======
+import prisma from '../config/prisma.js';
+>>>>>>> 82672d343b6be74c079cf881125d14baa85e7b74
 
 /**
  * Lista cupons do vendedor com filtros opcionais
@@ -697,4 +701,21 @@ export const validarCupom = async (req, res) => {
     logControllerError('validar_cupom_error', error, req);
     res.status(500).json({ error: "Erro ao validar cupom" });
   }
+<<<<<<< HEAD
+=======
+};
+
+export default {
+  criarCupom,
+  listarCupons,
+  buscarCupomPorId,
+  atualizarCupom,
+  deletarCupom,
+  listarCuponsPublicos,
+  listarCuponsDisponiveis,
+  resgatarCupom,
+  listarMeusCupons,
+  validarCupom,
+  calcularDesconto
+>>>>>>> 82672d343b6be74c079cf881125d14baa85e7b74
 };
