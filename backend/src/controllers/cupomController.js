@@ -701,8 +701,7 @@ export const validarCupom = async (req, res) => {
     logControllerError('validar_cupom_error', error, req);
     res.status(500).json({ error: "Erro ao validar cupom" });
   }
-<<<<<<< HEAD
-=======
+
 };
 
 export default {
@@ -717,5 +716,5 @@ export default {
   listarMeusCupons,
   validarCupom,
   calcularDesconto
->>>>>>> 82672d343b6be74c079cf881125d14baa85e7b74
+
 };
