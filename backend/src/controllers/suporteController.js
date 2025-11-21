@@ -157,13 +157,13 @@ export const buscarMinhaAvaliacao = async (req, res) => {
   }
 };
 
-// Listar avaliações para exibir no site (apenas as que têm ExibirSite = true)
+// Listar avaliações para exibir no site (apenas as que têm ExibirSite = true e 5 estrelas)
 export const listarAvaliacoesSite = async (req, res) => {
   try {
     const avaliacoes = await prisma.avaliacaoPlataforma.findMany({
       where: {
         ExibirSite: true,
-        Nota: { gte: 4 } // Apenas avaliações positivas (4-5 estrelas)
+        Nota: 5 // Apenas avaliações de 5 estrelas
       },
       include: {
         cliente: {

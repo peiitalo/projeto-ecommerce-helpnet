@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCounters } from '../../context/CountersContext';
 import { useNotifications } from '../../hooks/useNotifications';
+import CouponDetailsModal from '../../components/CouponDetailsModal';
 import {
   FaUser,
   FaShoppingCart,
@@ -15,7 +16,8 @@ import {
   FaCheck,
   FaTimes,
   FaCalendarAlt,
-  FaPercent
+  FaPercent,
+  FaEye
 } from 'react-icons/fa';
 import {
   FiSearch,
@@ -36,10 +38,11 @@ function MeusCuponsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedCoupon, setSelectedCoupon] = useState(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const { logout } = useAuth();
   const { favoritesCount, notificationsCount, cartCount } = useCounters();
-  const { showSuccess, showError } = useNotifications();
-  const navigate = useNavigate();
+  const { showSuccess } = useNotifications();
 
   // Logo configuration
   const logoConfig = {
@@ -67,7 +70,7 @@ function MeusCuponsPage() {
         const token = localStorage.getItem('accessToken');
         console.log('Frontend Debug - Token:', token ? 'present' : 'missing');
 
-        // Buscar TODOS os cupons do cliente (disponíveis E resgatados)
+        // Buscar cupons disponíveis do cliente
         const meusCuponsResponse = await fetch('/api/cupons/meus', {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -75,24 +78,24 @@ function MeusCuponsPage() {
           }
         });
 
-        let allCoupons = [];
+        let availableCoupons = [];
         if (meusCuponsResponse.ok) {
           const data = await meusCuponsResponse.json();
           console.log('Frontend Debug - Meus cupons response:', data);
           if (data.success && data.data.length > 0) {
-            allCoupons = data.data.map(cupomCliente => ({
+            availableCoupons = data.data.map(cupomCliente => ({
               id: cupomCliente.id,
               code: cupomCliente.code,
               discount: cupomCliente.discount,
               type: cupomCliente.type,
               description: cupomCliente.description,
               validUntil: cupomCliente.validUntil,
-              used: cupomCliente.used,
+              used: false, // Sempre false pois backend filtra apenas disponíveis
               minValue: cupomCliente.minValue,
-              status: cupomCliente.status,
+              status: 'available', // Sempre available pois backend filtra apenas disponíveis
               redeemedAt: cupomCliente.redeemedAt,
-              usedAt: cupomCliente.usedAt,
-              canRedeem: cupomCliente.canRedeem,
+              usedAt: null, // Sempre null pois backend filtra apenas disponíveis
+              canRedeem: true, // Sempre true pois são disponíveis
               vendedor: cupomCliente.vendedor,
               restricoes: cupomCliente.restricoes
             }));
@@ -101,14 +104,8 @@ function MeusCuponsPage() {
           console.log('Frontend Debug - Meus cupons failed:', meusCuponsResponse.status, await meusCuponsResponse.text());
         }
 
-        // Ordenar cupons
-        const sortedCoupons = allCoupons.sort((a, b) => {
-          // Ordenar por status: disponíveis primeiro, depois resgatados, depois usados
-          const statusOrder = { 'available': 0, 'redeemed': 1, 'used': 2 };
-          if (statusOrder[a.status] !== statusOrder[b.status]) {
-            return statusOrder[a.status] - statusOrder[b.status];
-          }
-          // Dentro do mesmo status, ordenar por data de validade
+        // Ordenar cupons por data de validade (todos são disponíveis)
+        const sortedCoupons = availableCoupons.sort((a, b) => {
           return new Date(a.validUntil) - new Date(b.validUntil);
         });
 
@@ -150,38 +147,6 @@ function MeusCuponsPage() {
     showSuccess('Código copiado para a área de transferência!');
   };
 
-  const redeemCoupon = async (cupomClienteID) => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch('/api/cupons/resgatar', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ cupomClienteID })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          showSuccess('Cupom resgatado com sucesso!');
-          // Copiar código para área de transferência
-          navigator.clipboard.writeText(data.data.cupom.Codigo);
-          showSuccess('Código copiado para a área de transferência!');
-          // Recarregar cupons
-          window.location.reload();
-        } else {
-          showError(data.message || 'Erro ao resgatar cupom');
-        }
-      } else {
-        showError('Erro ao resgatar cupom');
-      }
-    } catch (error) {
-      console.error('Erro ao resgatar cupom:', error);
-      showError('Erro interno do servidor');
-    }
-  };
 
   const formatDiscount = (coupon) => {
     if (coupon.type === 'free_shipping') {
@@ -401,22 +366,10 @@ function MeusCuponsPage() {
                             {formatDiscount(coupon)}
                           </h3>
                         <div className="flex gap-2">
-                          {coupon.status === 'used' && (
-                            <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full">
-                              Utilizado
-                            </span>
-                          )}
-                          {coupon.status === 'available' && (
-                            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
-                              Disponível
-                            </span>
-                          )}
-                          {coupon.status === 'redeemed' && (
-                            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
-                              Resgatado
-                            </span>
-                          )}
-                          {isExpired(coupon.validUntil) && coupon.status !== 'used' && (
+                          <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
+                            Disponível
+                          </span>
+                          {isExpired(coupon.validUntil) && (
                             <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded-full">
                               Expirado
                             </span>
@@ -446,35 +399,25 @@ function MeusCuponsPage() {
                         <span className="font-mono text-lg font-bold px-3 py-2 rounded border border-blue-200 text-blue-700 bg-blue-50">
                           {coupon.code}
                         </span>
-                      {coupon.status === 'available' && !isExpired(coupon.validUntil) && (
+                      {!isExpired(coupon.validUntil) && (
                         <button
-                          onClick={() => redeemCoupon(coupon.id)}
-                          className="px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
-                          title="Resgatar cupom"
+                          onClick={() => copyToClipboard(coupon.code)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Copiar código"
                         >
-                          Resgatar
+                          <FaCopy />
                         </button>
                       )}
-                      {coupon.status === 'redeemed' && !coupon.used && !isExpired(coupon.validUntil) && (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => copyToClipboard(coupon.code)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="Copiar código"
-                          >
-                            <FaCopy />
-                          </button>
-                          <button
-                            onClick={() => {
-                              navigate('/carrinho');
-                            }}
-                            className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-                            title="Usar no carrinho"
-                          >
-                            Usar
-                          </button>
-                        </div>
-                      )}
+                      <button
+                        onClick={() => {
+                          setSelectedCoupon(coupon);
+                          setIsDetailsModalOpen(true);
+                        }}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Ver detalhes"
+                      >
+                        <FaEye />
+                      </button>
                       </div>
                     </div>
                   </div>
@@ -505,7 +448,12 @@ function MeusCuponsPage() {
         </footer>
       </div>
 
-      {/* Removido: Modal de geração de cupom - agora cupons são distribuídos pelos vendedores */}
+      {/* Modal de detalhes do cupom */}
+      <CouponDetailsModal
+        isOpen={isDetailsModalOpen}
+        onClose={() => setIsDetailsModalOpen(false)}
+        coupon={selectedCoupon}
+      />
     </div>
   );
 }

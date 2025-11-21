@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext.jsx';
-import { useAuth } from '../../context/AuthContext.jsx';
-import { clienteService, freteService } from '../../services/api';
+import { clienteService } from '../../services/api';
 import { useNotifications } from '../../hooks/useNotifications';
-import MaskedInput from '../../components/cadastro/MaskedInput.jsx';
 import {
   FaShoppingCart,
   FaUser,
@@ -52,10 +50,12 @@ function CheckoutPage() {
   ];
   const [orderData, setOrderData] = useState(null);
   const [processingOrder, setProcessingOrder] = useState(false);
+  const [installments, setInstallments] = useState({});
   const [orderComplete, setOrderComplete] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
-  const [cardDetails, setCardDetails] = useState({});
-  const [installments, setInstallments] = useState({});
+  const [availableCoupons, setAvailableCoupons] = useState([]);
+  const [couponInput, setCouponInput] = useState('');
+  const [showCouponSection, setShowCouponSection] = useState(false);
   const CASH_DISCOUNT_PERCENTAGE = 5; // Desconto fixo de 5% para pagamentos à vista
 
   // Calcular desconto atual baseado nos métodos de pagamento selecionados
@@ -65,15 +65,10 @@ function CheckoutPage() {
     );
     return hasCashPayment ? CASH_DISCOUNT_PERCENTAGE : 0;
   };
-  const [couponCode, setCouponCode] = useState(''); // Código do cupom
-  const [couponApplied, setCouponApplied] = useState(null); // Cupom aplicado
-  const [couponLoading, setCouponLoading] = useState(false); // Loading do cupom
-  const [couponError, setCouponError] = useState(''); // Erro do cupom
 
-  const { items, count, clear, freight, freightOptions, selectedFreight, setSelectedFreight, calculateFreight, freightLoading, freightError, selectedAddress, setSelectedAddress, total, subtotal } = useCart();
-  const { user } = useAuth();
+  const { items, count, clear, freight, freightOptions, selectedFreight, setSelectedFreight, calculateFreight, freightLoading, freightError, selectedAddress, setSelectedAddress, total, appliedCoupons, couponDiscount } = useCart();
   const navigate = useNavigate();
-  const { showSuccess, showError, showWarning, showInfo } = useNotifications();
+  const { showSuccess, showError, showInfo } = useNotifications();
 
   // Logo configuration
   const logoConfig = {
@@ -103,6 +98,13 @@ function CheckoutPage() {
     carregarDadosCheckout();
   }, [count, navigate]);
 
+  // Carregar e filtrar cupons disponíveis baseado no carrinho
+  useEffect(() => {
+    if (items.length > 0 && orderData) {
+      carregarCuponsDisponiveis();
+    }
+  }, [items, orderData]);
+
   // Ler itens selecionados do sessionStorage
   const getSelectedItems = () => {
     try {
@@ -117,30 +119,97 @@ function CheckoutPage() {
     }
   };
 
-  // Atualizar orderData sempre que freight ou discountPercentage mudar
+  // Carregar e filtrar cupons disponíveis
+  const carregarCuponsDisponiveis = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) return;
+
+      // Buscar cupons disponíveis do cliente
+      const response = await fetch('/api/cupons/meus', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+      const userCoupons = data.success ? data.data : [];
+
+      // Filtrar cupons baseado no conteúdo do carrinho atual
+      const selectedItemIds = getSelectedItems();
+      const selectedItems = items.filter(item => selectedItemIds.includes(item.id));
+      const cartTotal = selectedItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+
+      const applicableCoupons = [];
+
+      for (const coupon of userCoupons) {
+        try {
+          // Validar se o cupom é aplicável ao carrinho atual
+          const validationResponse = await fetch('/api/cupons/validar', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              codigo: coupon.code,
+              itensCarrinho: selectedItemIds,
+              valorTotal: cartTotal
+            })
+          });
+
+          if (validationResponse.ok) {
+            const validationData = await validationResponse.json();
+            if (validationData.valido) {
+              applicableCoupons.push({
+                ...coupon,
+                discountAmount: validationData.desconto,
+                finalValue: validationData.valorFinal
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao validar cupom:', coupon.code, error);
+        }
+      }
+
+      setAvailableCoupons(applicableCoupons);
+    } catch (error) {
+      console.error('Erro ao carregar cupons disponíveis:', error);
+      setAvailableCoupons([]);
+    }
+  };
+
+  // Atualizar orderData sempre que freight, discountPercentage ou appliedCoupon mudar
   useEffect(() => {
     if (orderData) {
       const selectedItemIds = getSelectedItems();
       const selectedItems = items.filter(item => selectedItemIds.includes(item.id));
       const selectedSubtotal = selectedItems.reduce((total, item) => {
-        const discountValue = Number(item.discount) || 0;
-        const basePrice = item.originalPrice || item.price || 0;
-        const finalPrice = discountValue > 0 ? basePrice * (1 - discountValue / 100) : basePrice;
-        return total + (finalPrice * item.quantity);
+        return total + (item.price * item.quantity);
       }, 0);
 
       const currentDiscountPercentage = getCurrentDiscountPercentage();
-      const discountAmount = selectedSubtotal * (currentDiscountPercentage / 100);
+      // Apply coupon discounts first, then payment discounts to the remaining amount
+      const amountAfterCouponDiscount = selectedSubtotal - couponDiscount;
+      const discountAmount = amountAfterCouponDiscount * (currentDiscountPercentage / 100);
+
+      const freteCost = appliedCoupons.some(coupon => coupon.TipoDesconto === 'frete_gratis') ? 0 : freight.valor;
+      const totalCalculado = amountAfterCouponDiscount - discountAmount + freteCost;
       const dadosAtualizados = {
         items: selectedItems,
         subtotal: selectedSubtotal,
         discountAmount: discountAmount,
-        frete: freight.valor,
-        total: selectedSubtotal - discountAmount + freight.valor
+        couponDiscountAmount: couponDiscount,
+        frete: freteCost,
+        total: Math.max(0, totalCalculado)
       };
       setOrderData(dadosAtualizados);
 
-      console.log(`[DEBUG] Order total updated: R$ ${dadosAtualizados.total.toFixed(2)} (subtotal: R$ ${dadosAtualizados.subtotal.toFixed(2)}, discount: R$ ${dadosAtualizados.discountAmount.toFixed(2)}, freight: R$ ${dadosAtualizados.frete.toFixed(2)})`);
+      console.log(`[DEBUG] Order total updated: R$ ${dadosAtualizados.total.toFixed(2)} (subtotal: R$ ${dadosAtualizados.subtotal.toFixed(2)}, coupon discount: R$ ${dadosAtualizados.couponDiscountAmount.toFixed(2)}, payment discount: R$ ${dadosAtualizados.discountAmount.toFixed(2)}, freight: R$ ${dadosAtualizados.frete.toFixed(2)})`);
 
       // Atualizar valores dos métodos de pagamento baseado no novo total apenas se houver apenas 1 método
       setPaymentMethods(prev => {
@@ -152,14 +221,22 @@ function CheckoutPage() {
         return prev;
       });
     }
-  }, [freight.valor, items]);
+  }, [freight.valor, items, appliedCoupons, total]);
 
   const carregarDadosCheckout = async () => {
     try {
       setLoading(true);
 
+      // Carregar dados do checkout do sessionStorage
+      const checkoutData = JSON.parse(sessionStorage.getItem('helpnet_checkout_data') || '{}');
+
+      // Aplicar cupons se existirem nos dados salvos
+      if (checkoutData.appliedCoupons && Array.isArray(checkoutData.appliedCoupons)) {
+        // Note: CartContext will handle loading coupons from storage
+      }
+
       // Obter itens selecionados
-      const selectedItemIds = getSelectedItems();
+      const selectedItemIds = checkoutData.selectedItems || getSelectedItems();
       const selectedItems = items.filter(item => selectedItemIds.includes(item.id));
 
       // Carregar endereços do cliente
@@ -167,32 +244,45 @@ function CheckoutPage() {
       const enderecos = enderecosResponse.enderecos || [];
       setAddresses(enderecos);
 
-      // Selecionar primeiro endereço como padrão se existir
-      if (enderecos.length > 0) {
-        setSelectedAddress(enderecos[0]);
-        // Calcular frete automaticamente para o primeiro endereço e itens selecionados
-        await calculateFreight(enderecos[0].EnderecoID, selectedItemIds);
+      // Selecionar endereço salvo ou primeiro como padrão
+      let selectedAddressToUse = null;
+      if (checkoutData.selectedAddressId && enderecos.length > 0) {
+        selectedAddressToUse = enderecos.find(a => a.EnderecoID === checkoutData.selectedAddressId) || enderecos[0];
+      } else if (enderecos.length > 0) {
+        selectedAddressToUse = enderecos[0];
       }
 
-      // Calcular subtotal apenas dos itens selecionados (já com descontos de produto aplicados)
+      if (selectedAddressToUse) {
+        setSelectedAddress(selectedAddressToUse);
+        // Calcular frete automaticamente para o endereço selecionado e itens selecionados
+        await calculateFreight(selectedAddressToUse.EnderecoID, selectedItemIds);
+      }
+
+      // Calcular subtotal apenas dos itens selecionados (usando preços já com desconto)
       const selectedSubtotal = selectedItems.reduce((total, item) => {
-        const discountValue = Number(item.discount) || 0;
-        const basePrice = item.originalPrice || item.price || 0;
-        const finalPrice = discountValue > 0 ? basePrice * (1 - discountValue / 100) : basePrice;
-        return total + (finalPrice * item.quantity);
+        return total + (item.price * item.quantity);
       }, 0);
 
       // Calcular desconto à vista
       const currentDiscountPercentage = getCurrentDiscountPercentage();
-      const discountAmount = selectedSubtotal * (currentDiscountPercentage / 100);
+      // Apply coupon discounts first, then payment discounts to the remaining amount
+      const amountAfterCouponDiscount = selectedSubtotal - couponDiscount;
+      const discountAmount = amountAfterCouponDiscount * (currentDiscountPercentage / 100);
 
-      // Preparar dados do pedido usando valores calculados
+      // Usar valores calculados do CartContext
+      const freteCost = appliedCoupons.some(coupon => coupon.TipoDesconto === 'frete_gratis') ? 0 : freight.valor;
+
+      // Calcular total correto
+      const totalCalculado = amountAfterCouponDiscount - discountAmount + freteCost;
+
+      // Preparar dados do pedido usando valores do CartContext
       const dadosPedido = {
         items: selectedItems,
         subtotal: selectedSubtotal,
         discountAmount: discountAmount,
-        frete: freight.valor,
-        total: selectedSubtotal - discountAmount + freight.valor
+        couponDiscountAmount: couponDiscount,
+        frete: freteCost,
+        total: Math.max(0, totalCalculado)
       };
 
       setOrderData(dadosPedido);
@@ -207,85 +297,6 @@ function CheckoutPage() {
     }
   };
 
-  // Aplicar cupom
-  const handleAplicarCupom = async () => {
-    if (!couponCode.trim()) {
-      setCouponError('Digite o código do cupom');
-      return;
-    }
-
-    setCouponLoading(true);
-    setCouponError('');
-
-    try {
-      // Validar cupom via API
-      const response = await fetch('/api/cupons/validar', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          codigo: couponCode.toUpperCase(),
-          clienteID: user?.id,
-          produtos: items.map(item => ({
-            ProdutoID: item.id,
-            CategoriaID: item.categoryId,
-            PrecoUnitario: item.price,
-            Quantidade: item.quantity
-          })),
-          subtotal: orderData?.subtotal || 0,
-          frete: freight.valor || 0
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Erro ao validar cupom');
-      }
-
-      if (!data.valido) {
-        throw new Error(data.message || 'Cupom inválido');
-      }
-
-      setCouponApplied(data.data.cupom);
-      showSuccess('Cupom aplicado com sucesso!');
-
-      // Recalcular frete se necessário (cupom pode dar frete grátis)
-      if (selectedAddress && data.data.cupom.TipoDesconto === 'FRETE_GRATIS') {
-        const selectedItemIds = getSelectedItems();
-        await calculateFreight(selectedAddress.EnderecoID, selectedItemIds);
-      }
-
-    } catch (error) {
-      console.error('Erro ao aplicar cupom:', error);
-      setCouponError(error.message);
-      setCouponApplied(null);
-    } finally {
-      setCouponLoading(false);
-    }
-  };
-
-  // Remover cupom
-  const handleRemoverCupom = () => {
-    setCouponApplied(null);
-    setCouponCode('');
-    setCouponError('');
-    showInfo('Cupom removido');
-
-    // Recalcular frete se necessário
-    if (selectedAddress) {
-      const selectedItemIds = getSelectedItems();
-      calculateFreight(selectedAddress.EnderecoID, selectedItemIds);
-    }
-  };
-
-  // Calcular subtotal
-  const calcularSubtotal = () => {
-    return items.reduce((total, item) => total + (item.price * item.quantity), 0);
-  };
-
 
   // Atualizar valor do método de pagamento
   const updatePaymentAmount = (id, amount) => {
@@ -293,27 +304,6 @@ function CheckoutPage() {
     setPaymentMethods(prev => prev.map(method => {
       return method.id === id ? { ...method, amount: numericAmount } : method;
     }));
-  };
-
-  // Atualizar dados do cartão para um método específico
-  const updateCardDetails = (methodId, field, value) => {
-    setCardDetails(prev => ({
-      ...prev,
-      [methodId]: {
-        ...prev[methodId],
-        [field]: value
-      }
-    }));
-  };
-
-  // Obter dados do cartão para um método específico
-  const getCardDetails = (methodId) => {
-    return cardDetails[methodId] || {
-      number: '',
-      expiry: '',
-      cvv: '',
-      name: ''
-    };
   };
 
   // Calcular parcelas para cartão de crédito
@@ -366,14 +356,6 @@ function CheckoutPage() {
     if (paymentMethods.length <= 1) return;
 
     setPaymentMethods(prev => prev.filter(method => method.id !== id));
-    
-    // Limpar dados do cartão do método removido
-    setCardDetails(prev => {
-      const newCardDetails = { ...prev };
-      delete newCardDetails[id];
-      return newCardDetails;
-    });
-
   };
 
   // Calcular total dos pagamentos (os valores já incluem descontos aplicados)
@@ -423,28 +405,60 @@ function CheckoutPage() {
       // Recalcular dados do pedido usando os valores calculados do CartContext
       const selectedItems = items.filter(item => selectedItemIds.includes(item.id));
 
-      // Recalcular subtotal com descontos de produto
+      // Recalcular subtotal usando preços já com desconto
       const recalculatedSubtotal = selectedItems.reduce((total, item) => {
-        const discountValue = Number(item.discount) || 0;
-        const basePrice = item.originalPrice || item.price || 0;
-        const finalPrice = discountValue > 0 ? basePrice * (1 - discountValue / 100) : basePrice;
-        return total + (finalPrice * item.quantity);
+        return total + (item.price * item.quantity);
       }, 0);
 
       const currentDiscountPercentage = getCurrentDiscountPercentage();
-      const discountAmount = recalculatedSubtotal * (currentDiscountPercentage / 100);
+      // Apply coupon discounts first, then payment discounts to the remaining amount
+      const amountAfterCouponDiscount = recalculatedSubtotal - couponDiscount;
+      const discountAmount = amountAfterCouponDiscount * (currentDiscountPercentage / 100);
+
+      const freteCost = appliedCoupons.some(coupon => coupon.TipoDesconto === 'frete_gratis') ? 0 : freight.valor;
+      const totalCalculado = amountAfterCouponDiscount - discountAmount + freteCost;
       setOrderData({
         items: selectedItems,
         subtotal: recalculatedSubtotal,
         discountAmount: discountAmount,
-        frete: freight.valor,
-        total: recalculatedSubtotal - discountAmount + freight.valor
+        couponDiscountAmount: couponDiscount,
+        frete: freteCost,
+        total: Math.max(0, totalCalculado)
       });
 
       // Ajustar valor do pagamento para o novo total (se apenas 1 método ativo)
       if (paymentMethods.length === 1) {
         setPaymentMethods(prev => prev.map(method => ({ ...method, amount: total })));
       }
+    }
+  };
+
+  // Aplicar cupom da lista de disponíveis
+  const handleApplyCouponFromList = async (couponCode) => {
+    const success = await applyCoupon(couponCode, getSelectedItems());
+    if (success) {
+      setCouponInput('');
+      setShowCouponSection(false);
+      showSuccess('Cupom aplicado com sucesso!');
+      // Recarregar cupons disponíveis para atualizar a lista
+      setTimeout(() => carregarCuponsDisponiveis(), 500);
+    }
+  };
+
+  // Aplicar cupom manualmente
+  const handleApplyManualCoupon = async () => {
+    if (!couponInput.trim()) {
+      showError('Digite o código do cupom');
+      return;
+    }
+
+    const success = await applyCoupon(couponInput.trim(), getSelectedItems());
+    if (success) {
+      setCouponInput('');
+      setShowCouponSection(false);
+      showSuccess('Cupom aplicado com sucesso!');
+      // Recarregar cupons disponíveis para atualizar a lista
+      setTimeout(() => carregarCuponsDisponiveis(), 500);
     }
   };
 
@@ -490,7 +504,7 @@ function CheckoutPage() {
         itens: selectedItems.map(item => ({
           produtoId: item.id,
           quantidade: item.quantity,
-          precoUnitario: item.price * (1 - (item.discount || 0) / 100) // Send discounted price
+          precoUnitario: item.price // Send discounted price
         })),
         metodosPagamento: metodosComValor.map(method => ({
           tipo: method.type,
@@ -501,7 +515,7 @@ function CheckoutPage() {
         descontoVista: getCurrentDiscountPercentage(),
         valorDescontoVista: orderData.discountAmount || 0,
         observacoes: '',
-        cupomCodigo: couponApplied?.Codigo
+        cupomCodigos: appliedCoupons.map(coupon => coupon.Codigo)
       };
 
       console.log('[DEBUG] Dados do pedido preparados:', {
@@ -880,30 +894,25 @@ function CheckoutPage() {
                         <div className="text-right">
                           {(() => {
                             const discountValue = Number(item.discount) || 0;
-                            // Garantir que usamos o preço base original do produto
-                            const basePrice = item.originalPrice || item.price || 0;
                             const quantity = item.quantity || 1;
+                            const totalPrice = item.price * quantity;
 
                             if (discountValue > 0) {
-                              // Calcular preço com desconto aplicado ao preço base
-                              const discountedPrice = basePrice * (1 - discountValue / 100);
-                              const totalDiscounted = discountedPrice * quantity;
-                              // Preço original total
-                              const originalTotal = basePrice * quantity;
+                              const originalPrice = item.originalPrice || (item.price / (1 - discountValue / 100));
+                              const originalTotal = originalPrice * quantity;
 
                               return (
                                 <div>
-                                  <p className="font-semibold text-green-600">{formatPrice(totalDiscounted)}</p>
+                                  <p className="font-semibold text-green-600">{formatPrice(totalPrice)}</p>
                                   <p className="text-sm text-slate-400 line-through">{formatPrice(originalTotal)}</p>
-                                  <p className="text-sm text-slate-600">{formatPrice(discountedPrice)} cada</p>
+                                  <p className="text-sm text-slate-600">{formatPrice(item.price)} cada</p>
                                 </div>
                               );
                             } else {
-                              const totalPrice = basePrice * quantity;
                               return (
                                 <div>
                                   <p className="font-semibold text-slate-900">{formatPrice(totalPrice)}</p>
-                                  <p className="text-sm text-slate-600">{formatPrice(basePrice)} cada</p>
+                                  <p className="text-sm text-slate-600">{formatPrice(item.price)} cada</p>
                                 </div>
                               );
                             }
@@ -917,6 +926,7 @@ function CheckoutPage() {
                       </div>
                     )}
                   </div>
+ }
                 </div>
 
                 {/* Seleção de Endereço */}
@@ -959,51 +969,207 @@ function CheckoutPage() {
                         </div>
                       ))}
 
-                      {/* Exibir opções de frete */}
-                      {selectedAddress && freightOptions.length > 0 && (
-                        <div className="mt-4 space-y-3">
-                          <div className="flex items-center gap-2 mb-2">
-                            <FaTruck className="text-blue-600" />
-                            <span className="text-sm font-medium text-blue-900">Opções de Frete</span>
-                          </div>
+                      {/* Cupons e Opções de Frete */}
+                      {selectedAddress && (
+                        <div className="mt-4 space-y-4">
+                          {/* Cupons Aplicados */}
+                          {appliedCoupons.length > 0 && (
+                            <div>
+                              <div className="flex items-center gap-2 mb-3">
+                                <FiTag className="text-blue-600" />
+                                <span className="text-sm font-medium text-blue-900">Cupons Aplicados</span>
+                              </div>
+                              <div className="space-y-3">
+                                {appliedCoupons.map((coupon, index) => (
+                                  <div
+                                    key={index}
+                                    className={`p-4 border rounded-lg ${
+                                      coupon.TipoDesconto === 'frete_gratis'
+                                        ? 'border-green-500 bg-green-50 cursor-pointer'
+                                        : 'border-blue-500 bg-blue-50'
+                                    }`}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-3">
+                                        {coupon.TipoDesconto === 'frete_gratis' ? (
+                                          <FaTruck className="text-green-600" />
+                                        )
+                                        
+                                         : (
+                                          <FiTag className="text-blue-600" />
+                                        )}
+                                        <div>
+                                          <h4 className="font-medium text-slate-900">{coupon.Codigo}</h4>
+                                          <p className="text-sm text-slate-600">
+                                            {coupon.TipoDesconto === 'porcentagem' ? `${coupon.ValorDesconto}% de desconto` :
+                                             coupon.TipoDesconto === 'valor_fixo' ? `R$ ${coupon.ValorDesconto} de desconto` :
+                                             coupon.TipoDesconto === 'frete_gratis' ? 'Frete grátis' :
+                                             'Desconto aplicado'}
+                                          </p>
+                                          {coupon.TipoDesconto === 'frete_gratis' && (
+                                            <p className="text-sm text-green-700 font-medium">Entrega gratuita</p>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="text-right">
+                                        {coupon.TipoDesconto === 'frete_gratis' ? (
+                                          <div>
+                                            <p className="font-medium text-green-600">GRÁTIS</p>
+                                            <p className="text-sm text-slate-600">Selecionado</p>
+                                          </div>
+                                         :
+                                          <p className="font-medium text-blue-600">
+                                            -{coupon.TipoDesconto === 'porcentagem' ? `${coupon.ValorDesconto}%` : formatPrice(coupon.ValorDesconto)}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                    {coupon.TipoDesconto === 'frete_gratis' && (
+                                      <div className="flex items-center gap-2 mt-2">
+                                        <FaCheck className="text-green-600" />
+                                        <span className="text-sm text-green-600">Cupom de frete aplicado</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
 
+                          {/* Opções de Frete */}
+                          {(!appliedCoupons.some(coupon => coupon.TipoDesconto === 'frete_gratis')) && freightOptions.length > 0 && (
+                            <>
+                              <div className="flex items-center gap-2 mb-3">
+                                <FaTruck className="text-blue-600" />
+                                <span className="text-sm font-medium text-blue-900">Opções de Frete</span>
+                              </div>
 
-                          {/* Mostrar opções de frete */}
-                          {freightOptions.map((option) => (
-                            <div
-                              key={option.id}
-                              onClick={() => setSelectedFreight(option)}
-                              className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                                selectedFreight?.id === option.id
-                                  ? 'border-blue-500 bg-blue-50'
-                                  : 'border-slate-200 hover:border-slate-300'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  <div>
-                                    <h4 className="font-medium text-slate-900">{option.nome}</h4>
-                                    <p className="text-sm text-slate-600">{option.transportadora}</p>
-                                    <p className="text-sm text-slate-600">{option.descricao}</p>
+                              {/* Mostrar opções de frete */}
+                              {freightOptions.map((option) => (
+                                <div
+                                  key={option.id}
+                                  onClick={() => setSelectedFreight(option)}
+                                  className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                                    selectedFreight?.id === option.id
+                                      ? 'border-blue-500 bg-blue-50'
+                                      : 'border-slate-200 hover:border-slate-300'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <FaTruck className="text-slate-400" />
+                                      <div>
+                                        <h4 className="font-medium text-slate-900">{option.nome}</h4>
+                                        <p className="text-sm text-slate-600">{option.transportadora}</p>
+                                        <p className="text-sm text-slate-600">{option.descricao}</p>
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="font-medium text-blue-600">{formatPrice(option.valor)}</p>
+                                      <p className="text-sm text-slate-600">{option.prazo}</p>
+                                    </div>
+                                  </div>
+                                  {selectedFreight?.id === option.id && (
+                                    <div className="flex items-center gap-2 mt-2">
+                                      <FaCheck className="text-blue-600" />
+                                      <span className="text-sm text-blue-600">Selecionado</span>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </>
+                          )}
+
+                          {/* Seção de Cupons */}
+                          <div className="mt-6 border-t border-slate-200 pt-4">
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center gap-2">
+                                <FiTag className="text-blue-600" />
+                                <span className="text-sm font-medium text-blue-900">Cupons Disponíveis</span>
+                              </div>
+                              <button
+                                onClick={() => setShowCouponSection(!showCouponSection)}
+                                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                              >
+                                {showCouponSection ? 'Ocultar' : 'Ver cupons'}
+                              </button>
+                            </div>
+
+                            {showCouponSection && (
+                              <div className="space-y-4">
+                                {/* Lista de cupons aplicáveis */}
+                                {availableCoupons.length > 0 ? (
+                                  <div className="space-y-3">
+                                    <p className="text-sm text-slate-600">Cupons aplicáveis ao seu carrinho:</p>
+                                    {availableCoupons.map((coupon) => (
+                                      <div
+                                        key={coupon.id}
+                                        className="p-4 border border-blue-200 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors"
+                                      >
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex-1">
+                                            <div className="flex items-center gap-2 mb-1">
+                                              <span className="font-mono text-sm font-bold px-2 py-1 rounded bg-blue-600 text-white">
+                                                {coupon.code}
+                                              </span>
+                                              <span className="text-sm text-green-600 font-medium">
+                                                {coupon.type === 'free_shipping' ? 'Frete Grátis' :
+                                                 coupon.type === 'percentage' ? `${coupon.discount}% OFF` :
+                                                 `R$ ${coupon.discount} OFF`}
+                                              </span>
+                                            </div>
+                                            <p className="text-sm text-slate-600 mb-2">{coupon.description}</p>
+                                            {coupon.discountAmount > 0 && (
+                                              <p className="text-sm text-green-600 font-medium">
+                                                Desconto: R$ {coupon.discountAmount.toFixed(2)}
+                                              </p>
+                                            )}
+                                            {coupon.minValue > 0 && (
+                                              <p className="text-xs text-slate-500">
+                                                Valor mínimo: R$ {coupon.minValue}
+                                              </p>
+                                            )}
+                                          </div>
+                                          <button
+                                            onClick={() => handleApplyCouponFromList(coupon.code)}
+                                            className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                                          >
+                                            Aplicar
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )
+                                : (
+                                  <p className="text-sm text-slate-600">Nenhum cupom aplicável encontrado para os itens do seu carrinho.</p>
+                                )}
+
+                                {/* Aplicar cupom manualmente */}
+                                <div className="border-t border-slate-200 pt-4">
+                                  <p className="text-sm text-slate-600 mb-3">Ou digite o código de um cupom:</p>
+                                  <div className="flex gap-2">
+                                    <input
+                                      type="text"
+                                      value={couponInput}
+                                      onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                                      placeholder="CÓDIGO DO CUPOM"
+                                      className="flex-1 px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm uppercase"
+                                      onKeyPress={(e) => e.key === 'Enter' && handleApplyManualCoupon()}
+                                    />
+                                    <button
+                                      onClick={handleApplyManualCoupon}
+                                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                                    >
+                                      Aplicar
+                                    </button>
                                   </div>
                                 </div>
-                                <div className="text-right">
-                                  <p className="font-medium text-blue-600">{formatPrice(option.valor)}</p>
-                                  <p className="text-sm text-slate-600">{option.prazo}</p>
-                                </div>
                               </div>
-                              {selectedFreight?.id === option.id && (
-                                <div className="flex items-center gap-2 mt-2">
-                                  <FaCheck className="text-blue-600" />
-                                  <span className="text-sm text-blue-600">Selecionado</span>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                            )}
+                          </div>
 
-                      {/* Exibir erro de cálculo de frete */}
+                          {/* Exibir erro de cálculo de frete */}
                       {freightError && (
                         <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
                           <div className="flex items-center gap-2 mb-2">
@@ -1029,7 +1195,7 @@ function CheckoutPage() {
                   )}
                 </div>
 
-                {/* Método de Pagamento */}
+                {/* Método de Pagamento */} 
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-xl font-semibold text-slate-900">Métodos de Pagamento</h2>
@@ -1221,7 +1387,7 @@ function CheckoutPage() {
                   <div className="space-y-3 mb-6">
                     <div className="flex justify-between text-sm">
                       <span className="text-slate-600">Subtotal ({orderData?.items?.length || 0} itens)</span>
-                      <span className="font-medium">{formatPrice((orderData?.subtotal || 0) - (orderData?.discountAmount || 0))}</span>
+                      <span className="font-medium">{formatPrice(orderData?.subtotal || 0)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-slate-600">Frete</span>
@@ -1231,73 +1397,22 @@ function CheckoutPage() {
                             <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-slate-600"></div>
                             <span>Calculando...</span>
                           </div>
+                        ) : orderData?.frete === 0 && appliedCoupons.some(coupon => coupon.TipoDesconto === 'frete_gratis') ? (
+                          <div className="text-right">
+                            <div className="text-green-600 font-medium">Frete Grátis</div>
+                            <div className="text-xs text-slate-500">{selectedFreight?.nome || 'Cupom aplicado'}</div>
+                          </div>
                         ) : selectedFreight ? (
                           <div className="text-right">
-                            <div>{formatPrice(selectedFreight.valor)}</div>
+                            <div>{formatPrice(orderData?.frete || 0)}</div>
                             <div className="text-xs text-slate-500">{selectedFreight.nome}</div>
                           </div>
                         ) : (
-                          formatPrice(0)
+                          formatPrice(orderData?.frete || 0)
                         )}
                       </span>
                     </div>
                     <div className="border-t border-slate-200 pt-3">
-                      {/* Cupom */}
-                      <div className="border-t border-slate-200 pt-3 mb-4">
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          <input
-                            type="text"
-                            value={couponCode}
-                            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                            placeholder="Código do cupom"
-                            className="flex-1 px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
-                            disabled={couponApplied}
-                          />
-                          {!couponApplied ? (
-                            <button
-                              onClick={handleAplicarCupom}
-                              disabled={couponLoading || !couponCode.trim()}
-                              className="px-4 w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed text-sm font-medium"
-                            >
-                              {couponLoading ? 'Aplicando...' : 'Aplicar'}
-                            </button>
-                          ) : (
-                            <button
-                              onClick={handleRemoverCupom}
-                              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium"
-                            >
-                              Remover
-                            </button>
-                          )}
-                        </div>
-                        {couponError && (
-                          <p className="text-red-600 text-sm mb-2">{couponError}</p>
-                        )}
-                        {couponApplied && (
-                          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm font-medium text-green-800">
-                                  Cupom aplicado: {couponApplied.Codigo}
-                                </p>
-                                <p className="text-xs text-green-600">
-                                  {couponApplied.Descricao || 'Desconto aplicado'}
-                                </p>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-sm font-medium text-green-800">
-                                  {couponApplied.TipoDesconto === 'PERCENTUAL'
-                                    ? `${couponApplied.ValorDesconto}% OFF`
-                                    : couponApplied.TipoDesconto === 'FRETE_GRATIS'
-                                    ? 'Frete Grátis'
-                                    : `R$ ${couponApplied.ValorDesconto.toFixed(2)} OFF`}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
- 
                       <div className="flex justify-between text-lg font-semibold">
                         <span className="text-slate-900">Total</span>
                         <span className="text-blue-600">{formatPrice(orderData?.total || 0)}</span>

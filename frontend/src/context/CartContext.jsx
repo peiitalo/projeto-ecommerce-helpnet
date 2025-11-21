@@ -32,6 +32,7 @@ function safeStorageSet(key, value) {
 export function CartProvider({ children }) {
   const { user } = useAuth();
   const STORAGE_KEY = user ? `helpnet_cart_${user.id}` : 'helpnet_cart_guest';
+  const COUPON_STORAGE_KEY = user ? `helpnet_coupon_${user.id}` : 'helpnet_coupon_guest';
 
   const [items, setItems] = useState([]);
   const [freightOptions, setFreightOptions] = useState([]);
@@ -39,7 +40,7 @@ export function CartProvider({ children }) {
   const [selectedAddress, setSelectedAddress] = useState(null);
   const [freightLoading, setFreightLoading] = useState(false);
   const [freightError, setFreightError] = useState(null);
-  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [appliedCoupons, setAppliedCoupons] = useState([]);
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponError, setCouponError] = useState(null);
 
@@ -47,6 +48,11 @@ export function CartProvider({ children }) {
   useEffect(() => {
     safeStorageSet(STORAGE_KEY, items);
   }, [items, STORAGE_KEY]);
+
+  // Persiste cupons aplicados
+  useEffect(() => {
+    safeStorageSet(COUPON_STORAGE_KEY, appliedCoupons);
+  }, [appliedCoupons, COUPON_STORAGE_KEY]);
 
   // Limpa carrinho quando usuário muda (logout/login com outra conta)
   useEffect(() => {
@@ -83,12 +89,20 @@ export function CartProvider({ children }) {
         console.error('Erro ao carregar carrinho:', error);
         setItems([]);
       });
+
+      // Carrega cupons aplicados do localStorage
+      const savedCoupons = safeStorageGet(COUPON_STORAGE_KEY, []);
+      setAppliedCoupons(Array.isArray(savedCoupons) ? savedCoupons : []);
     } else {
       // Usuário não logado, carrega do localStorage guest
       const guestItems = safeStorageGet('helpnet_cart_guest', []);
       setItems(guestItems);
+
+      // Carrega cupons aplicados do localStorage guest
+      const guestCoupons = safeStorageGet('helpnet_coupon_guest', []);
+      setAppliedCoupons(Array.isArray(guestCoupons) ? guestCoupons : []);
     }
-  }, [user]);
+  }, [user, COUPON_STORAGE_KEY]);
 
   // Adiciona item (soma quantidade se já existir)
   const addItem = async (product, quantity = 1) => {
@@ -273,28 +287,45 @@ export function CartProvider({ children }) {
 
   const count = useMemo(() => items.length, [items]); // Conta itens únicos
 
-  // Calcular subtotal considerando descontos por produto
+  // Calcular subtotal usando preços já com desconto aplicado
   const subtotal = useMemo(() => {
     return items.reduce((sum, i) => {
-      // Usar preço base original para calcular desconto
-      const basePrice = i.originalPrice || i.price || 0;
-      const discount = i.discount || 0;
-      const discountedPrice = basePrice * (1 - discount / 100); // Aplicar desconto percentual
-      return sum + (discountedPrice * (i.quantity || 0));
+      return sum + (i.price * (i.quantity || 0));
     }, 0);
   }, [items]);
 
   const freight = useMemo(() => selectedFreight || { valor: 0, prazo: '', nome: '' }, [selectedFreight]);
   
-  // Aplicar cupom
-  const applyCoupon = async (couponCode) => {
-    if (!couponCode.trim()) {
+  // Aplicar cupom (adicionar à lista de cupons aplicados)
+  const applyCoupon = async (couponCode, selectedItems = null) => {
+    // Improved validation
+    const trimmedCode = couponCode.trim().toUpperCase();
+
+    if (!trimmedCode) {
       setCouponError('Digite o código do cupom');
+      return false;
+    }
+
+    // Validate format: only letters, numbers, underscores, hyphens
+    const codeRegex = /^[A-Z0-9_-]+$/;
+    if (!codeRegex.test(trimmedCode)) {
+      setCouponError('Código do cupom contém caracteres inválidos. Use apenas letras, números, traços (-) e underscores (_)');
+      return false;
+    }
+
+    // Validate length
+    if (trimmedCode.length < 3 || trimmedCode.length > 20) {
+      setCouponError('Código do cupom deve ter entre 3 e 20 caracteres');
       return false;
     }
 
     setCouponLoading(true);
     setCouponError(null);
+
+    const itemsToUse = selectedItems || items;
+    const itemsTotal = selectedItems ? selectedItems.reduce((total, item) => {
+      return total + (item.price * item.quantity);
+    }, 0) : subtotal;
 
     try {
       const response = await fetch('/api/cupons/validar', {
@@ -304,61 +335,97 @@ export function CartProvider({ children }) {
           'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`
         },
         body: JSON.stringify({
-          codigo: couponCode.toUpperCase(),
-          clienteID: user?.id,
-          produtos: items.map(item => ({
-            ProdutoID: item.id,
-            CategoriaID: item.categoryId,
-            PrecoUnitario: item.price,
-            Quantidade: item.quantity
-          }))
+          codigo: trimmedCode,
+          itensCarrinho: itemsToUse.map(item => item.id), // Send just product IDs for validation
+          valorTotal: itemsTotal
         })
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Erro ao validar cupom');
+        throw new Error(data.error || 'Erro ao validar cupom');
       }
 
       if (!data.valido) {
-        throw new Error(data.message || 'Cupom inválido');
+        throw new Error(data.error || 'Cupom inválido');
       }
 
-      setAppliedCoupon(data.data.cupom);
+      // Verificar se o cupom já está aplicado
+      const isAlreadyApplied = appliedCoupons.some(coupon => coupon.Codigo === data.cupom.Codigo);
+      if (isAlreadyApplied) {
+        throw new Error('Este cupom já está aplicado');
+      }
+
+      // Transform API response to match expected format
+      const transformedCoupon = {
+        ...data.cupom,
+        TipoDesconto: data.cupom.DescontoTipo,
+        ValorDesconto: data.cupom.DescontoValor,
+        ValorMinimo: data.cupom.Restricoes?.valorMinimo || 0,
+        Codigo: data.cupom.Codigo,
+        Nome: data.cupom.Nome,
+        descontoAplicado: data.desconto,
+        valorFinal: data.valorFinal
+      };
+
+      setAppliedCoupons(prev => [...prev, transformedCoupon]);
       return true;
     } catch (error) {
       console.error('Erro ao aplicar cupom:', error);
       setCouponError(error.message);
-      setAppliedCoupon(null);
       return false;
     } finally {
       setCouponLoading(false);
     }
   };
 
-  // Remover cupom
-  const removeCoupon = () => {
-    setAppliedCoupon(null);
+  // Remover cupom específico
+  const removeCoupon = (couponCode = null) => {
+    if (couponCode) {
+      // Remove specific coupon
+      setAppliedCoupons(prev => prev.filter(coupon => coupon.Codigo !== couponCode));
+    } else {
+      // Remove all coupons if no code specified
+      setAppliedCoupons([]);
+    }
     setCouponError(null);
   };
 
-  // Calcular desconto do cupom
+  // Calcular desconto total dos cupons aplicados
   const couponDiscount = useMemo(() => {
-    if (!appliedCoupon || subtotal < (appliedCoupon.ValorMinimo || 0)) return 0;
+    if (!appliedCoupons || appliedCoupons.length === 0) return 0;
 
-    if (appliedCoupon.TipoDesconto === 'PERCENTUAL') {
-      return (subtotal * appliedCoupon.ValorDesconto) / 100;
-    } else if (appliedCoupon.TipoDesconto === 'VALOR_FIXO') {
-      return Math.min(appliedCoupon.ValorDesconto, subtotal);
+    let totalDiscount = 0;
+    let currentSubtotal = subtotal;
+
+    // Process discount coupons first (percentage and fixed value)
+    const discountCoupons = appliedCoupons.filter(coupon =>
+      coupon.TipoDesconto === 'porcentagem' || coupon.TipoDesconto === 'valor_fixo'
+    );
+
+    for (const coupon of discountCoupons) {
+      if (currentSubtotal < (coupon.ValorMinimo || 0)) continue;
+
+      if (coupon.TipoDesconto === 'porcentagem') {
+        const discount = (currentSubtotal * coupon.ValorDesconto) / 100;
+        totalDiscount += discount;
+        currentSubtotal -= discount; // Reduce subtotal for next coupon calculation
+      } else if (coupon.TipoDesconto === 'valor_fixo') {
+        const discount = Math.min(coupon.ValorDesconto, currentSubtotal);
+        totalDiscount += discount;
+        currentSubtotal -= discount;
+      }
     }
-    return 0;
-  }, [appliedCoupon, subtotal]);
+
+    return totalDiscount;
+  }, [appliedCoupons, subtotal]);
   
   const total = useMemo(() => {
-    const freightCost = appliedCoupon?.TipoDesconto === 'FRETE_GRATIS' ? 0 : freight.valor;
+    const hasFreeShipping = appliedCoupons.some(coupon => coupon.TipoDesconto === 'frete_gratis');
+    const freightCost = hasFreeShipping ? 0 : freight.valor;
     return Math.max(0, subtotal - couponDiscount + freightCost);
-  }, [subtotal, couponDiscount, freight.valor, appliedCoupon]);
+  }, [subtotal, couponDiscount, freight.valor, appliedCoupons]);
 
   const value = {
     items,
@@ -378,7 +445,7 @@ export function CartProvider({ children }) {
     calculateFreight,
     freightLoading,
     freightError,
-    appliedCoupon,
+    appliedCoupons,
     couponDiscount,
     couponLoading,
     couponError,

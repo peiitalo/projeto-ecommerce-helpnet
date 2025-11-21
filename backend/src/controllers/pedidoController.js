@@ -16,7 +16,7 @@ export const criarPedido = async (req, res) => {
       descontoVista = 0,
       valorDescontoVista = 0,
       observacoes,
-      cupomCodigo
+      cupomCodigos
     } = req.body;
 
     logger.info('criar_pedido_iniciado', {
@@ -65,67 +65,84 @@ export const criarPedido = async (req, res) => {
     // Criar mapa de produtos para acesso rápido
     const produtosMap = new Map(produtos.map(p => [p.ProdutoID, p]));
 
-    // Validar cupom se fornecido
-    let cupomAplicado = null;
+    // Validar cupons se fornecidos
+    let cuponsAplicados = [];
     let descontoCupom = 0;
     let freteGratisCupom = false;
 
-    if (cupomCodigo) {
+    if (cupomCodigos && Array.isArray(cupomCodigos) && cupomCodigos.length > 0) {
       try {
         // Importar função de validação de cupom
-        const { validarCupom, calcularDesconto } = await import('../controllers/cupomController.js');
+        const { validarCupomLogic } = await import('../controllers/cupomController.js');
 
-        // Validar cupom
-        const validacao = await validarCupom({
-          body: {
-            codigo: cupomCodigo,
-            clienteID: user.id,
-            produtos: itens.map(item => ({
-              ProdutoID: parseInt(item.produtoId),
-              CategoriaID: null, // Será preenchido depois
-              PrecoUnitario: 0, // Será preenchido depois
-              Quantidade: item.quantidade
-            }))
-          }
+        // Calcular total dos itens para validação
+        let totalItensValidacao = 0;
+        const itensParaValidacao = itens.map(item => {
+          const produto = produtosMap.get(parseInt(item.produtoId));
+          const precoUnitario = item.precoUnitario || produto.Preco;
+          totalItensValidacao += precoUnitario * item.quantidade;
+
+          return {
+            produtoId: parseInt(item.produtoId),
+            categoriaId: produto.CategoriaID,
+            quantidade: item.quantidade
+          };
         });
 
-        if (!validacao || !validacao.valido) {
-          return res.status(400).json({
-            success: false,
-            errors: [validacao?.message || "Cupom inválido"]
+        // Validar cada cupom e acumular descontos
+        let subtotalAtual = totalItensValidacao;
+
+        for (const cupomCodigo of cupomCodigos) {
+          const validacao = await validarCupomLogic(
+            cupomCodigo,
+            itensParaValidacao,
+            subtotalAtual,
+            user.id
+          );
+
+          if (!validacao || !validacao.valido) {
+            return res.status(400).json({
+              success: false,
+              errors: [`Cupom ${cupomCodigo}: ${validacao?.error || "Cupom inválido"}`]
+            });
+          }
+
+          cuponsAplicados.push(validacao.cupom);
+          descontoCupom += validacao.desconto;
+
+          // Verificar se é frete grátis
+          if (validacao.cupom.TipoDesconto === 'frete_gratis') {
+            freteGratisCupom = true;
+          }
+
+          // Reduzir subtotal para próximos cupons (exceto frete grátis)
+          if (validacao.cupom.TipoDesconto !== 'frete_gratis') {
+            subtotalAtual -= validacao.desconto;
+          }
+
+          logger.info('cupom_validado_aplicado', {
+            clienteId: user.id,
+            cupomCodigo,
+            desconto: validacao.desconto,
+            freteGratis: validacao.cupom.TipoDesconto === 'frete_gratis'
           });
         }
 
-        cupomAplicado = validacao.data.cupom;
-
-        // Calcular desconto
-        const calculoDesconto = await calcularDesconto({
-          body: {
-            codigo: cupomCodigo,
-            subtotal: 0, // Será calculado depois
-            frete: frete,
-            produtos: [] // Será preenchido depois
-          }
-        });
-
-        descontoCupom = calculoDesconto.data.desconto;
-        freteGratisCupom = calculoDesconto.data.freteGratis;
-
-        logger.info('cupom_validado_aplicado', {
+        logger.info('cupons_totais_validacao', {
           clienteId: user.id,
-          cupomCodigo,
-          desconto: descontoCupom,
+          cuponsCount: cuponsAplicados.length,
+          descontoTotal: descontoCupom,
           freteGratis: freteGratisCupom
         });
       } catch (cupomError) {
-        logger.warn('erro_validacao_cupom', {
+        logger.warn('erro_validacao_cupons', {
           clienteId: user.id,
-          cupomCodigo,
+          cupomCodigos,
           error: cupomError.message
         });
         return res.status(400).json({
           success: false,
-          errors: ["Erro ao validar cupom"]
+          errors: ["Erro ao validar cupons"]
         });
       }
     }
@@ -205,46 +222,6 @@ export const criarPedido = async (req, res) => {
     //   });
     // }
 
-    // Recalcular desconto do cupom com valores reais
-    if (cupomAplicado) {
-      try {
-        const { calcularDesconto } = await import('../controllers/cupomController.js');
-
-        const produtosParaCalculo = itensComPreco.map(item => ({
-          ProdutoID: item.produtoId,
-          CategoriaID: item.categoriaId,
-          PrecoUnitario: item.precoUnitario,
-          Quantidade: item.quantidade
-        }));
-
-        const calculoDesconto = await calcularDesconto({
-          body: {
-            codigo: cupomCodigo,
-            subtotal: totalItens,
-            frete: valorFrete,
-            produtos: produtosParaCalculo
-          }
-        });
-
-        descontoCupom = calculoDesconto.data.desconto;
-        freteGratisCupom = calculoDesconto.data.freteGratis;
-        valorFrete = freteGratisCupom ? 0 : valorFrete;
-
-        logger.info('desconto_cupom_recalculado', {
-          clienteId: user.id,
-          subtotal: totalItens,
-          frete: valorFrete,
-          desconto: descontoCupom,
-          freteGratis: freteGratisCupom
-        });
-      } catch (recalculoError) {
-        logger.warn('erro_recalculo_desconto_cupom', {
-          clienteId: user.id,
-          error: recalculoError.message
-        });
-        // Manter desconto anterior se falhar
-      }
-    }
 
     // Calcular total dos pagamentos
     const totalPagamentos = metodosPagamento.reduce((total, metodo) => total + parseFloat(metodo.valor), 0);
@@ -357,7 +334,7 @@ export const criarPedido = async (req, res) => {
           ExpiraEm: expiraEm,
           TotalPago: 0,
           // Adicionar campos do cupom se aplicável
-          CupomID: cupomAplicado ? cupomAplicado.CupomID : null,
+          CupomID: cuponsAplicados.length > 0 ? cuponsAplicados[0].CupomID : null, // Primeiro cupom para compatibilidade
           DescontoCupom: descontoCupom,
           DescontoVista: valorDescontoVista
         }
@@ -458,49 +435,51 @@ export const criarPedido = async (req, res) => {
         }
       });
 
-      // Registrar uso do cupom se aplicável
-      if (cupomAplicado) {
+      // Registrar uso dos cupons se aplicáveis
+      if (cuponsAplicados.length > 0) {
         try {
-          // Incrementar usos totais do cupom
-          await prisma.cupom.update({
-            where: { CupomID: cupomAplicado.CupomID },
-            data: { UsosAtuais: { increment: 1 } }
-          });
+          for (const cupom of cuponsAplicados) {
+            // Incrementar usos totais do cupom
+            await prisma.cupom.update({
+              where: { CupomID: cupom.CupomID },
+              data: { UsosAtuais: { increment: 1 } }
+            });
 
-          // Registrar uso por cliente
-          await prisma.cupomCliente.upsert({
-            where: {
-              CupomID_ClienteID: {
-                CupomID: cupomAplicado.CupomID,
-                ClienteID: user.id
+            // Registrar uso por cliente
+            await prisma.cupomCliente.upsert({
+              where: {
+                CupomID_ClienteID: {
+                  CupomID: cupom.CupomID,
+                  ClienteID: user.id
+                }
+              },
+              update: {
+                Usado: true,
+                DataUso: new Date(),
+                PedidoID: resultado.PedidoID,
+                UsosCliente: { increment: 1 }
+              },
+              create: {
+                CupomID: cupom.CupomID,
+                ClienteID: user.id,
+                Usado: true,
+                DataUso: new Date(),
+                PedidoID: resultado.PedidoID,
+                UsosCliente: 1
               }
-            },
-            update: {
-              Usado: true,
-              DataUso: new Date(),
-              PedidoID: resultado.PedidoID,
-              UsosCliente: { increment: 1 }
-            },
-            create: {
-              CupomID: cupomAplicado.CupomID,
-              ClienteID: user.id,
-              Usado: true,
-              DataUso: new Date(),
-              PedidoID: resultado.PedidoID,
-              UsosCliente: 1
-            }
-          });
+            });
 
-          logger.info('cupom_uso_registrado', {
-            pedidoId: resultado.PedidoID,
-            cupomId: cupomAplicado.CupomID,
-            clienteId: user.id,
-            desconto: descontoCupom
-          });
+            logger.info('cupom_uso_registrado', {
+              pedidoId: resultado.PedidoID,
+              cupomId: cupom.CupomID,
+              clienteId: user.id,
+              desconto: descontoCupom
+            });
+          }
         } catch (cupomUsoError) {
-          logger.error('erro_registro_uso_cupom', {
+          logger.error('erro_registro_uso_cupons', {
             pedidoId: resultado.PedidoID,
-            cupomId: cupomAplicado?.CupomID,
+            cupomIds: cuponsAplicados.map(c => c.CupomID),
             error: cupomUsoError.message
           });
           // Não falhar o pedido por erro no registro do cupom
@@ -583,11 +562,11 @@ export const criarPedido = async (req, res) => {
         frete: valorFrete,
         subtotal: totalItens,
         descontoCupom: descontoCupom,
-        cupomAplicado: cupomAplicado ? {
-          codigo: cupomAplicado.Codigo,
-          tipo: cupomAplicado.TipoDesconto,
-          valor: cupomAplicado.ValorDesconto
-        } : null,
+        cuponsAplicados: cuponsAplicados.map(cupom => ({
+          codigo: cupom.Codigo,
+          tipo: cupom.TipoDesconto,
+          valor: cupom.ValorDesconto
+        })),
         status: 'Pago',
         // Pagamento simulado aprovado - redirecionar para página de sucesso
         paymentUrl: null, // Não há URL de pagamento externa

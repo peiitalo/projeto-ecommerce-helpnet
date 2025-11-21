@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FiX, FiPlus, FiTrash2 } from 'react-icons/fi';
+import { FiX, FiPlus, FiTrash2, FiShuffle } from 'react-icons/fi';
 import cupomApi from '../services/cupomApi.js';
 
 function CouponModal({ isOpen, onClose, onSuccess, editingCoupon = null }) {
@@ -52,6 +52,15 @@ function CouponModal({ isOpen, onClose, onSuccess, editingCoupon = null }) {
     } catch (error) {
       console.error('Erro ao carregar categorias:', error);
     }
+  };
+
+  const generateRandomCode = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < 8; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
   };
 
   const resetForm = () => {
@@ -117,7 +126,7 @@ function CouponModal({ isOpen, onClose, onSuccess, editingCoupon = null }) {
 
     if (!formData.nome.trim()) newErrors.nome = 'Nome é obrigatório';
     if (!formData.codigo.trim()) newErrors.codigo = 'Código é obrigatório';
-    if (!formData.descontoValor || formData.descontoValor <= 0) {
+    if (formData.descontoTipo !== 'frete_gratis' && (!formData.descontoValor || formData.descontoValor <= 0)) {
       newErrors.descontoValor = 'Valor do desconto deve ser maior que zero';
     }
 
@@ -150,7 +159,7 @@ function CouponModal({ isOpen, onClose, onSuccess, editingCoupon = null }) {
     try {
       const submitData = {
         ...formData,
-        descontoValor: parseFloat(formData.descontoValor),
+        descontoValor: formData.descontoTipo === 'frete_gratis' ? 0 : parseFloat(formData.descontoValor),
         limiteUso: formData.limiteUso ? parseInt(formData.limiteUso) : null,
         usoPorCliente: formData.usoPorCliente ? parseInt(formData.usoPorCliente) : null,
         valorMinimo: formData.valorMinimo ? parseFloat(formData.valorMinimo) : null,
@@ -223,15 +232,26 @@ function CouponModal({ isOpen, onClose, onSuccess, editingCoupon = null }) {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Código do Cupom *
               </label>
-              <input
-                type="text"
-                value={formData.codigo}
-                onChange={(e) => handleInputChange('codigo', e.target.value.toUpperCase())}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.codigo ? 'border-red-300' : 'border-gray-300'
-                }`}
-                placeholder="Ex: DESCONTO10"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={formData.codigo}
+                  onChange={(e) => handleInputChange('codigo', e.target.value.toUpperCase())}
+                  className={`flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    errors.codigo ? 'border-red-300' : 'border-gray-300'
+                  }`}
+                  placeholder="Ex: DESCONTO10"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleInputChange('codigo', generateRandomCode())}
+                  className="px-3 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors flex items-center gap-1"
+                  title="Gerar código aleatório"
+                >
+                  <FiShuffle className="w-4 h-4" />
+                  Gerar
+                </button>
+              </div>
               {errors.codigo && <p className="text-red-600 text-sm mt-1">{errors.codigo}</p>}
             </div>
           </div>
@@ -273,7 +293,7 @@ function CouponModal({ isOpen, onClose, onSuccess, editingCoupon = null }) {
             {/* Valor do Desconto */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Valor do Desconto *
+                Valor do Desconto {formData.descontoTipo !== 'frete_gratis' ? '*' : ''}
               </label>
               <input
                 type="number"

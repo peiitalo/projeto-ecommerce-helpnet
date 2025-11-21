@@ -723,7 +723,7 @@ export const publicService = {
 
   // Obter avaliações da plataforma para landing page
   obterAvaliacoesPlataforma: async () => {
-    return apiRequest('/suporte/avaliacoes/site');
+    return apiRequest('/public/platform-reviews');
   },
 };
 

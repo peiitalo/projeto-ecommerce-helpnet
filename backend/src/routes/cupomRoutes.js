@@ -9,6 +9,8 @@ import {
   toggleCupomStatus,
   listarClientesParaCupom,
   listarCuponsDisponiveisCliente,
+  listarCuponsCliente,
+  resgatarCupom,
   validarCupom
 } from '../controllers/cupomController.js';
 
@@ -34,7 +36,8 @@ router.patch('/:id/toggle-status', toggleCupomStatus);
 router.get('/clientes/disponiveis', listarClientesParaCupom);
 
 // Rotas públicas para clientes
-publicRouter.get('/meus', listarCuponsDisponiveisCliente);
+publicRouter.get('/meus', listarCuponsCliente);
+publicRouter.post('/resgatar', resgatarCupom);
 publicRouter.post('/validar', validarCupom);
 
 export { publicRouter };
