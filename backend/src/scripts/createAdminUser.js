@@ -1,4 +1,5 @@
 // backend/src/scripts/createAdminUser.js
+import 'dotenv/config';
 import prisma from '../config/prisma.js';
 import cryptoService from '../services/cryptoService.js';
 
