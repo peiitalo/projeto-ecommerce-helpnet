@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../hooks/useNotifications';
 import LazyImage from './LazyImage';
 import {
@@ -15,39 +16,11 @@ import {
   FaRegHeart,
   FaEye
 } from 'react-icons/fa';
-import {
-  FiChevronLeft,
-  FiChevronRight
-} from 'react-icons/fi';
 
-function ProductCarousel({ title, products, loading, favorites = [], favoriteLoading = null, onToggleFavorite, setProductModalId, setShowProductModal }) {
-  const [activeIndex, setActiveIndex] = useState(0);
+function ProductCarousel({ title, products, loading, favorites = [], favoriteLoading = null, onToggleFavorite, setProductModalId, setShowProductModal, onRequireAuth }) {
   const { addItem, removeItem, items } = useCart();
+  const { user } = useAuth();
   const { showSuccess, showWarning } = useNotifications();
-
-  const getItemsPerView = () => {
-    if (typeof window !== 'undefined') {
-      if (window.innerWidth >= 1024) return 4;
-      if (window.innerWidth >= 768) return 3;
-      if (window.innerWidth >= 640) return 2;
-      return 2;
-    }
-    return 4;
-  };
-
-  const [itemsPerView, setItemsPerView] = useState(getItemsPerView());
-
-  useEffect(() => {
-    const handleResize = () => {
-      setItemsPerView(getItemsPerView());
-      setActiveIndex(0);
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const maxIndex = Math.max(0, Math.ceil(products.length / itemsPerView) - 1);
 
   const renderStars = (rating) => {
     const stars = [];
@@ -63,6 +36,10 @@ function ProductCarousel({ title, products, loading, favorites = [], favoriteLoa
   const formatPrice = (n) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   const handleAddToCart = (product) => {
+    if (!user) {
+      onRequireAuth && onRequireAuth();
+      return;
+    }
     addItem(product, 1);
     showSuccess(`${product.name} adicionado ao carrinho!`);
   };
@@ -99,37 +76,14 @@ function ProductCarousel({ title, products, loading, favorites = [], favoriteLoa
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-bold text-slate-900">{title}</h3>
-        {products.length > itemsPerView && (
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setActiveIndex(Math.max(0, activeIndex - 1))}
-              disabled={activeIndex === 0}
-              className="p-1.5 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <FiChevronLeft className="text-sm" />
-            </button>
-            <button
-              onClick={() => setActiveIndex(Math.min(maxIndex, activeIndex + 1))}
-              disabled={activeIndex === maxIndex}
-              className="p-1.5 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <FiChevronRight className="text-sm" />
-            </button>
-          </div>
-        )}
-      </div>
+      <h3 className="text-lg font-bold text-slate-900 mb-4">{title}</h3>
 
-      <div className="overflow-hidden">
-        <div className="flex gap-3 transition-transform duration-300 ease-in-out">
-          {products.map((product, index) => (
+      <div className="overflow-x-auto scrollbar-hide">
+        <div className="flex gap-3 pb-2">
+          {products.map((product) => (
             <div
               key={product.id}
               className="flex-shrink-0 bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 w-48"
-              style={{
-                transform: `translateX(-${activeIndex * (192 + 12)}px)`
-              }}
             >
               <Link to={`/produto/${product.id}`} className="relative aspect-square overflow-hidden block">
                 <LazyImage
@@ -172,6 +126,10 @@ function ProductCarousel({ title, products, loading, favorites = [], favoriteLoa
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
+                      if (!user) {
+                        onRequireAuth && onRequireAuth();
+                        return;
+                      }
                       onToggleFavorite(product.id);
                     }}
                     disabled={favoriteLoading === product.id}
@@ -227,20 +185,6 @@ function ProductCarousel({ title, products, loading, favorites = [], favoriteLoa
           ))}
         </div>
       </div>
-
-      {products.length > itemsPerView && (
-        <div className="flex justify-center gap-1 mt-4">
-          {Array.from({ length: maxIndex + 1 }, (_, i) => (
-            <button
-              key={i}
-              onClick={() => setActiveIndex(i)}
-              className={`h-1.5 rounded-full transition-all ${
-                i === activeIndex ? 'w-4 bg-blue-600' : 'w-1.5 bg-slate-300 hover:bg-slate-400'
-              }`}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }

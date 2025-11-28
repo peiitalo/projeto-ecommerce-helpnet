@@ -26,14 +26,6 @@ function PaymentMethodsSection({
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold text-slate-900">Métodos de Pagamento</h2>
         <div className="flex items-center gap-2">
-          {paymentMethods.length > 1 && (
-            <button
-              onClick={distribuirValorAutomaticamente}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-            >
-              Distribuir automaticamente
-            </button>
-          )}
           {!showAllMethods && (
             <button
               onClick={() => setShowAllMethods(true)}

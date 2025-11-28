@@ -10,6 +10,7 @@ import AddressSelection from '../../components/checkout/AddressSelection';
 import PaymentMethodsSection from '../../components/checkout/PaymentMethodsSection';
 import OrderSummary from '../../components/checkout/OrderSummary';
 import ReceiptPage from '../../components/checkout/ReceiptPage';
+import CouponInput from '../../components/CouponInput';
 import {
   FaShoppingCart,
   FaUser,
@@ -45,9 +46,7 @@ function CheckoutPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [addresses, setAddresses] = useState([]);
-  const [paymentMethods, setPaymentMethods] = useState([
-    { id: 1, type: 'pix', amount: 0, label: 'PIX', active: true }
-  ]);
+  const [paymentMethods, setPaymentMethods] = useState([]);
   const [showAllMethods, setShowAllMethods] = useState(false);
   const allAvailableMethods = [
     { id: 1, type: 'pix', amount: 0, label: 'PIX' },
@@ -60,9 +59,7 @@ function CheckoutPage() {
   const [installments, setInstallments] = useState({});
   const [orderComplete, setOrderComplete] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
-  const [availableCoupons, setAvailableCoupons] = useState([]);
-  const [couponInput, setCouponInput] = useState('');
-  const [showCouponSection, setShowCouponSection] = useState(false);
+  // Removed coupon-related state as it's now handled by CouponInput component
   const CASH_DISCOUNT_PERCENTAGE = 5; // Desconto fixo de 5% para pagamentos à vista
 
   // Calcular desconto atual baseado nos métodos de pagamento selecionados
@@ -96,11 +93,6 @@ function CheckoutPage() {
     { label: 'Configurações', to: '/configuracoes', icon: <FiSettings className="text-slate-500" /> },
   ];
 
-  // Função para aplicar cupom
-  const applyCoupon = async (codigo, itensCarrinho) => {
-    // TODO: implementar aplicação de cupom
-    return true;
-  };
 
 
   // Carregar dados necessários
@@ -112,12 +104,6 @@ function CheckoutPage() {
     carregarDadosCheckout();
   }, [count, navigate]);
 
-  // Carregar e filtrar cupons disponíveis baseado no carrinho
-  useEffect(() => {
-    if (items.length > 0 && orderData) {
-      carregarCuponsDisponiveis();
-    }
-  }, [items, orderData]);
 
   // Ler itens selecionados do sessionStorage
   const getSelectedItems = () => {
@@ -133,69 +119,6 @@ function CheckoutPage() {
     }
   };
 
-  // Carregar e filtrar cupons disponíveis
-  const carregarCuponsDisponiveis = async () => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      if (!token) return;
-
-      // Buscar cupons disponíveis do cliente
-      const response = await fetch('/api/cupons/meus', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) return;
-
-      const data = await response.json();
-      const userCoupons = data.success ? data.data : [];
-
-      // Filtrar cupons baseado no conteúdo do carrinho atual
-      const selectedItemIds = getSelectedItems();
-      const selectedItems = items.filter(item => selectedItemIds.includes(item.id));
-      const cartTotal = selectedItems.reduce((total, item) => total + (item.price * item.quantity), 0);
-
-      const applicableCoupons = [];
-
-      for (const coupon of userCoupons) {
-        try {
-          // Validar se o cupom é aplicável ao carrinho atual
-          const validationResponse = await fetch('/api/cupons/validar', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              codigo: coupon.code,
-              itensCarrinho: selectedItemIds,
-              valorTotal: cartTotal
-            })
-          });
-
-          if (validationResponse.ok) {
-            const validationData = await validationResponse.json();
-            if (validationData.valido) {
-              applicableCoupons.push({
-                ...coupon,
-                discountAmount: validationData.desconto,
-                finalValue: validationData.valorFinal
-              });
-            }
-          }
-        } catch (error) {
-          console.error('Erro ao validar cupom:', coupon.code, error);
-        }
-      }
-
-      setAvailableCoupons(applicableCoupons);
-    } catch (error) {
-      console.error('Erro ao carregar cupons disponíveis:', error);
-      setAvailableCoupons([]);
-    }
-  };
 
   // Atualizar orderData sempre que freight, discountPercentage ou appliedCoupon mudar
   useEffect(() => {
@@ -225,15 +148,8 @@ function CheckoutPage() {
 
       console.log(`[DEBUG] Order total updated: R$ ${dadosAtualizados.total.toFixed(2)} (subtotal: R$ ${dadosAtualizados.subtotal.toFixed(2)}, coupon discount: R$ ${dadosAtualizados.couponDiscountAmount.toFixed(2)}, payment discount: R$ ${dadosAtualizados.discountAmount.toFixed(2)}, freight: R$ ${dadosAtualizados.frete.toFixed(2)})`);
 
-      // Atualizar valores dos métodos de pagamento baseado no novo total apenas se houver apenas 1 método
-      setPaymentMethods(prev => {
-        if (prev.length === 1) {
-          // Se há apenas 1 método, definir o valor total
-          return prev.map(method => ({ ...method, amount: dadosAtualizados.total }));
-        }
-        // Se há múltiplos métodos, manter os valores atuais (usuário pode ajustar manualmente)
-        return prev;
-      });
+      // Não atualizar automaticamente os valores - cliente deve escolher
+      // setPaymentMethods(prev => prev);
     }
   }, [freight.valor, items, appliedCoupons, total]);
 
@@ -270,6 +186,7 @@ function CheckoutPage() {
         setSelectedAddress(selectedAddressToUse);
         // Calcular frete automaticamente para o endereço selecionado e itens selecionados
         await calculateFreight(selectedAddressToUse.EnderecoID, selectedItemIds);
+        setSelectedFreight(null); // Não selecionar frete automaticamente
       }
 
       // Calcular subtotal apenas dos itens selecionados (usando preços já com desconto)
@@ -301,8 +218,7 @@ function CheckoutPage() {
 
       setOrderData(dadosPedido);
 
-      // Definir valor total no PIX por padrão
-      setPaymentMethods([{ id: 1, type: 'pix', amount: dadosPedido.total, label: 'PIX', active: true }]);
+      // Não preencher automaticamente - cliente deve escolher
 
     } catch (error) {
       console.error('Erro ao carregar dados do checkout:', error);
@@ -415,6 +331,8 @@ function CheckoutPage() {
     if (endereco) {
       const selectedItemIds = getSelectedItems();
       await calculateFreight(endereco.EnderecoID, selectedItemIds);
+      // Aguardar um pouco para garantir que calculateFreight terminou de definir
+      setTimeout(() => setSelectedFreight(null), 10);
 
       // Recalcular dados do pedido usando os valores calculados do CartContext
       const selectedItems = items.filter(item => selectedItemIds.includes(item.id));
@@ -447,34 +365,6 @@ function CheckoutPage() {
     }
   };
 
-  // Aplicar cupom da lista de disponíveis
-  const handleApplyCouponFromList = async (couponCode) => {
-    const success = await applyCoupon(couponCode, getSelectedItems());
-    if (success) {
-      setCouponInput('');
-      setShowCouponSection(false);
-      showSuccess('Cupom aplicado com sucesso!');
-      // Recarregar cupons disponíveis para atualizar a lista
-      setTimeout(() => carregarCuponsDisponiveis(), 500);
-    }
-  };
-
-  // Aplicar cupom manualmente
-  const handleApplyManualCoupon = async () => {
-    if (!couponInput.trim()) {
-      showError('Digite o código do cupom');
-      return;
-    }
-
-    const success = await applyCoupon(couponInput.trim(), getSelectedItems());
-    if (success) {
-      setCouponInput('');
-      setShowCouponSection(false);
-      showSuccess('Cupom aplicado com sucesso!');
-      // Recarregar cupons disponíveis para atualizar a lista
-      setTimeout(() => carregarCuponsDisponiveis(), 500);
-    }
-  };
 
   // Finalizar pedido
   const handleFinalizarPedido = async () => {
@@ -483,6 +373,13 @@ function CheckoutPage() {
     if (!selectedAddress) {
       console.log('[DEBUG] Erro: Nenhum endereço selecionado');
       showError('Selecione um endereço de entrega');
+      return;
+    }
+
+    // Verificar se frete foi selecionado (exceto se há cupom de frete grátis)
+    if (!appliedCoupons.some(coupon => coupon.TipoDesconto === 'frete_gratis') && !selectedFreight) {
+      console.log('[DEBUG] Erro: Nenhum frete selecionado');
+      showError('Selecione uma opção de frete');
       return;
     }
 
@@ -722,13 +619,6 @@ function CheckoutPage() {
                   freightOptions={freightOptions}
                   selectedFreight={selectedFreight}
                   setSelectedFreight={setSelectedFreight}
-                  availableCoupons={availableCoupons}
-                  showCouponSection={showCouponSection}
-                  setShowCouponSection={setShowCouponSection}
-                  handleApplyCouponFromList={handleApplyCouponFromList}
-                  couponInput={couponInput}
-                  setCouponInput={setCouponInput}
-                  handleApplyManualCoupon={handleApplyManualCoupon}
                   freightError={freightError}
                 />
                 <PaymentMethodsSection
@@ -763,6 +653,9 @@ function CheckoutPage() {
                 processingOrder={processingOrder}
                 selectedAddress={selectedAddress}
                 calcularTotalPagamentos={calcularTotalPagamentos}
+                calcularValorRestante={calcularValorRestante}
+                items={items}
+                getSelectedItems={getSelectedItems}
               />
             </div>
           </div>

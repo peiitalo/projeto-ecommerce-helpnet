@@ -100,9 +100,9 @@ function VendorCuponsPage() {
       return 'Frete Grátis';
     }
     if (coupon.DescontoTipo === 'valor_fixo') {
-      return `R$ ${coupon.DescontoValor.toFixed(2)} OFF`;
+      return `R$ ${coupon.DescontoValor.toFixed(2)}`;
     }
-    return `${coupon.DescontoValor}% OFF`;
+    return `${coupon.DescontoValor}%`;
   };
 
   const getStatusColor = (active) => {

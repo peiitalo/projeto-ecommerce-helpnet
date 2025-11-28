@@ -76,11 +76,13 @@ function App() {
         >
           <Routes>
             {/* Público */}
-            <Route path="/" element={<LandingPage />} />
+            <Route path="/" element={<Home />} />
             <Route path="/home" element={<Home />} />
             <Route path="/suporte" element={<SuportePage />} />
             <Route path="/vendedor/suporte" element={<SuportePage />} />
             <Route path="/carrinho" element={<CartPage />} />
+            <Route path="/favoritos" element={<FavoritesPage />} />
+            <Route path="/notificacoes" element={<NotificationsPage />} />
             <Route path="/produto/:id" element={<ProductPage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/cadastro" element={<Cadastro />} />
@@ -92,8 +94,6 @@ function App() {
                 <ProtectedRoute allowedRoles={["cliente", "vendedor"]} />
               }
             >
-              <Route path="/favoritos" element={<FavoritesPage />} />
-              <Route path="/notificacoes" element={<NotificationsPage />} />
               <Route path="/perfil" element={<ProfilePage />} />
               <Route path="/explorer/:category?" element={<ExplorePage />} />
               <Route path="/enderecos" element={<AddressPage />} />

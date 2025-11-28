@@ -411,8 +411,21 @@ export const clienteService = {
   },
 
   // Listar cupons disponíveis para o cliente
+  listarCuponsDisponiveis: async () => {
+    return apiRequest('/cupons/disponiveis');
+  },
+
+  // Listar cupons do cliente
   listarMeusCupons: async () => {
     return apiRequest('/cupons/meus');
+  },
+
+  // Resgatar cupom
+  resgatarCupom: async (codigo) => {
+    return apiRequest('/cupons/resgatar', {
+      method: 'POST',
+      body: JSON.stringify({ codigo }),
+    });
   },
 
   // Validar cupom

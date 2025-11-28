@@ -9,9 +9,9 @@ function CouponDetailsModal({ isOpen, onClose, coupon }) {
       return 'Frete Grátis';
     }
     if (coupon.type === 'fixed') {
-      return `R$ ${coupon.discount} OFF`;
+      return `R$ ${coupon.discount}`;
     }
-    return `${coupon.discount}% OFF`;
+    return `${coupon.discount}%`;
   };
 
   const formatDate = (dateString) => {
@@ -25,22 +25,56 @@ function CouponDetailsModal({ isOpen, onClose, coupon }) {
     });
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'available': return 'bg-green-100 text-green-700';
-      case 'redeemed': return 'bg-blue-100 text-blue-700';
-      case 'used': return 'bg-red-100 text-red-700';
-      default: return 'bg-slate-100 text-slate-700';
+  const getStatusColor = (coupon) => {
+    // Handle new state-based system
+    if (coupon.state) {
+      switch (coupon.state) {
+        case 'active': return 'bg-green-100 text-green-700 border-green-200';
+        case 'grayed_out': return 'bg-gray-100 text-gray-700 border-gray-200';
+        case 'inactive': return 'bg-red-100 text-red-700 border-red-200';
+        default: return 'bg-slate-100 text-slate-700 border-slate-200';
+      }
+    }
+
+    // Fallback to old status system
+    switch (coupon.status) {
+      case 'available': return 'bg-green-100 text-green-700 border-green-200';
+      case 'redeemed': return 'bg-blue-100 text-blue-700 border-blue-200';
+      case 'used': return 'bg-red-100 text-red-700 border-red-200';
+      default: return 'bg-slate-100 text-slate-700 border-slate-200';
     }
   };
 
-  const getStatusText = (status) => {
-    switch (status) {
+  const getStatusText = (coupon) => {
+    // Handle new state-based system
+    if (coupon.state) {
+      switch (coupon.state) {
+        case 'active': return 'Ativo';
+        case 'grayed_out': return 'Aplicável com restrições';
+        case 'inactive': return 'Não pode ser aplicado';
+        default: return coupon.state;
+      }
+    }
+
+    // Fallback to old status system
+    switch (coupon.status) {
       case 'available': return 'Disponível';
       case 'redeemed': return 'Resgatado';
       case 'used': return 'Utilizado';
-      default: return status;
+      default: return coupon.status;
     }
+  };
+
+  const getStatusIcon = (coupon) => {
+    if (coupon.state) {
+      switch (coupon.state) {
+        case 'active': return '';
+        case 'grayed_out': return '⚠️';
+        case 'inactive': return '❌';
+        default: return '❓';
+      }
+    }
+    return '📋';
   };
 
   return (
@@ -75,12 +109,21 @@ function CouponDetailsModal({ isOpen, onClose, coupon }) {
                 <span className="font-medium text-slate-900">Código:</span>
                 <span className="font-mono text-slate-600">{coupon.code}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="font-medium text-slate-900">Status:</span>
-                <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(coupon.status)}`}>
-                  {getStatusText(coupon.status)}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">{getStatusIcon(coupon)}</span>
+                  <span className={`px-2 py-1 text-xs rounded-full border ${getStatusColor(coupon)}`}>
+                    {getStatusText(coupon)}
+                  </span>
+                </div>
               </div>
+              {coupon.reason && (
+                <div className="flex justify-between">
+                  <span className="font-medium text-slate-900">Motivo:</span>
+                  <span className="text-slate-600 text-sm max-w-xs text-right">{coupon.reason}</span>
+                </div>
+              )}
             </div>
           </div>
 

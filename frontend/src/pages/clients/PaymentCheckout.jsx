@@ -17,10 +17,9 @@ export default function PaymentCheckout() {
   const carregarResumo = async () => {
     const data = await apiRequest(`/pagamentos/${id}/resumo`);
     setResumo(data.resumo);
-    // Selecionar automaticamente o primeiro método com restante > 0
-    const m = data.resumo.metodos.find(m => m.restante > 0) || data.resumo.metodos[0];
-    setMetodoSelecionado(m?.metodoId || null);
-    setValorPagamento(m ? String(m.restante.toFixed(2)) : '');
+    // Não selecionar automaticamente - cliente deve escolher
+    setMetodoSelecionado(null);
+    setValorPagamento('');
   };
 
   useEffect(() => { carregarResumo(); }, [id]);
@@ -43,10 +42,9 @@ export default function PaymentCheckout() {
         body: JSON.stringify({ metodoId: metodoSelecionado, valor })
       });
       setResumo(resp.resumo);
-      // Ajusta seleção para próximo restante
-      const prox = resp.resumo.metodos.find(m => m.restante > 0);
-      setMetodoSelecionado(prox?.metodoId || null);
-      setValorPagamento(prox ? String(prox.restante.toFixed(2)) : '');
+      // Não ajustar seleção automaticamente - cliente deve escolher
+      setMetodoSelecionado(null);
+      setValorPagamento('');
 
       // Redirecionar quando pago
       if (resp.resumo.statusPagamento === 'PAGO') {
@@ -82,7 +80,7 @@ export default function PaymentCheckout() {
           {resumo.metodos.map((m) => (
             <label key={m.metodoId} className={`flex items-center justify-between p-3 border rounded-lg ${m.restante <= 0 ? 'opacity-50' : ''}`}>
               <div className="flex items-center gap-2">
-                <input type="radio" name="metodo" value={m.metodoId} checked={metodoSelecionado===m.metodoId} onChange={()=>{setMetodoSelecionado(m.metodoId); setValorPagamento(String(Math.max(0, m.restante).toFixed(2)));}} disabled={m.restante<=0 || resumo.statusPagamento==='PAGO' || resumo.statusPagamento==='EXPIRADO'} />
+                <input type="radio" name="metodo" value={m.metodoId} checked={metodoSelecionado===m.metodoId} onChange={()=>{setMetodoSelecionado(m.metodoId);}} disabled={m.restante<=0 || resumo.statusPagamento==='PAGO' || resumo.statusPagamento==='EXPIRADO'} />
                 <div>
                   <div className="font-medium text-slate-900">{m.metodo}</div>
                   <div className="text-xs text-slate-600">Alocado: {formatBRL(m.alocado)} • Pago: {formatBRL(m.pago)} • Restante: {formatBRL(m.restante)}</div>

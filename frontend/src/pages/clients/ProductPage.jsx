@@ -25,8 +25,10 @@ import {
 import { produtoService, favoritoService, avaliacaoService } from '../../services/api';
 import { log } from '../../utils/logger';
 import { useCart } from '../../context/CartContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 import LazyImage from '../../components/LazyImage';
 import LoadingSkeleton from '../../components/LoadingSkeleton';
+import LoginRegisterModal from '../../components/LoginRegisterModal';
 import { buildImageUrl, buildImageUrls, getFirstValidImage } from '../../utils/imageUtils';
 import { useNotifications } from '../../hooks/useNotifications';
 
@@ -34,10 +36,12 @@ import { useNotifications } from '../../hooks/useNotifications';
 function ProductPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { addItem, removeItem, items } = useCart();
+  const { addItem, removeItem, items, clear } = useCart();
+  const { user } = useAuth();
   const [buttonState, setButtonState] = useState('add'); // 'add', 'added', 'remove'
   const [addedToCartTimeout, setAddedToCartTimeout] = useState(null);
   const { showSuccess, showError, showWarning } = useNotifications();
+  const [showLoginModal, setShowLoginModal] = useState(false);
   
   // Estados para avaliações
   const [avaliacoes, setAvaliacoes] = useState([]);
@@ -339,6 +343,10 @@ function ProductPage() {
   };
 
   const handleAddToCart = () => {
+    if (!user) {
+      setShowLoginModal(true);
+      return;
+    }
     const mapped = {
       id: product?.ProdutoID || product?.id || id,
       name: product?.Nome || product?.nome || name,
@@ -363,6 +371,10 @@ function ProductPage() {
   };
 
   const handleToggleFavorite = async () => {
+    if (!user) {
+      setShowLoginModal(true);
+      return;
+    }
     try {
       const produtoId = product?.ProdutoID || product?.id || id;
       if (isFavorite) {
@@ -379,21 +391,25 @@ function ProductPage() {
   };
 
   const handleAddComment = async () => {
+    if (!user) {
+      setShowLoginModal(true);
+      return;
+    }
     if (!newComment.trim() || !newRating) return;
-    
+
     setSubmittingAvaliacao(true);
     try {
       await avaliacaoService.avaliar(id, newRating, newComment.trim());
-      
+
       // Recarregar avaliações
       const [avaliacoesResponse, minhaAvaliacaoResponse] = await Promise.all([
         avaliacaoService.listarPorProduto(id),
         avaliacaoService.minhaDoProduto(id).catch(() => null)
       ]);
-      
+
       setAvaliacoes(avaliacoesResponse.data || []);
       setMinhaAvaliacao(minhaAvaliacaoResponse?.data || null);
-      
+
       setNewComment('');
       setNewRating(5);
       showSuccess('Avaliação enviada com sucesso!');
@@ -493,7 +509,7 @@ function ProductPage() {
                   {discount > 0 && (
                     <span className="px-3 py-1 bg-red-500 text-white text-sm font-bold rounded-lg flex items-center gap-1 shadow-sm">
                       <FaPercent className="text-xs" />
-                      {discount}% OFF
+                      {discount}%
                     </span>
                   )}
                   {freeShipping && (
@@ -669,14 +685,31 @@ function ProductPage() {
                   >
                     −
                   </button>
-                  <span className="px-4 py-2 font-medium bg-slate-50 border-x border-slate-200 min-w-[60px] text-center">{quantity}</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max={estoque || 999}
+                    value={quantity}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value) || 1;
+                      const maxQty = estoque || 999;
+                      setQuantity(Math.max(1, Math.min(maxQty, value)));
+                    }}
+                    className="px-4 py-2 font-medium bg-slate-50 border-x border-slate-200 min-w-[60px] text-center focus:outline-none focus:ring-0"
+                  />
                   <button
-                    onClick={() => setQuantity(quantity + 1)}
+                    onClick={() => setQuantity(Math.min(estoque || 999, quantity + 1))}
                     className="px-3 py-2 hover:bg-slate-50 transition-colors text-slate-600 hover:text-slate-900 font-medium"
+                    disabled={quantity >= (estoque || 999)}
                   >
                     +
                   </button>
                 </div>
+                {estoque && (
+                  <span className="text-sm text-slate-500">
+                    {estoque} disponíveis
+                  </span>
+                )}
               </div>
 
               {/* Botões de Ação */}
@@ -724,8 +757,29 @@ function ProductPage() {
                   </button>
 
                   <button
-                    onClick={() => {
-                      handleAddToCart();
+                    onClick={async () => {
+                      if (!user) {
+                        setShowLoginModal(true);
+                        return;
+                      }
+                      // Clear cart and add only this item for direct purchase
+                      await clear();
+                      const mapped = {
+                        id: product?.ProdutoID || product?.id || id,
+                        name: product?.Nome || product?.nome || name,
+                        price: Number(product?.Preco ?? product?.preco ?? price ?? 0),
+                        image: Array.isArray(product?.Imagens) ? product.Imagens[0] : null,
+                        sku: product?.SKU || product?.sku || sku,
+                        estoque: product?.Estoque ?? product?.estoque ?? estoque ?? 0,
+                      };
+                      await addItem(mapped, quantity);
+                      // Set sessionStorage for direct checkout
+                      sessionStorage.setItem('helpnet_checkout_data', JSON.stringify({
+                        selectedItems: [mapped.id],
+                        subtotal: mapped.price * quantity,
+                        couponDiscount: 0,
+                        appliedCoupons: []
+                      }));
                       navigate('/checkout');
                     }}
                     className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-green-300 bg-green-50 text-green-700 rounded-xl font-medium hover:bg-green-100 hover:border-green-400 transition-all duration-200"
@@ -1191,6 +1245,9 @@ function ProductPage() {
           </div>
         </div>
       )}
+
+      {/* Login/Register Modal */}
+      <LoginRegisterModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
     </div>
   );
 }

@@ -1,4 +1,6 @@
-import { FaCheck } from 'react-icons/fa';
+import { FaCheck, FaTimes } from 'react-icons/fa';
+import { useCart } from '../../context/CartContext';
+import CouponInput from '../CouponInput';
 
 function OrderSummary({
   orderData,
@@ -10,15 +12,82 @@ function OrderSummary({
   selectedAddress,
   calcularTotalPagamentos,
   calcularValorRestante,
-  handleFinalizarPedido
+  handleFinalizarPedido,
+  items,
+  getSelectedItems
 }) {
+  const { removeCoupon } = useCart();
+
   const formatPrice = (price) => {
     return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
+  // Get selected items for coupon validation
+  const selectedItemIds = getSelectedItems ? getSelectedItems() : [];
+  const selectedItems = items ? items.filter(item => selectedItemIds.includes(item.id)) : [];
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 sticky top-24">
       <h2 className="text-xl font-semibold text-slate-900 mb-4">Resumo do Pedido</h2>
+
+      {/* Applied Coupons */}
+      {appliedCoupons.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-sm font-medium text-slate-900 mb-3">Cupons Aplicados</h3>
+          <div className="space-y-2">
+            {appliedCoupons.map((coupon, index) => (
+              <div
+                key={index}
+                className={`p-3 border rounded-lg ${
+                  coupon.TipoDesconto === 'frete_gratis'
+                    ? 'border-green-500 bg-green-50'
+                    : 'border-blue-500 bg-blue-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div>
+                      <p className="font-medium text-slate-900 text-sm">{coupon.Codigo}</p>
+                      <p className="text-xs text-slate-600">
+                        {coupon.TipoDesconto === 'porcentagem' ? `${coupon.ValorDesconto}% de desconto` :
+                         coupon.TipoDesconto === 'valor_fixo' ? `R$ ${coupon.ValorDesconto} de desconto` :
+                         coupon.TipoDesconto === 'frete_gratis' ? 'Frete grátis' :
+                         'Desconto aplicado'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm font-medium ${
+                      coupon.TipoDesconto === 'frete_gratis' ? 'text-green-600' : 'text-blue-600'
+                    }`}>
+                      {coupon.TipoDesconto === 'frete_gratis' ? 'GRÁTIS' :
+                       coupon.TipoDesconto === 'porcentagem' ? `-${coupon.ValorDesconto}%` :
+                       `-${formatPrice(coupon.ValorDesconto)}`}
+                    </span>
+                    <button
+                      onClick={() => removeCoupon(coupon.Codigo)}
+                      className="p-1 rounded-full hover:bg-slate-200 transition-colors"
+                      title="Remover cupom"
+                    >
+                      <FaTimes className="text-slate-500 text-xs" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Coupon Input */}
+      <div className="mb-6">
+        <CouponInput
+          cartItems={selectedItems}
+          cartTotal={orderData?.subtotal || 0}
+          onCouponApplied={() => {}} // CartContext handles this
+          disabled={false}
+        />
+      </div>
 
       <div className="space-y-3 mb-6">
         <div className="flex justify-between text-sm">

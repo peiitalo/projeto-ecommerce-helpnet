@@ -1,6 +1,7 @@
 // backend/src/controllers/cupomController.js
 import prisma from "../config/prisma.js";
 import { logControllerError, logger } from "../utils/logger.js";
+import { validateCouponState } from "../services/couponValidationService.js";
 
 /**
  * Lista cupons do vendedor com filtros opcionais
@@ -544,7 +545,7 @@ export const listarCuponsDisponiveisCliente = async (req, res) => {
           }
         }
       },
-      orderBy: { RecebidoEm: 'desc' }
+      orderBy: { CriadoEm: 'desc' }
     });
 
     // Filtrar cupons que ainda podem ser usados pelo cliente
@@ -862,221 +863,43 @@ export const resgatarCupom = async (req, res) => {
   }
 };
 
-/**
- * Lógica de validação de cupom (função utilitária)
- * @param {string} codigo - Código do cupom
- * @param {Array} itensCarrinho - Itens do carrinho (pode ser array de IDs ou objetos)
- * @param {number} valorTotal - Valor total do carrinho
- * @param {number} clienteId - ID do cliente
- * @returns {Object} Resultado da validação
- */
-export const validarCupomLogic = async (codigo, itensCarrinho, valorTotal, clienteId) => {
-  if (!clienteId) {
-    throw new Error("Cliente não autenticado");
-  }
-
-  if (!codigo || typeof codigo !== 'string') {
-    throw new Error("Código do cupom é obrigatório e deve ser uma string");
-  }
-
-  // Sanitize and validate coupon code
-  const sanitizedCode = codigo.trim().toUpperCase();
-  if (!sanitizedCode) {
-    throw new Error("Código do cupom não pode estar vazio");
-  }
-
-  // Validate code format
-  const codeRegex = /^[A-Z0-9_-]+$/;
-  if (!codeRegex.test(sanitizedCode)) {
-    throw new Error("Código do cupom contém caracteres inválidos");
-  }
-
-  // Validate code length
-  if (sanitizedCode.length < 3 || sanitizedCode.length > 20) {
-    throw new Error("Código do cupom deve ter entre 3 e 20 caracteres");
-  }
-
-  // Buscar cupom por código
-  const cupom = await prisma.cupom.findFirst({
-    where: {
-      Codigo: sanitizedCode,
-      Ativo: true,
-      DataInicio: { lte: new Date() }, // Cupom deve ter iniciado
-      OR: [
-        { DataExpiracao: null },
-        { DataExpiracao: { gte: new Date() } }
-      ]
-    },
-    include: {
-      cuponsCliente: {
-        where: { ClienteID: clienteId }
-      }
-    }
-  });
-
-  if (!cupom) {
-    return { valido: false, error: "Cupom não encontrado ou expirado" };
-  }
-
-  // Verificar se o cliente pode usar este cupom
-  if (cupom.Tipo === 'especifico') {
-    if (cupom.cuponsCliente.length === 0) {
-      return { valido: false, error: "Este cupom não está disponível para você" };
-    }
-
-    const usoCliente = cupom.cuponsCliente[0];
-    if (usoCliente.Usado || (cupom.UsoPorCliente && usoCliente.UsosCliente >= cupom.UsoPorCliente)) {
-      return { valido: false, error: "Você já usou este cupom o máximo permitido" };
-    }
-  } else if (cupom.Tipo === 'publico') {
-    // Para cupons públicos, verificar limite de uso por cliente
-    if (cupom.UsoPorCliente) {
-      // Contar quantas vezes o cliente já usou este cupom
-      const usosCliente = await prisma.pedido.count({
-        where: {
-          ClienteID: clienteId,
-          CupomID: cupom.CupomID
-        }
-      });
-
-      if (usosCliente >= cupom.UsoPorCliente) {
-        return { valido: false, error: "Você já usou este cupom o máximo permitido" };
-      }
-    }
-  }
-
-  // Verificar limite total de uso
-  if (cupom.LimiteUso && cupom.UsosAtuais >= cupom.LimiteUso) {
-    return { valido: false, error: "Este cupom atingiu o limite de uso" };
-  }
-
-  // Validar restrições baseadas no conteúdo do carrinho
-  if (cupom.Restricoes) {
-    // Restrição de categoria - verificar se há produtos da categoria restrita no carrinho
-    if (cupom.Restricoes.categoriaId && itensCarrinho) {
-      let temCategoria = false;
-      let produtosValidos = [];
-
-      if (Array.isArray(itensCarrinho) && itensCarrinho.length > 0) {
-        if (typeof itensCarrinho[0] === 'number') {
-          // itensCarrinho é array de IDs de produto, buscar categorias
-          const produtos = await prisma.produto.findMany({
-            where: { ProdutoID: { in: itensCarrinho } },
-            select: { ProdutoID: true, CategoriaID: true, Nome: true }
-          });
-          produtosValidos = produtos.filter(produto => produto.CategoriaID === cupom.Restricoes.categoriaId);
-          temCategoria = produtosValidos.length > 0;
-        } else if (typeof itensCarrinho[0] === 'object') {
-          // itensCarrinho é array de objetos, verificar diferentes formatos
-          if (itensCarrinho[0].categoriaId !== undefined) {
-            // Formato antigo: { categoriaId, ... }
-            produtosValidos = itensCarrinho.filter(item => item.categoriaId === cupom.Restricoes.categoriaId);
-            temCategoria = produtosValidos.length > 0;
-          } else if (itensCarrinho[0].CategoriaID !== undefined) {
-            // Formato do CartContext: { ProdutoID, CategoriaID, PrecoUnitario, Quantidade }
-            produtosValidos = itensCarrinho.filter(item => item.CategoriaID === cupom.Restricoes.categoriaId);
-            temCategoria = produtosValidos.length > 0;
-          } else if (itensCarrinho[0].ProdutoID !== undefined) {
-            // Mesmo formato, mas sem CategoriaID - buscar no banco
-            const produtoIds = itensCarrinho.map(item => item.ProdutoID).filter(id => id);
-            if (produtoIds.length > 0) {
-              const produtos = await prisma.produto.findMany({
-                where: { ProdutoID: { in: produtoIds } },
-                select: { ProdutoID: true, CategoriaID: true, Nome: true }
-              });
-              produtosValidos = produtos.filter(produto => produto.CategoriaID === cupom.Restricoes.categoriaId);
-              temCategoria = produtosValidos.length > 0;
-            }
-          }
-        }
-      }
-
-      if (!temCategoria) {
-        // Buscar nome da categoria para mensagem mais informativa
-        const categoria = await prisma.categoria.findUnique({
-          where: { CategoriaID: cupom.Restricoes.categoriaId },
-          select: { Nome: true }
-        });
-
-        const nomeCategoria = categoria ? categoria.Nome : `categoria ${cupom.Restricoes.categoriaId}`;
-        return {
-          valido: false,
-          error: `Este cupom é válido apenas para produtos da categoria "${nomeCategoria}"`
-        };
-      }
-    }
-
-    // Restrição de valor mínimo
-    if (cupom.Restricoes.valorMinimo && valorTotal < cupom.Restricoes.valorMinimo) {
-      return {
-        valido: false,
-        error: `Este cupom requer um valor mínimo de compra de R$ ${cupom.Restricoes.valorMinimo.toFixed(2)}`
-      };
-    }
-  }
-
-  // Calcular desconto baseado no tipo
-  let desconto = 0;
-  let valorFinal = valorTotal;
-
-  if (cupom.DescontoTipo === 'porcentagem') {
-    desconto = (valorTotal * cupom.DescontoValor) / 100;
-    valorFinal = Math.max(0, valorTotal - desconto);
-  } else if (cupom.DescontoTipo === 'valor_fixo') {
-    desconto = Math.min(cupom.DescontoValor, valorTotal);
-    valorFinal = Math.max(0, valorTotal - desconto);
-  } else if (cupom.DescontoTipo === 'frete_gratis') {
-    // Desconto de frete será calculado no checkout
-    desconto = 0;
-    valorFinal = valorTotal; // Frete grátis não afeta o subtotal dos produtos
-  }
-
-  const resultado = {
-    cupom: {
-      CupomID: cupom.CupomID,
-      Codigo: cupom.Codigo,
-      Nome: cupom.Nome,
-      DescontoTipo: cupom.DescontoTipo,
-      DescontoValor: cupom.DescontoValor,
-      TipoDesconto: cupom.DescontoTipo, // Adicionado para compatibilidade
-      Restricoes: cupom.Restricoes
-    },
-    desconto: desconto,
-    valorFinal: valorFinal,
-    valido: true
-  };
-
-  logger.info('validar_cupom_logic_ok', {
-    codigo: sanitizedCode,
-    clienteId,
-    descontoTipo: cupom.DescontoTipo,
-    descontoValor: desconto
-  });
-  return resultado;
-};
 
 /**
  * Valida e aplica cupom a um carrinho/pedido (handler Express)
  * @param {Object} req - Requisição Express
  * @param {Object} res - Resposta Express
- * @returns {Object} JSON com resultado da validação
+ * @returns {Object} JSON com resultado da validação no formato state-based com compatibilidade
  */
 export const validarCupom = async (req, res) => {
   try {
-    const { codigo, itensCarrinho, valorTotal } = req.body;
+    const { codigo, itensCarrinho } = req.body;
     const clienteId = req.user?.id;
 
-    const resultado = await validarCupomLogic(codigo, itensCarrinho, valorTotal, clienteId);
+    const resultado = await validateCouponState(codigo, itensCarrinho, clienteId);
 
-    if (!resultado.valido) {
-      return res.json(resultado);
-    }
+    // Adicionar campos de compatibilidade com o formato antigo
+    const response = {
+      ...resultado,
+      valido: resultado.state === 'active',
+      ...(resultado.state !== 'active' && { error: resultado.reason }),
+      ...(resultado.discountDetails && {
+        desconto: resultado.discountDetails.discountAmount,
+        valorFinal: resultado.discountDetails.finalAmount
+      })
+    };
 
-    logger.info('validar_cupom_ok', { codigo, clienteId });
-    res.json(resultado);
+    logger.info('validar_cupom_ok', { codigo, clienteId, state: resultado.state });
+    res.json(response);
   } catch (error) {
     logControllerError('validar_cupom_error', error, req);
-    res.status(500).json({ error: "Erro ao validar cupom" });
+    res.status(500).json({
+      state: 'inactive',
+      reason: 'Erro interno ao validar cupom',
+      coupon: null,
+      discountDetails: null,
+      valido: false,
+      error: 'Erro interno ao validar cupom'
+    });
   }
 };
 

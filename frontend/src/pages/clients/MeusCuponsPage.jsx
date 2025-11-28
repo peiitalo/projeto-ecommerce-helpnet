@@ -97,7 +97,10 @@ function MeusCuponsPage() {
               usedAt: null, // Sempre null pois backend filtra apenas disponíveis
               canRedeem: true, // Sempre true pois são disponíveis
               vendedor: cupomCliente.vendedor,
-              restricoes: cupomCliente.restricoes
+              restricoes: cupomCliente.restricoes,
+              // Add new state-based properties
+              state: cupomCliente.state || 'active', // Default to active if not provided
+              reason: cupomCliente.reason || null
             }));
           }
         } else {
@@ -153,13 +156,69 @@ function MeusCuponsPage() {
       return 'Frete Grátis';
     }
     if (coupon.type === 'fixed') {
-      return `R$ ${coupon.discount} OFF`;
+      return `R$ ${coupon.discount}`;
     }
-    return `${coupon.discount}% OFF`;
+    return `${coupon.discount}%`;
   };
 
   const isExpired = (validUntil) => {
     return new Date(validUntil) < new Date();
+  };
+
+  const getCouponStateDisplay = (coupon) => {
+    // Handle new state-based system
+    if (coupon.state) {
+      switch (coupon.state) {
+        case 'active':
+          return {
+            color: 'bg-green-100 text-green-700',
+            text: 'Ativo',
+            canApply: true,
+            icon: ''
+          };
+        case 'grayed_out':
+          return {
+            color: 'bg-gray-100 text-gray-700',
+            text: 'Aplicável com restrições',
+            canApply: false,
+            icon: '⚠️',
+            reason: coupon.reason
+          };
+        case 'inactive':
+          return {
+            color: 'bg-red-100 text-red-700',
+            text: 'Não aplicável',
+            canApply: false,
+            icon: '❌',
+            reason: coupon.reason
+          };
+        default:
+          return {
+            color: 'bg-slate-100 text-slate-700',
+            text: coupon.state,
+            canApply: false,
+            icon: '❓'
+          };
+      }
+    }
+
+    // Fallback to old status system
+    const expired = isExpired(coupon.validUntil);
+    if (expired) {
+      return {
+        color: 'bg-red-100 text-red-700',
+        text: 'Expirado',
+        canApply: false,
+        icon: '⏰'
+      };
+    }
+
+    return {
+      color: 'bg-green-100 text-green-700',
+      text: 'Disponível',
+      canApply: true,
+      icon: '✅'
+    };
   };
 
   return (
@@ -365,14 +424,17 @@ function MeusCuponsPage() {
                           <h3 className="font-semibold text-lg text-slate-900">
                             {formatDiscount(coupon)}
                           </h3>
-                        <div className="flex gap-2">
-                          <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
-                            Disponível
-                          </span>
-                          {isExpired(coupon.validUntil) && (
-                            <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded-full">
-                              Expirado
+                        <div className="flex flex-col gap-2">
+                          <div className="flex gap-2 items-center">
+                            <span className="text-sm">{getCouponStateDisplay(coupon).icon}</span>
+                            <span className={`px-2 py-1 text-xs rounded-full ${getCouponStateDisplay(coupon).color}`}>
+                              {getCouponStateDisplay(coupon).text}
                             </span>
+                          </div>
+                          {getCouponStateDisplay(coupon).reason && (
+                            <div className="text-xs text-slate-600 bg-slate-50 px-2 py-1 rounded">
+                              {getCouponStateDisplay(coupon).reason}
+                            </div>
                           )}
                         </div>
                         </div>
@@ -399,7 +461,7 @@ function MeusCuponsPage() {
                         <span className="font-mono text-lg font-bold px-3 py-2 rounded border border-blue-200 text-blue-700 bg-blue-50">
                           {coupon.code}
                         </span>
-                      {!isExpired(coupon.validUntil) && (
+                      {getCouponStateDisplay(coupon).canApply && (
                         <button
                           onClick={() => copyToClipboard(coupon.code)}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"

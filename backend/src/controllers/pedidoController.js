@@ -4,6 +4,8 @@ import { logControllerError, logger } from "../utils/logger.js";
 import paymentService from "../services/paymentService.js";
 import { calcularFrete } from "../services/freightService.js";
 import { sendOrderConfirmationEmail, sendDeliveryStatusEmail, sendVendorNewSaleEmail } from "../services/emailService.js";
+import { validateCouponState } from "../services/couponValidationService.js";
+import { calculateDiscount } from "../services/couponCalculator.js";
 
 export const criarPedido = async (req, res) => {
   try {
@@ -65,66 +67,67 @@ export const criarPedido = async (req, res) => {
     // Criar mapa de produtos para acesso rápido
     const produtosMap = new Map(produtos.map(p => [p.ProdutoID, p]));
 
-    // Validar cupons se fornecidos
+    // Validar cupons se fornecidos usando os novos serviços
     let cuponsAplicados = [];
     let descontoCupom = 0;
     let freteGratisCupom = false;
+    let cuponsDetalhes = []; // Para armazenar detalhes dos cupons aplicados
 
     if (cupomCodigos && Array.isArray(cupomCodigos) && cupomCodigos.length > 0) {
       try {
-        // Importar função de validação de cupom
-        const { validarCupomLogic } = await import('../controllers/cupomController.js');
-
-        // Calcular total dos itens para validação
-        let totalItensValidacao = 0;
-        const itensParaValidacao = itens.map(item => {
+        // Preparar itens do carrinho para validação
+        const itensCarrinho = itens.map(item => {
           const produto = produtosMap.get(parseInt(item.produtoId));
-          const precoUnitario = item.precoUnitario || produto.Preco;
-          totalItensValidacao += precoUnitario * item.quantidade;
-
           return {
-            produtoId: parseInt(item.produtoId),
-            categoriaId: produto.CategoriaID,
-            quantidade: item.quantidade
+            ProdutoID: parseInt(item.produtoId),
+            Quantidade: item.quantidade,
+            PrecoUnitario: item.precoUnitario || produto.Preco,
+            CategoriaID: produto.CategoriaID,
+            Nome: produto.Nome
           };
         });
 
-        // Validar cada cupom e acumular descontos
-        let subtotalAtual = totalItensValidacao;
-
+        // Validar cada cupom com o estado atual do carrinho
         for (const cupomCodigo of cupomCodigos) {
-          const validacao = await validarCupomLogic(
-            cupomCodigo,
-            itensParaValidacao,
-            subtotalAtual,
-            user.id
-          );
+          const validacao = await validateCouponState(cupomCodigo, itensCarrinho, user.id);
 
-          if (!validacao || !validacao.valido) {
+          if (validacao.state !== 'active') {
             return res.status(400).json({
               success: false,
-              errors: [`Cupom ${cupomCodigo}: ${validacao?.error || "Cupom inválido"}`]
+              errors: [`Cupom ${cupomCodigo}: ${validacao.reason}`]
             });
           }
 
-          cuponsAplicados.push(validacao.cupom);
-          descontoCupom += validacao.desconto;
+          const cupom = validacao.coupon;
+          const discountDetails = validacao.discountDetails;
 
-          // Verificar se é frete grátis
-          if (validacao.cupom.TipoDesconto === 'frete_gratis') {
+          // Aplicar desconto baseado no tipo
+          let descontoAplicado = 0;
+          if (cupom.DescontoTipo === 'frete_gratis') {
             freteGratisCupom = true;
+          } else {
+            descontoAplicado = discountDetails.discountAmount;
+            descontoCupom += descontoAplicado;
           }
 
-          // Reduzir subtotal para próximos cupons (exceto frete grátis)
-          if (validacao.cupom.TipoDesconto !== 'frete_gratis') {
-            subtotalAtual -= validacao.desconto;
-          }
+          // Registrar detalhes do cupom aplicado
+          cuponsAplicados.push(cupom);
+          cuponsDetalhes.push({
+            cupom: cupom,
+            descontoAplicado: descontoAplicado,
+            eligibleItems: discountDetails.eligibleItems,
+            eligibleSubtotal: discountDetails.eligibleSubtotal,
+            discountAmount: discountDetails.discountAmount,
+            finalAmount: discountDetails.finalAmount
+          });
 
           logger.info('cupom_validado_aplicado', {
             clienteId: user.id,
             cupomCodigo,
-            desconto: validacao.desconto,
-            freteGratis: validacao.cupom.TipoDesconto === 'frete_gratis'
+            desconto: descontoAplicado,
+            freteGratis: cupom.DescontoTipo === 'frete_gratis',
+            eligibleItemsCount: discountDetails.eligibleItems.length,
+            eligibleSubtotal: discountDetails.eligibleSubtotal
           });
         }
 
@@ -562,10 +565,13 @@ export const criarPedido = async (req, res) => {
         frete: valorFrete,
         subtotal: totalItens,
         descontoCupom: descontoCupom,
-        cuponsAplicados: cuponsAplicados.map(cupom => ({
-          codigo: cupom.Codigo,
-          tipo: cupom.TipoDesconto,
-          valor: cupom.ValorDesconto
+        cuponsAplicados: cuponsDetalhes.map(detalhe => ({
+          codigo: detalhe.cupom.Codigo,
+          tipo: detalhe.cupom.DescontoTipo,
+          valor: detalhe.cupom.DescontoValor,
+          descontoAplicado: detalhe.descontoAplicado,
+          itensElegiveis: detalhe.eligibleItems.length,
+          subtotalElegivel: detalhe.eligibleSubtotal
         })),
         status: 'Pago',
         // Pagamento simulado aprovado - redirecionar para página de sucesso

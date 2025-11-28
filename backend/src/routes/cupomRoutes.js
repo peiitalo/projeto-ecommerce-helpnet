@@ -36,6 +36,7 @@ router.patch('/:id/toggle-status', toggleCupomStatus);
 router.get('/clientes/disponiveis', listarClientesParaCupom);
 
 // Rotas públicas para clientes
+publicRouter.get('/disponiveis', listarCuponsDisponiveisCliente);
 publicRouter.get('/meus', listarCuponsCliente);
 publicRouter.post('/resgatar', resgatarCupom);
 publicRouter.post('/validar', validarCupom);
