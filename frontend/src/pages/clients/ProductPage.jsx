@@ -14,7 +14,8 @@ import {
   FaUser,
   FaRegHeart,
   FaImage,
-  FaSearchPlus
+  FaSearchPlus,
+  FaBell,
 } from 'react-icons/fa';
 import {
   FiChevronLeft,
@@ -31,13 +32,17 @@ import LoadingSkeleton from '../../components/LoadingSkeleton';
 import LoginRegisterModal from '../../components/LoginRegisterModal';
 import { buildImageUrl, buildImageUrls, getFirstValidImage } from '../../utils/imageUtils';
 import { useNotifications } from '../../hooks/useNotifications';
+import { useCounters } from '../../context/CountersContext';
 
 
 function ProductPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { addItem, removeItem, items, clear } = useCart();
+  const { addItem, removeItem, items, clear, count: cartCount } = useCart();
   const { user } = useAuth();
+  const { favoritesCount, notificationsCount } = useCounters();
+
+  console.log('[ProductPage] Rendering with id:', id, 'user:', user ? 'logged in' : 'not logged in');
   const [buttonState, setButtonState] = useState('add'); // 'add', 'added', 'remove'
   const [addedToCartTimeout, setAddedToCartTimeout] = useState(null);
   const { showSuccess, showError, showWarning } = useNotifications();
@@ -456,18 +461,79 @@ function ProductPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Header com botão voltar */}
+      {/* Header com navegação */}
       <header className="bg-white sticky top-0 z-40 border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-4 h-16">
-            <button
-              onClick={() => navigate(-1)}
-              className="p-2 text-slate-600 hover:text-blue-700 transition-colors"
-              aria-label="Voltar"
-            >
-              <FaArrowLeft className="text-lg" />
-            </button>
-            <h1 className="text-lg font-semibold text-slate-900 truncate">{name}</h1>
+          <div className="flex items-center justify-between gap-4 h-16">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate(-1)}
+                className="p-2 text-slate-600 hover:text-blue-700 transition-colors"
+                aria-label="Voltar"
+              >
+                <FaArrowLeft className="text-lg" />
+              </button>
+              <h1 className="text-lg font-semibold text-slate-900 truncate">{name}</h1>
+            </div>
+
+            <div className="flex items-center gap-2 sm:gap-3">
+              <button
+                onClick={() => {
+                  if (!user?.id) {
+                    setShowLoginModal(true);
+                  } else {
+                    navigate('/favoritos');
+                  }
+                }}
+                className="relative p-2 rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50"
+              >
+                <FaHeart />
+                {favoritesCount > 0 && (
+                  <span className="absolute -top-1 -right-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-600 text-white">
+                    {favoritesCount}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  if (!user?.id) {
+                    setShowLoginModal(true);
+                  } else {
+                    navigate('/notificacoes');
+                  }
+                }}
+                className="relative p-2 rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50"
+              >
+                <FaBell />
+                {notificationsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-600 text-white">
+                    {notificationsCount}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  if (!user?.id) {
+                    setShowLoginModal(true);
+                  } else {
+                    navigate('/carrinho');
+                  }
+                }}
+                className="relative p-2 rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50"
+              >
+                <FaShoppingCart />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-600 text-white">
+                    {cartCount}
+                  </span>
+                )}
+              </button>
+              {user && user.id && (
+                <Link to="/perfil" className="p-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100">
+                  <FaUser />
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       </header>

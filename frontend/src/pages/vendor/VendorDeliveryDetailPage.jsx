@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import VendorLayout from '../../components/VendorLayout.jsx';
 import { entregaApi } from '../../services/api.js';
 import { useNotifications } from '../../hooks/useNotifications';
+import { buildImageUrl } from '../../utils/imageUtils.js';
 import {
   FaArrowLeft,
   FaTruck,
@@ -19,7 +20,7 @@ import {
 
 function VendorDeliveryDetailPage() {
   const { pedidoId } = useParams();
-  const { showSuccess, showError } = useNotifications();
+  const { showError } = useNotifications();
   const navigate = useNavigate();
   const [delivery, setDelivery] = useState(null);
   const [tracking, setTracking] = useState([]);
@@ -298,7 +299,7 @@ function VendorDeliveryDetailPage() {
                 <div key={item.ItemID} className="flex items-center gap-4 p-4 bg-slate-50 rounded-lg">
                   <div className="flex-shrink-0">
                     <img
-                      src={item.produto?.Imagens?.[0] ? `http://localhost:3001${item.produto.Imagens[0]}` : '/placeholder-image.png'}
+                      src={buildImageUrl(item.produto?.Imagens?.[0])}
                       alt={item.produto?.Nome || 'Produto'}
                       className="w-16 h-16 object-cover rounded-lg"
                     />

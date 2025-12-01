@@ -592,6 +592,15 @@ function OrdersPage() {
                           <span>Ver Detalhes</span>
                         </button>
                       
+                        <Link
+                          to={`/tracking/${order.pedidoId}`}
+                          className="flex items-center gap-2 px-4 py-2 text-green-600 hover:bg-green-50 rounded-lg border border-green-200 transition-colors"
+                          title="Acompanhar entrega"
+                        >
+                          <FaTruck />
+                          <span>Acompanhar</span>
+                        </Link>
+                      
                         {(order.statusPagamento === 'PENDENTE' || order.statusPagamento === 'PARCIAL') && (
                           <Link
                             to={`/checkout/pagamento/${order.pedidoId}`}

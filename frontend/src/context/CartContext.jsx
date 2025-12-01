@@ -222,7 +222,9 @@ export function CartProvider({ children }) {
 
   // Calcular frete baseado no endereço selecionado e produtos específicos
   const calculateFreight = async (enderecoId, produtoIds = null) => {
+    console.log('[CartContext] calculateFreight called:', { user: !!user, enderecoId, produtoIds });
     if (!user || !enderecoId) {
+      console.log('[CartContext] calculateFreight early return - no user or enderecoId');
       setFreightOptions([]);
       setSelectedFreight(null);
       return;
@@ -241,6 +243,10 @@ export function CartProvider({ children }) {
     // Filtrar apenas produtos que NÃO têm frete grátis para cálculo
     const produtosQuePagamFrete = itemsParaCalculo.filter(item => !item.freeShipping);
     const idsProdutosQuePagamFrete = produtosQuePagamFrete.map(item => item.id);
+
+    console.log('[CartContext] Produtos no carrinho:', itemsParaCalculo.length);
+    console.log('[CartContext] Produtos que pagam frete:', produtosQuePagamFrete.length);
+    console.log('[CartContext] IDs produtos que pagam frete:', idsProdutosQuePagamFrete);
 
     // Se nenhum produto paga frete (todos têm frete grátis), mostrar frete grátis
     if (produtosQuePagamFrete.length === 0) {
@@ -264,9 +270,12 @@ export function CartProvider({ children }) {
     setFreightError(null);
 
     try {
+      console.log('[CartContext] Calling freteService.calcular with:', user.id, enderecoId, idsProdutosQuePagamFrete);
       const freteResult = await freteService.calcular(user.id, enderecoId, idsProdutosQuePagamFrete);
+      console.log('[CartContext] freteService.calcular result:', freteResult);
 
       const options = freteResult.opcoes || [];
+      console.log('[CartContext] Setting freight options:', options);
       setFreightOptions(options);
 
       // Selecionar primeira opção como padrão se disponível

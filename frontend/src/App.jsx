@@ -18,7 +18,7 @@ const FinanceiroPage = lazy(() => import("./pages/vendor/FinanceiroPage"));
 const ConfiguracoesPage = lazy(() => import("./pages/admin/ConfiguracoesPage"));
 const NotFound = lazy(() => import("./pages/errors/notFound"));
 const Home = lazy(() => import("./pages/clients/home"));
-const ProductPage = lazy(() => import("./pages/clients/ProductPage"));
+import ProductPage from "./pages/clients/ProductPage";
 const CartPage = lazy(() => import("./pages/clients/CartPage"));
 const FavoritesPage = lazy(() => import("./pages/clients/FavoritesPage"));
 const NotificationsPage = lazy(() =>
@@ -29,6 +29,7 @@ const ExplorePage = lazy(() => import("./pages/clients/ExplorePage"));
 const CheckoutPage = lazy(() => import("./pages/clients/CheckoutPage"));
 const AddressPage = lazy(() => import("./pages/clients/AddressPage"));
 const OrdersPage = lazy(() => import("./pages/clients/OrdersPage"));
+const TrackingPage = lazy(() => import("./pages/clients/TrackingPage"));
 const HistoryPage = lazy(() => import("./pages/clients/HistoryPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const PaymentSimulator = lazy(() => import("./pages/clients/PaymentSimulator"));
@@ -103,6 +104,7 @@ function App() {
                 element={<PaymentCheckout />}
               />
               <Route path="/meus-pedidos" element={<OrdersPage />} />
+              <Route path="/tracking/:pedidoId" element={<TrackingPage />} />
               <Route path="/historico" element={<HistoryPage />} />
               <Route path="/cupons" element={<MeusCuponsPage />} />
               <Route

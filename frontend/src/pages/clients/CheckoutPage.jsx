@@ -183,10 +183,14 @@ function CheckoutPage() {
       }
 
       if (selectedAddressToUse) {
+        console.log('[CheckoutPage] Setting selected address and calculating freight:', selectedAddressToUse.EnderecoID);
         setSelectedAddress(selectedAddressToUse);
         // Calcular frete automaticamente para o endereço selecionado e itens selecionados
+        console.log('[CheckoutPage] Calling calculateFreight with:', selectedAddressToUse.EnderecoID, selectedItemIds);
         await calculateFreight(selectedAddressToUse.EnderecoID, selectedItemIds);
         setSelectedFreight(null); // Não selecionar frete automaticamente
+      } else {
+        console.log('[CheckoutPage] No address selected, skipping freight calculation');
       }
 
       // Calcular subtotal apenas dos itens selecionados (usando preços já com desconto)
