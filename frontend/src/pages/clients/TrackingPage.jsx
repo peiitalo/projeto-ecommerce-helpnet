@@ -239,9 +239,9 @@ const TrackingPage = () => {
                       return (
                         <div key={step.key} className="relative flex items-start gap-3 sm:gap-4">
                           <div className={`relative z-10 flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 ${
-                            isCompleted 
-                              ? 'bg-blue-100 border-blue-500 text-blue-600' 
-                              : isCurrent 
+                            isCompleted
+                              ? 'bg-green-100 border-green-500 text-green-600'
+                              : isCurrent
                               ? 'bg-blue-100 border-blue-500 text-blue-600'
                               : 'bg-slate-100 border-slate-300 text-slate-400'
                           }`}>
@@ -249,12 +249,12 @@ const TrackingPage = () => {
                           </div>
                           <div className="flex-1 min-w-0 pb-4 sm:pb-6">
                             <div className={`font-medium ${
-                              isCompleted ? 'text-blue-900' : isCurrent ? 'text-blue-900' : 'text-slate-500'
+                              isCompleted ? 'text-green-900' : isCurrent ? 'text-blue-900' : 'text-slate-500'
                             }`}>
                               {step.label}
                             </div>
                             <div className={`text-sm ${
-                              isCompleted ? 'text-blue-700' : isCurrent ? 'text-blue-700' : 'text-slate-500'
+                              isCompleted ? 'text-green-700' : isCurrent ? 'text-blue-700' : 'text-slate-500'
                             }`}>
                               {step.description}
                             </div>

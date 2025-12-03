@@ -1219,7 +1219,7 @@ export const listarPedidosVendedor = async (req, res) => {
 export const listarPedidosAdmin = async (req, res) => {
   try {
     const { user } = req;
-    const { pagina = 1, limit = 10, status, cliente, dataInicio, dataFim } = req.query;
+    const { pagina = 1, limit = 10, status, cliente, dataInicio, dataFim, search } = req.query;
     const skip = (pagina - 1) * limit;
 
     // Verificar se o usuário é administrador
@@ -1249,6 +1249,30 @@ export const listarPedidosAdmin = async (req, res) => {
       if (dataFim) {
         whereClause.DataPedido.lte = new Date(dataFim);
       }
+    }
+
+    // Adicionar busca por ID do pedido ou nome do cliente
+    if (search && search.trim()) {
+      const searchTerm = search.trim();
+      whereClause.OR = [
+        { PedidoID: isNaN(parseInt(searchTerm)) ? undefined : parseInt(searchTerm) },
+        {
+          cliente: {
+            NomeCompleto: {
+              contains: searchTerm,
+              mode: 'insensitive'
+            }
+          }
+        },
+        {
+          cliente: {
+            Email: {
+              contains: searchTerm,
+              mode: 'insensitive'
+            }
+          }
+        }
+      ].filter(Boolean); // Remove undefined values
     }
 
     const [pedidos, total] = await prisma.$transaction([

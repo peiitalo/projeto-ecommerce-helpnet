@@ -13,7 +13,7 @@ const DOMPurifyServer = DOMPurify(window);
 // Helpers para tokens
 const ACCESS_SECRET = process.env.JWT_SECRET || 'seu_segredo';
 const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'seu_segredo_refresh';
-const ACCESS_EXPIRES = process.env.JWT_ACCESS_EXPIRES || '15m';
+const ACCESS_EXPIRES = process.env.JWT_ACCESS_EXPIRES || '1h';
 const REFRESH_EXPIRES = process.env.JWT_REFRESH_EXPIRES || '30d';
 
 // Login para administradores
@@ -156,6 +156,9 @@ export const obterDashboardStats = async (req, res) => {
       totalClientes,
       totalVendedores,
       totalProdutos,
+      totalAvaliacoes,
+      totalCupons,
+      totalEntregas,
       pedidosRecentes,
       faturamentoTotal,
       produtosMaisVendidos
@@ -171,6 +174,18 @@ export const obterDashboardStats = async (req, res) => {
 
       // Total de produtos ativos
       prisma.produto.count({ where: { Ativo: true } }),
+
+      // Total de avaliações (produto + plataforma)
+      Promise.all([
+        prisma.avaliacao.count(),
+        prisma.avaliacaoPlataforma.count()
+      ]).then(([prod, plat]) => prod + plat),
+
+      // Total de cupons ativos
+      prisma.cupom.count({ where: { Ativo: true } }),
+
+      // Total de entregas
+      prisma.entrega.count(),
 
       // Pedidos recentes (últimos 5)
       prisma.pedido.findMany({
@@ -246,6 +261,9 @@ export const obterDashboardStats = async (req, res) => {
         totalClientes,
         totalVendedores,
         totalProdutos,
+        totalAvaliacoes,
+        totalCupons,
+        totalEntregas,
         faturamentoTotal: faturamentoTotal._sum.Total || 0,
         pedidosRecentes: pedidosRecentes.map(p => ({
           id: p.PedidoID,
@@ -494,7 +512,7 @@ export const listarEmpresas = async (req, res) => {
         },
         orderBy: { CriadoEm: 'desc' },
         skip,
-        take: limitNum
+        take: limit
       }),
       prisma.empresa.count({ where: whereClause })
     ]);

@@ -201,6 +201,11 @@ export const adminService = {
     return adminApiRequest(endpoint);
   },
 
+  // Buscar detalhes do pedido
+  buscarPedido: async (pedidoId) => {
+    return adminApiRequest(`/admin/pedidos/${pedidoId}`);
+  },
+
   // Atualizar status do pedido
   atualizarStatusPedido: async (pedidoId, data) => {
     return adminApiRequest(`/admin/pedidos/${pedidoId}/status`, {

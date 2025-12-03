@@ -122,7 +122,9 @@ function AddressSelection({
                 ))
               ) : (
                 <div className="text-center py-4 text-slate-500">
+                  <FaTruck className="mx-auto h-8 w-8 text-slate-400 mb-2" />
                   <p>Nenhuma opção de frete disponível</p>
+                  <p className="text-xs mt-1">Verifique se todos os produtos estão disponíveis para entrega neste endereço</p>
                 </div>
               )}
 

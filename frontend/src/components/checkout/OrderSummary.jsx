@@ -4,17 +4,16 @@ import CouponInput from '../CouponInput';
 
 function OrderSummary({
   orderData,
-  freight,
   appliedCoupons,
   selectedFreight,
   freightLoading,
   processingOrder,
   selectedAddress,
   calcularTotalPagamentos,
-  calcularValorRestante,
   handleFinalizarPedido,
   items,
-  getSelectedItems
+  getSelectedItems,
+  freightOptions = []
 }) {
   const { removeCoupon } = useCart();
 
@@ -212,6 +211,12 @@ function OrderSummary({
       {calcularTotalPagamentos() > 0 && Math.abs(calcularTotalPagamentos() - (orderData?.total || 0)) > 0.01 && (
         <p className="text-red-600 text-sm mt-2">
           O total dos pagamentos deve ser igual a {formatPrice(orderData?.total || 0)}
+        </p>
+      )}
+      {selectedAddress && (appliedCoupons.some(coupon => coupon.TipoDesconto === 'frete_gratis') || freightOptions.length === 0) && (
+        <p className="text-green-600 text-sm mt-2 flex items-center gap-2">
+          <FaCheck className="text-xs" />
+          <span>Frete não obrigatório para estes produtos</span>
         </p>
       )}
     </div>

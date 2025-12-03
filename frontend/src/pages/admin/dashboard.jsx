@@ -47,7 +47,7 @@ function Dashboard() {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+            'Authorization': `Bearer ${localStorage.getItem('adminAccessToken')}`
           }
         });
 
@@ -74,9 +74,9 @@ function Dashboard() {
     { titulo: "Clientes", valor: String(stats.totalClientes || 0), icone: <FiUsers />, cor: "bg-blue-400" },
     { titulo: "Produtos", valor: String(stats.totalProdutos || 0), icone: <FiBox />, cor: "bg-blue-700" },
     { titulo: "Vendedores", valor: String(stats.totalVendedores || 0), icone: <FiBriefcase />, cor: "bg-green-600" },
-    { titulo: "Avaliações", valor: "1.2k", icone: <FiStar />, cor: "bg-yellow-500" },
-    { titulo: "Cupons", valor: "23", icone: <FiTag />, cor: "bg-purple-600" },
-    { titulo: "Entregas", valor: "89", icone: <FiTruck />, cor: "bg-orange-600" },
+    { titulo: "Avaliações", valor: String(stats.totalAvaliacoes || 0), icone: <FiStar />, cor: "bg-yellow-500" },
+    { titulo: "Cupons", valor: String(stats.totalCupons || 0), icone: <FiTag />, cor: "bg-purple-600" },
+    { titulo: "Entregas", valor: String(stats.totalEntregas || 0), icone: <FiTruck />, cor: "bg-orange-600" },
   ];
 
   const pedidosRecentes = stats.pedidosRecentes?.map(p => ({

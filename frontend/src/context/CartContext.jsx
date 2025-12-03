@@ -262,6 +262,7 @@ export function CartProvider({ children }) {
       setFreightOptions([freteGratisOption]);
       setSelectedFreight(freteGratisOption);
       setFreightLoading(false);
+      setFreightError(null);
       return;
     }
 

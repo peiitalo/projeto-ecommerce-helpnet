@@ -14,6 +14,8 @@ const Cadastro = lazy(() => import("./pages/cadastro"));
 const Dashboard = lazy(() => import("./pages/admin/dashboard"));
 const AdminOrdersPage = lazy(() => import("./pages/admin/orders"));
 const VendedoresPage = lazy(() => import("./pages/admin/VendedoresPage"));
+const EmpresasPage = lazy(() => import("./pages/admin/EmpresasPage"));
+const UsuariosPage = lazy(() => import("./pages/admin/UsuariosPage"));
 const FinanceiroPage = lazy(() => import("./pages/vendor/FinanceiroPage"));
 const ConfiguracoesPage = lazy(() => import("./pages/admin/ConfiguracoesPage"));
 const NotFound = lazy(() => import("./pages/errors/notFound"));
@@ -123,23 +125,13 @@ function App() {
             {/* Admin Protected */}
             <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
               <Route path="/admin/dashboard" element={<Dashboard />} />
-
               <Route path="/admin/pedidos" element={<AdminOrdersPage />} />
+              <Route path="/admin/empresas" element={<EmpresasPage />} />
+              <Route path="/admin/usuarios" element={<UsuariosPage />} />
               <Route path="/admin/vendedores" element={<VendedoresPage />} />
-              <Route
-                path="/admin/configuracoes"
-                element={<ConfiguracoesPage />}
-              />
+              <Route path="/admin/suporte" element={<SuporteAdminPage />} />
+              <Route path="/admin/configuracoes" element={<ConfiguracoesPage />} />
             </Route>
-          {/* Admin */}
-          <Route>
-            <Route path="/admin/dashboard" element={<Dashboard />} />
-            <Route path="/admin/login" element={<AdminLogin />} />
-            <Route path="/admin/pedidos" element={<AdminOrdersPage />} />
-            <Route path="/admin/vendedores" element={<VendedoresPage />} />
-            <Route path="/admin/suporte" element={<SuporteAdminPage />} />
-            <Route path="/admin/configuracoes" element={<ConfiguracoesPage />} />
-          </Route>
 
             {/* Vendedor */}
             <Route

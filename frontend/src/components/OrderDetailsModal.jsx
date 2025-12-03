@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { FaTimes, FaEye, FaUser, FaSpinner, FaReceipt, FaBox, FaTruck, FaCheck, FaClock, FaMapMarkerAlt, FaShippingFast, FaPrint, FaCreditCard } from 'react-icons/fa';
 import { clienteService } from '../services/api';
 import { FiX } from 'react-icons/fi'
-import api from '../services/api';
+import { adminService } from '../services/adminApi';
 import entregaApi from '../services/entregaApi';
 
 const OrderDetailsModal = ({ orderId, isOpen, onClose, isAdmin = false }) => {
@@ -26,7 +26,7 @@ const OrderDetailsModal = ({ orderId, isOpen, onClose, isAdmin = false }) => {
      try {
        let response;
        if (isAdmin) {
-         response = await api.get(`/admin/pedidos/${orderId}`);
+         response = await adminService.buscarPedido(orderId);
          if (response.success) {
            setOrder(response.pedido);
          } else {

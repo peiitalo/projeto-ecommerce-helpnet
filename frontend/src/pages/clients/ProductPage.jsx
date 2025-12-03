@@ -154,7 +154,7 @@ function ProductPage() {
     };
 
     const checkFavoriteStatus = async () => {
-      if (!id || id === 'undefined') return;
+      if (!id || id === 'undefined' || !user?.id) return;
 
       try {
         const favorites = await favoritoService.listar();
@@ -168,7 +168,7 @@ function ProductPage() {
 
     fetchProduct();
     checkFavoriteStatus();
-  }, [id]);
+  }, [id, user?.id]);
 
   // Check if product is in cart
   const isInCart = items.some(item => item.id === (product?.ProdutoID || product?.id || id));

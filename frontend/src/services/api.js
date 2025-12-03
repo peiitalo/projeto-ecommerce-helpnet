@@ -78,14 +78,12 @@ const apiRequest = async (endpoint, options = {}, retryCount = 0) => {
         return apiRequest(endpoint, options, retryCount + 1);
       } catch (refreshError) {
         console.error('Erro ao renovar token:', refreshError);
-        // Se refresh falhar, limpa tokens e redireciona para login
+        // Se refresh falhar, limpa tokens mas não redireciona automaticamente
         try {
           if (typeof window !== 'undefined') {
             localStorage.removeItem('accessToken');
-            // Redirecionar para login se estiver em página protegida
-            if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
-              window.location.href = '/login';
-            }
+            // Não redireciona automaticamente - deixa o usuário decidir
+            console.log('Token removido devido à expiração');
           }
         } catch {}
         throw new Error('Sessão expirada. Faça login novamente.');

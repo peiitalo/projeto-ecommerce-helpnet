@@ -75,6 +75,7 @@ function AdminOrdersPage() {
       });
 
       if (statusFilter) params.append('status', statusFilter);
+      if (searchTerm.trim()) params.append('search', searchTerm.trim());
 
       const response = await adminService.listarPedidos(params);
 
@@ -131,7 +132,7 @@ function AdminOrdersPage() {
 
   useEffect(() => {
     loadOrders();
-  }, [currentPage, statusFilter]);
+  }, [currentPage, statusFilter, searchTerm]);
 
   const totalPages = Math.ceil(totalOrders / ordersPerPage);
 

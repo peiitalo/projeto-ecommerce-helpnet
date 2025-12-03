@@ -153,6 +153,13 @@ function CheckoutPage() {
     }
   }, [freight.valor, items, appliedCoupons, total]);
 
+  // Auto-fill total amount when only one payment method is selected
+  useEffect(() => {
+    if (paymentMethods.length === 1 && orderData?.total > 0) {
+      setPaymentMethods(prev => prev.map(method => ({ ...method, amount: orderData.total })));
+    }
+  }, [paymentMethods.length, orderData?.total]);
+
   const carregarDadosCheckout = async () => {
     try {
       setLoading(true);
@@ -380,10 +387,12 @@ function CheckoutPage() {
       return;
     }
 
-    // Verificar se frete foi selecionado (exceto se há cupom de frete grátis)
-    if (!appliedCoupons.some(coupon => coupon.TipoDesconto === 'frete_gratis') && !selectedFreight) {
-      console.log('[DEBUG] Erro: Nenhum frete selecionado');
-      showError('Selecione uma opção de frete');
+    // Verificar se frete foi selecionado ou há cupom de frete grátis
+    const hasFreeShippingCoupon = appliedCoupons.some(coupon => coupon.TipoDesconto === 'frete_gratis');
+
+    if (!selectedFreight && !hasFreeShippingCoupon) {
+      console.log('[DEBUG] Erro: Nenhum frete selecionado e nenhum cupom de frete grátis');
+      showError('Selecione uma opção de frete ou aplique um cupom de frete grátis válido');
       return;
     }
 
@@ -654,7 +663,6 @@ function CheckoutPage() {
 
               <OrderSummary
                 orderData={orderData}
-                freight={freight}
                 freightLoading={freightLoading}
                 selectedFreight={selectedFreight}
                 appliedCoupons={appliedCoupons}
@@ -666,6 +674,7 @@ function CheckoutPage() {
                 calcularValorRestante={calcularValorRestante}
                 items={items}
                 getSelectedItems={getSelectedItems}
+                freightOptions={freightOptions}
               />
             </div>
           </div>

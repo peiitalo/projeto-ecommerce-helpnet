@@ -36,10 +36,13 @@ function ProductCarousel({ title, products, loading, favorites = [], favoriteLoa
   const formatPrice = (n) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   const handleAddToCart = (product) => {
+    console.log('[ProductCarousel] Add to cart clicked for product:', product.id);
     if (!user) {
+      console.log('[ProductCarousel] User not logged in, showing auth modal');
       onRequireAuth && onRequireAuth();
       return;
     }
+    console.log('[ProductCarousel] User logged in, adding to cart');
     addItem(product, 1);
     showSuccess(`${product.name} adicionado ao carrinho!`);
   };
@@ -85,7 +88,12 @@ function ProductCarousel({ title, products, loading, favorites = [], favoriteLoa
               key={product.id}
               className="flex-shrink-0 bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 w-48"
             >
-              <Link to={`/produto/${product.id}`} className="relative aspect-square overflow-hidden block">
+              {/* Container principal do produto - SEMPRE navega para a página */}
+              <Link 
+                to={`/produto/${product.id}`} 
+                className="relative aspect-square overflow-hidden block cursor-pointer"
+                onClick={() => console.log('[ProductCarousel] Product link clicked:', product.id)}
+              >
                 <LazyImage
                   src={product.image || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?q=80&w=400&auto=format&fit=crop'}
                   alt={product.name}
@@ -108,15 +116,18 @@ function ProductCarousel({ title, products, loading, favorites = [], favoriteLoa
                   )}
                 </div>
 
+                {/* Botão de visualização rápida - APENAS abre o modal */}
                 <button
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
+                    console.log('[ProductCarousel] Quick view button clicked for product:', product.id);
                     setProductModalId && setProductModalId(product.id);
                     setShowProductModal && setShowProductModal(true);
                   }}
-                  className="absolute top-2 right-12 p-1.5 rounded-full bg-white/90 hover:bg-white shadow-sm hover:shadow-md transition-all text-slate-700 hover:text-blue-600"
+                  className="absolute top-2 right-12 p-1.5 rounded-full bg-white/90 hover:bg-white shadow-sm hover:shadow-md transition-all text-slate-700 hover:text-blue-600 z-10"
                   aria-label="Ver detalhes do produto"
+                  title="Visualização rápida"
                 >
                   <FaEye className="text-xs" />
                 </button>
@@ -126,14 +137,17 @@ function ProductCarousel({ title, products, loading, favorites = [], favoriteLoa
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
+                      console.log('[ProductCarousel] Favorite button clicked for product:', product.id);
                       if (!user) {
+                        console.log('[ProductCarousel] User not logged in for favorite, showing auth modal');
                         onRequireAuth && onRequireAuth();
                         return;
                       }
+                      console.log('[ProductCarousel] User logged in for favorite, toggling');
                       onToggleFavorite(product.id);
                     }}
                     disabled={favoriteLoading === product.id}
-                    className={`absolute top-2 right-2 p-1.5 rounded-full bg-white/90 hover:bg-white shadow-sm hover:shadow-md transition-all ${
+                    className={`absolute top-2 right-2 p-1.5 rounded-full bg-white/90 hover:bg-white shadow-sm hover:shadow-md transition-all z-10 ${
                       isFavorite(product.id) ? 'text-red-500' : 'text-slate-700'
                     } ${favoriteLoading === product.id ? 'opacity-50 cursor-not-allowed' : ''}`}
                     aria-label={isFavorite(product.id) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
@@ -145,7 +159,11 @@ function ProductCarousel({ title, products, loading, favorites = [], favoriteLoa
 
               <div className="p-3">
                 <Link to={`/produto/${product.id}`}>
-                  <h4 className="font-medium text-slate-900 text-sm leading-tight mb-2 line-clamp-2 min-h-[2.5rem] flex-shrink-0 hover:text-blue-700 transition-colors">
+                  <h4 
+                    className="font-medium text-slate-900 text-sm leading-tight mb-2 line-clamp-2 min-h-[2.5rem] flex-shrink-0 hover:text-blue-700 transition-colors cursor-pointer"
+                    title="Clique para ver detalhes completos"
+                    onClick={() => console.log('[ProductCarousel] Product name clicked:', product.id)}
+                  >
                     {product.name}
                   </h4>
                 </Link>
