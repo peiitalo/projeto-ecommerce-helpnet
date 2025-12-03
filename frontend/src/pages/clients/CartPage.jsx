@@ -213,25 +213,23 @@ export default function CartPage() {
             {/* Método de Pagamento removido: a seleção e distribuição ocorrerá no checkout */}
 
             {/* Resumo */}
-            <div className="mt-4 space-y-2">
+            <div className="space-y-2">
               <h3 className="font-semibold text-slate-900">Itens selecionados ({selectedItems.length})</h3>
-              {appliedCoupons.length > 0 && couponDiscount > 0 && (
-                <>
-                  <div className="flex justify-between items-center">
-                    <span className="font-semibold text-slate-900">Subtotal</span>
-                    <span className="font-semibold text-blue-700">
-                      {formatPrice(subtotal)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-green-600 font-semibold">
-                    <span>Desconto ({appliedCoupons[0].Codigo})</span>
-                    <span>
-                      {`-${formatPrice(couponDiscount)}`}
-                    </span>
-                  </div>
-                  <hr className="border-slate-200 my-2" />
-                </>
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-slate-900">Subtotal</span>
+                <span className="font-semibold text-blue-700">
+                  {formatPrice(subtotal)}
+                </span>
+              </div>
+              {couponDiscount > 0 && (
+                <div className="flex justify-between text-green-600 font-semibold">
+                  <span>Desconto</span>
+                  <span>
+                    {`-${formatPrice(couponDiscount)}`}
+                  </span>
+                </div>
               )}
+              <hr className="border-slate-200 my-2" />
               <div className="flex justify-between items-center">
                 <span className="font-semibold text-slate-900">Total</span>
                 <span className="font-semibold text-blue-700">
@@ -255,4 +253,5 @@ export default function CartPage() {
     </div>
   );
 }
+
 

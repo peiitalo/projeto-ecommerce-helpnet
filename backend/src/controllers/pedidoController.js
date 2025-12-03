@@ -68,12 +68,12 @@ export const criarPedido = async (req, res) => {
     const produtosMap = new Map(produtos.map(p => [p.ProdutoID, p]));
 
     // Validar cupons se fornecidos usando os novos serviços
-    let cuponsAplicados = [];
+    let cuponsAplicadosArray = [];
     let descontoCupom = 0;
     let freteGratisCupom = false;
     let cuponsDetalhes = []; // Para armazenar detalhes dos cupons aplicados
 
-    if (cupomCodigos && Array.isArray(cupomCodigos) && cupomCodigos.length > 0) {
+    if (req.body.cuponsAplicados && Array.isArray(req.body.cuponsAplicados) && req.body.cuponsAplicados.length > 0) {
       try {
         // Preparar itens do carrinho para validação
         const itensCarrinho = itens.map(item => {
@@ -88,13 +88,13 @@ export const criarPedido = async (req, res) => {
         });
 
         // Validar cada cupom com o estado atual do carrinho
-        for (const cupomCodigo of cupomCodigos) {
-          const validacao = await validateCouponState(cupomCodigo, itensCarrinho, user.id);
+        for (const cupomAplicado of req.body.cuponsAplicados) {
+          const validacao = await validateCouponState(cupomAplicado.codigo, itensCarrinho, user.id);
 
           if (validacao.state !== 'active') {
             return res.status(400).json({
               success: false,
-              errors: [`Cupom ${cupomCodigo}: ${validacao.reason}`]
+              errors: [`Cupom ${cupomAplicado.codigo}: ${validacao.reason}`]
             });
           }
 
@@ -106,41 +106,42 @@ export const criarPedido = async (req, res) => {
           if (cupom.DescontoTipo === 'frete_gratis') {
             freteGratisCupom = true;
           } else {
-            descontoAplicado = discountDetails.discountAmount;
+            descontoAplicado = discountDetails.totalDiscount || 0;
             descontoCupom += descontoAplicado;
           }
 
-          // Registrar detalhes do cupom aplicado
-          cuponsAplicados.push(cupom);
+          // Registrar detalhes do cupom aplicado com informações item-specific
+          cuponsAplicadosArray.push(cupom);
           cuponsDetalhes.push({
             cupom: cupom,
             descontoAplicado: descontoAplicado,
             eligibleItems: discountDetails.eligibleItems,
-            eligibleSubtotal: discountDetails.eligibleSubtotal,
-            discountAmount: discountDetails.discountAmount,
-            finalAmount: discountDetails.finalAmount
+            ineligibleItems: discountDetails.ineligibleItems,
+            totalDiscount: discountDetails.totalDiscount,
+            itemDiscounts: discountDetails.itemDiscounts,
+            itensAplicados: cupomAplicado.itensAplicados || []
           });
 
           logger.info('cupom_validado_aplicado', {
             clienteId: user.id,
-            cupomCodigo,
+            cupomCodigo: cupomAplicado.codigo,
             desconto: descontoAplicado,
             freteGratis: cupom.DescontoTipo === 'frete_gratis',
-            eligibleItemsCount: discountDetails.eligibleItems.length,
-            eligibleSubtotal: discountDetails.eligibleSubtotal
+            eligibleItemsCount: discountDetails.eligibleItems?.length || 0,
+            totalDiscount: discountDetails.totalDiscount
           });
         }
 
         logger.info('cupons_totais_validacao', {
           clienteId: user.id,
-          cuponsCount: cuponsAplicados.length,
+          cuponsCount: cuponsAplicadosArray.length,
           descontoTotal: descontoCupom,
           freteGratis: freteGratisCupom
         });
       } catch (cupomError) {
         logger.warn('erro_validacao_cupons', {
           clienteId: user.id,
-          cupomCodigos,
+          cuponsAplicados: req.body.cuponsAplicados,
           error: cupomError.message
         });
         return res.status(400).json({
@@ -337,7 +338,7 @@ export const criarPedido = async (req, res) => {
           ExpiraEm: expiraEm,
           TotalPago: 0,
           // Adicionar campos do cupom se aplicável
-          CupomID: cuponsAplicados.length > 0 ? cuponsAplicados[0].CupomID : null, // Primeiro cupom para compatibilidade
+          CupomID: cuponsAplicadosArray.length > 0 ? cuponsAplicadosArray[0].CupomID : null, // Primeiro cupom para compatibilidade
           DescontoCupom: descontoCupom,
           DescontoVista: valorDescontoVista
         }
@@ -439,9 +440,11 @@ export const criarPedido = async (req, res) => {
       });
 
       // Registrar uso dos cupons se aplicáveis
-      if (cuponsAplicados.length > 0) {
+      if (cuponsAplicadosArray.length > 0) {
         try {
-          for (const cupom of cuponsAplicados) {
+          for (let i = 0; i < cuponsAplicadosArray.length; i++) {
+            const cupom = cuponsAplicadosArray[i];
+            const cupomDetalhes = cuponsDetalhes[i];
             // Incrementar usos totais do cupom
             await prisma.cupom.update({
               where: { CupomID: cupom.CupomID },
@@ -476,13 +479,14 @@ export const criarPedido = async (req, res) => {
               pedidoId: resultado.PedidoID,
               cupomId: cupom.CupomID,
               clienteId: user.id,
-              desconto: descontoCupom
+              desconto: cupomDetalhes.descontoAplicado,
+              itensAplicados: cupomDetalhes.itensAplicados
             });
           }
         } catch (cupomUsoError) {
           logger.error('erro_registro_uso_cupons', {
             pedidoId: resultado.PedidoID,
-            cupomIds: cuponsAplicados.map(c => c.CupomID),
+            cupomIds: cuponsAplicadosArray.map(c => c.CupomID),
             error: cupomUsoError.message
           });
           // Não falhar o pedido por erro no registro do cupom
@@ -570,8 +574,10 @@ export const criarPedido = async (req, res) => {
           tipo: detalhe.cupom.DescontoTipo,
           valor: detalhe.cupom.DescontoValor,
           descontoAplicado: detalhe.descontoAplicado,
-          itensElegiveis: detalhe.eligibleItems.length,
-          subtotalElegivel: detalhe.eligibleSubtotal
+          itensAplicados: detalhe.itensAplicados,
+          itensElegiveis: detalhe.eligibleItems?.length || 0,
+          itensInelegiveis: detalhe.ineligibleItems?.length || 0,
+          totalDiscount: detalhe.totalDiscount
         })),
         status: 'Pago',
         // Pagamento simulado aprovado - redirecionar para página de sucesso

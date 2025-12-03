@@ -2,11 +2,11 @@ import prisma from "../config/prisma.js";
 import { logger } from "../utils/logger.js";
 
 /**
- * Main coupon validation function
+ * Main coupon validation function - now validates against individual items
  * @param {string} code - Coupon code
  * @param {Array} cartItems - Cart items array
  * @param {number} clientId - Client ID
- * @returns {Object} Validation result with state, reason, coupon, and discountDetails
+ * @returns {Object} Validation result with state, reason, coupon, and item-specific discountDetails
  */
 export const validateCouponState = async (code, cartItems, clientId) => {
   try {
@@ -43,7 +43,7 @@ export const validateCouponState = async (code, cartItems, clientId) => {
     if (!coupon) {
       return {
         state: 'inactive',
-        reason: 'Cupom não encontrado ou expirado',
+        reason: 'Cupom não encontrado',
         coupon: null,
         discountDetails: null
       };
@@ -71,24 +71,42 @@ export const validateCouponState = async (code, cartItems, clientId) => {
       };
     }
 
-    // Analyze cart eligibility
-    const cartAnalysis = await analyzeCartEligibility(coupon, cartItems);
-    if (!cartAnalysis.eligible) {
+    // Analyze item-specific eligibility
+    const itemAnalysis = await analyzeItemEligibility(coupon, cartItems);
+    if (!itemAnalysis.hasEligibleItems) {
       return {
         state: 'grayed_out',
-        reason: cartAnalysis.reason,
+        reason: itemAnalysis.reason,
         coupon: coupon,
         discountDetails: {
-          eligibleSubtotal: cartAnalysis.eligibleSubtotal,
-          discountAmount: 0,
-          finalAmount: cartAnalysis.eligibleSubtotal,
-          eligibleItems: cartAnalysis.eligibleItems
+          eligibleItems: [],
+          ineligibleItems: itemAnalysis.ineligibleItems,
+          totalDiscount: 0,
+          itemDiscounts: []
         }
       };
     }
 
-    // Calculate discount
-    const discountDetails = calculateDiscountDetails(coupon, cartAnalysis);
+    // Special validation for free shipping coupons
+    if (coupon.DescontoTipo === 'frete_gratis') {
+      const freeShippingValidation = await validateFreeShippingEligibility(coupon, itemAnalysis.eligibleItems);
+      if (!freeShippingValidation.eligible) {
+        return {
+          state: 'grayed_out',
+          reason: freeShippingValidation.reason,
+          coupon: coupon,
+          discountDetails: {
+            eligibleItems: [],
+            ineligibleItems: itemAnalysis.ineligibleItems,
+            totalDiscount: 0,
+            itemDiscounts: []
+          }
+        };
+      }
+    }
+
+    // Calculate item-specific discounts
+    const discountDetails = calculateItemDiscounts(coupon, itemAnalysis);
 
     return {
       state: 'active',
@@ -109,72 +127,78 @@ export const validateCouponState = async (code, cartItems, clientId) => {
 };
 
 /**
- * Analyze cart eligibility for coupon application
+ * Analyze item-specific eligibility for coupon application
  * @param {Object} coupon - Coupon object
  * @param {Array} cartItems - Cart items array
- * @returns {Object} Eligibility analysis result
+ * @returns {Object} Item eligibility analysis result
  */
-export const analyzeCartEligibility = async (coupon, cartItems) => {
+export const analyzeItemEligibility = async (coupon, cartItems) => {
   try {
     if (!cartItems || !Array.isArray(cartItems) || cartItems.length === 0) {
       return {
-        eligible: false,
+        hasEligibleItems: false,
         reason: 'Carrinho vazio',
-        eligibleSubtotal: 0,
-        eligibleItems: []
+        eligibleItems: [],
+        ineligibleItems: [],
+        totalEligibleValue: 0
       };
     }
 
-    let eligibleItems = [];
-    let eligibleSubtotal = 0;
+    const eligibleItems = [];
+    const ineligibleItems = [];
 
-    // Check category restrictions
-    if (coupon.Restricoes?.categoriaId) {
-      const categoryValidation = await validateCategoryRestriction(coupon, cartItems);
-      if (!categoryValidation.hasEligibleItems) {
-        return {
-          eligible: false,
-          reason: categoryValidation.reason,
-          eligibleSubtotal: 0,
-          eligibleItems: []
-        };
+    // Check each item individually
+    for (const item of cartItems) {
+      const itemEligibility = await checkItemEligibility(coupon, item);
+      if (itemEligibility.eligible) {
+        eligibleItems.push({
+          ...item,
+          eligibilityReason: itemEligibility.reason
+        });
+      } else {
+        ineligibleItems.push({
+          ...item,
+          ineligibilityReason: itemEligibility.reason
+        });
       }
-      eligibleItems = categoryValidation.eligibleItems;
-      eligibleSubtotal = categoryValidation.eligibleSubtotal;
-    } else {
-      // No category restriction - all items are eligible
-      eligibleItems = cartItems;
-      eligibleSubtotal = cartItems.reduce((total, item) => {
-        const price = item.PrecoUnitario || item.precoUnitario || 0;
-        const quantity = item.Quantidade || item.quantidade || 1;
-        return total + (price * quantity);
-      }, 0);
     }
 
-    // Check minimum value restriction
-    if (coupon.Restricoes?.valorMinimo && eligibleSubtotal < coupon.Restricoes.valorMinimo) {
+    if (eligibleItems.length === 0) {
       return {
-        eligible: false,
-        reason: `Valor mínimo de R$ ${coupon.Restricoes.valorMinimo.toFixed(2)} não atingido`,
-        eligibleSubtotal: eligibleSubtotal,
-        eligibleItems: eligibleItems
+        hasEligibleItems: false,
+        reason: 'Nenhum item do carrinho atende aos critérios do cupom',
+        eligibleItems: [],
+        ineligibleItems: ineligibleItems,
+        totalEligibleValue: 0
       };
     }
+
+    // Calculate total value of eligible items
+    const totalEligibleValue = eligibleItems.reduce((total, item) => {
+      const price = item.PrecoUnitario || item.precoUnitario || 0;
+      const quantity = item.Quantidade || item.quantidade || 1;
+      return total + (price * quantity);
+    }, 0);
+
+    // Note: Minimum value restriction is now checked per item in checkItemEligibility
+    // No total minimum check here - each eligible item already meets individual minimum requirements
 
     return {
-      eligible: true,
-      reason: 'Carrinho elegível para o cupom',
-      eligibleSubtotal: eligibleSubtotal,
-      eligibleItems: eligibleItems
+      hasEligibleItems: true,
+      reason: `${eligibleItems.length} item(ns) elegível(is) para o cupom`,
+      eligibleItems: eligibleItems,
+      ineligibleItems: ineligibleItems,
+      totalEligibleValue: totalEligibleValue
     };
 
   } catch (error) {
-    logger.error('analyzeCartEligibility_error', { couponId: coupon.CupomID, error: error.message });
+    logger.error('analyzeItemEligibility_error', { couponId: coupon.CupomID, error: error.message });
     return {
-      eligible: false,
-      reason: 'Erro ao analisar elegibilidade do carrinho',
-      eligibleSubtotal: 0,
-      eligibleItems: []
+      hasEligibleItems: false,
+      reason: 'Erro ao analisar elegibilidade dos itens',
+      eligibleItems: [],
+      ineligibleItems: cartItems || [],
+      totalEligibleValue: 0
     };
   }
 };
@@ -203,7 +227,7 @@ const validateBasicValidity = async (coupon) => {
 
     // Check total usage limit
     if (coupon.LimiteUso && coupon.UsosAtuais >= coupon.LimiteUso) {
-      return { valid: false, reason: 'Limite total de uso do cupom atingido' };
+      return { valid: false, reason: 'Cupom atingiu o limite máximo de uso' };
     }
 
     return { valid: true, reason: 'Cupom válido' };
@@ -235,7 +259,7 @@ const validateClientEligibility = async (coupon, clientId) => {
         if (clientUsage >= coupon.UsoPorCliente) {
           return {
             valid: false,
-            reason: `Você já usou este cupom o máximo permitido (${coupon.UsoPorCliente} vez${coupon.UsoPorCliente > 1 ? 'es' : ''})`
+            reason: 'Cupom já atingiu o limite de uso por cliente'
           };
         }
       }
@@ -264,7 +288,7 @@ const validateClientEligibility = async (coupon, clientId) => {
       if (coupon.UsoPorCliente && clientCoupon.UsosCliente >= coupon.UsoPorCliente) {
         return {
           valid: false,
-          reason: `Você já usou este cupom o máximo permitido (${coupon.UsoPorCliente} vez${coupon.UsoPorCliente > 1 ? 'es' : ''})`
+          reason: 'Cupom já atingiu o limite de uso por cliente'
         };
       }
 
@@ -280,65 +304,194 @@ const validateClientEligibility = async (coupon, clientId) => {
 };
 
 /**
- * Validate category restriction
+ * Check if an individual item is eligible for a coupon
+ * @param {Object} coupon - Coupon object
+ * @param {Object} item - Cart item
+ * @returns {Object} Item eligibility result
+ */
+const checkItemEligibility = async (coupon, item) => {
+  try {
+    const productId = item.ProdutoID || item.produtoId || item.id;
+    if (!productId) {
+      logger.warn('checkItemEligibility_no_product_id', { item, couponId: coupon.CupomID });
+      return { eligible: false, reason: 'ID do produto não encontrado' };
+    }
+
+    // Get product details
+    const product = await prisma.produto.findUnique({
+      where: { ProdutoID: parseInt(productId) },
+      select: {
+        ProdutoID: true,
+        Nome: true,
+        Preco: true,
+        CategoriaID: true,
+        FreteGratis: true
+      }
+    });
+
+    if (!product) {
+      logger.warn('checkItemEligibility_product_not_found', { productId: parseInt(productId), couponId: coupon.CupomID });
+      return { eligible: false, reason: 'Produto não encontrado' };
+    }
+
+    const itemPrice = item.PrecoUnitario || item.precoUnitario || product.Preco || 0;
+    const itemQuantity = item.Quantidade || item.quantidade || 1;
+    const itemTotal = itemPrice * itemQuantity;
+
+    logger.info('checkItemEligibility_item_details', {
+      productId: parseInt(productId),
+      productName: product.Nome,
+      itemPrice,
+      itemQuantity,
+      itemTotal,
+      couponId: coupon.CupomID,
+      couponType: coupon.DescontoTipo,
+      restrictions: coupon.Restricoes
+    });
+
+    // Check category restriction
+    if (coupon.Restricoes?.categoriaId) {
+      if (product.CategoriaID !== coupon.Restricoes.categoriaId) {
+        logger.info('checkItemEligibility_category_mismatch', {
+          productCategory: product.CategoriaID,
+          couponCategory: coupon.Restricoes.categoriaId,
+          productId: parseInt(productId)
+        });
+        return { eligible: false, reason: 'Produto não pertence à categoria elegível' };
+      }
+    }
+
+    // Check minimum value restriction (per item total)
+    if (coupon.Restricoes?.valorMinimo) {
+      if (itemTotal < coupon.Restricoes.valorMinimo) {
+        logger.info('checkItemEligibility_minimum_value_not_met', {
+          itemTotal,
+          minimumRequired: coupon.Restricoes.valorMinimo,
+          productId: parseInt(productId)
+        });
+        return { eligible: false, reason: `Valor mínimo de R$ ${coupon.Restricoes.valorMinimo.toFixed(2)} não atingido (item: R$ ${itemTotal.toFixed(2)})` };
+      }
+    }
+
+    // Special check for free shipping coupons
+    if (coupon.DescontoTipo === 'frete_gratis') {
+      if (!product.FreteGratis) {
+        logger.info('checkItemEligibility_free_shipping_not_allowed', {
+          productId: parseInt(productId),
+          productName: product.Nome,
+          freteGratis: product.FreteGratis
+        });
+        return { eligible: false, reason: 'Produto não permite frete grátis' };
+      }
+    }
+
+    logger.info('checkItemEligibility_item_eligible', {
+      productId: parseInt(productId),
+      itemTotal,
+      couponId: coupon.CupomID
+    });
+
+    return { eligible: true, reason: 'Item elegível para o cupom' };
+
+  } catch (error) {
+    logger.error('checkItemEligibility_error', {
+      couponId: coupon.CupomID,
+      productId: item.ProdutoID || item.produtoId || item.id,
+      item,
+      error: error.message
+    });
+    return { eligible: false, reason: 'Erro ao verificar elegibilidade do item' };
+  }
+};
+
+/**
+ * Calculate item-specific discounts
+ * @param {Object} coupon - Coupon object
+ * @param {Object} itemAnalysis - Item analysis result
+ * @returns {Object} Item discount details
+ */
+const calculateItemDiscounts = (coupon, itemAnalysis) => {
+  const { eligibleItems } = itemAnalysis;
+  const itemDiscounts = [];
+  let totalDiscount = 0;
+
+  for (const item of eligibleItems) {
+    const productId = item.ProdutoID || item.produtoId || item.id;
+    const itemPrice = item.PrecoUnitario || item.precoUnitario || 0;
+    const itemQuantity = item.Quantidade || item.quantidade || 1;
+    const itemTotal = itemPrice * itemQuantity;
+
+    let discountAmount = 0;
+    let finalAmount = itemTotal;
+
+    if (coupon.DescontoTipo === 'porcentagem') {
+      discountAmount = (itemTotal * coupon.DescontoValor) / 100;
+      finalAmount = Math.max(0, itemTotal - discountAmount);
+    } else if (coupon.DescontoTipo === 'valor_fixo') {
+      discountAmount = Math.min(coupon.DescontoValor, itemTotal);
+      finalAmount = Math.max(0, itemTotal - discountAmount);
+    } else if (coupon.DescontoTipo === 'frete_gratis') {
+      // Free shipping doesn't affect item price
+      discountAmount = 0;
+      finalAmount = itemTotal;
+    }
+
+    totalDiscount += discountAmount;
+
+    itemDiscounts.push({
+      productId: productId,
+      itemTotal: itemTotal,
+      discountAmount: discountAmount,
+      finalAmount: finalAmount,
+      quantity: itemQuantity,
+      unitPrice: itemPrice
+    });
+  }
+
+  return {
+    eligibleItems: eligibleItems,
+    ineligibleItems: itemAnalysis.ineligibleItems,
+    totalDiscount: totalDiscount,
+    itemDiscounts: itemDiscounts
+  };
+};
+
+/**
+ * Validate free shipping eligibility
  * @param {Object} coupon - Coupon object
  * @param {Array} cartItems - Cart items array
- * @returns {Object} Category validation result
+ * @returns {Object} Free shipping validation result
  */
-const validateCategoryRestriction = async (coupon, cartItems) => {
+const validateFreeShippingEligibility = async (coupon, cartItems) => {
   try {
-    const categoryId = coupon.Restricoes.categoriaId;
-    let eligibleItems = [];
-    let eligibleSubtotal = 0;
-
+    // Check if all products in cart allow free shipping
     for (const item of cartItems) {
       const productId = item.ProdutoID || item.produtoId || item.id;
       if (!productId) continue;
 
-      // Get product category
       const product = await prisma.produto.findUnique({
         where: { ProdutoID: parseInt(productId) },
-        select: { CategoriaID: true, Nome: true }
+        select: { FreteGratis: true, Nome: true }
       });
 
-      if (product && product.CategoriaID === categoryId) {
-        eligibleItems.push(item);
-        const price = item.PrecoUnitario || item.precoUnitario || 0;
-        const quantity = item.Quantidade || item.quantidade || 1;
-        eligibleSubtotal += price * quantity;
+      if (!product || !product.FreteGratis) {
+        return {
+          eligible: false,
+          reason: `O produto "${product?.Nome || 'Produto não encontrado'}" não permite frete grátis`
+        };
       }
     }
 
-    if (eligibleItems.length === 0) {
-      // Get category name for better error message
-      const category = await prisma.categoria.findUnique({
-        where: { CategoriaID: categoryId },
-        select: { Nome: true }
-      });
-
-      const categoryName = category ? category.Nome : `categoria ${categoryId}`;
-      return {
-        hasEligibleItems: false,
-        reason: `Este cupom é válido apenas para produtos da categoria "${categoryName}"`,
-        eligibleItems: [],
-        eligibleSubtotal: 0
-      };
-    }
-
     return {
-      hasEligibleItems: true,
-      reason: 'Itens elegíveis encontrados na categoria',
-      eligibleItems: eligibleItems,
-      eligibleSubtotal: eligibleSubtotal
+      eligible: true,
+      reason: 'Todos os produtos permitem frete grátis'
     };
 
   } catch (error) {
-    logger.error('validateCategoryRestriction_error', { couponId: coupon.CupomID, error: error.message });
+    logger.error('validateFreeShippingEligibility_error', { couponId: coupon.CupomID, error: error.message });
     return {
-      hasEligibleItems: false,
-      reason: 'Erro ao validar restrição de categoria',
-      eligibleItems: [],
-      eligibleSubtotal: 0
+      eligible: false,
+      reason: 'Erro ao validar elegibilidade para frete grátis'
     };
   }
 };
@@ -347,35 +500,46 @@ const validateCategoryRestriction = async (coupon, cartItems) => {
  * Calculate discount details
  * @param {Object} coupon - Coupon object
  * @param {Object} cartAnalysis - Cart analysis result
+ * @param {Array} allCartItems - All cart items for total calculation
  * @returns {Object} Discount details
  */
-const calculateDiscountDetails = (coupon, cartAnalysis) => {
+const calculateDiscountDetails = (coupon, cartAnalysis, allCartItems = []) => {
   const { eligibleSubtotal, eligibleItems } = cartAnalysis;
 
+  // For category-restricted coupons, apply discount to entire cart
+  const discountBase = coupon.Restricoes?.categoriaId ?
+    allCartItems.reduce((total, item) => {
+      const price = item.PrecoUnitario || item.precoUnitario || 0;
+      const quantity = item.Quantidade || item.quantidade || 1;
+      return total + (price * quantity);
+    }, 0) : eligibleSubtotal;
+
   let discountAmount = 0;
-  let finalAmount = eligibleSubtotal;
+  let finalAmount = discountBase;
 
   if (coupon.DescontoTipo === 'porcentagem') {
-    discountAmount = (eligibleSubtotal * coupon.DescontoValor) / 100;
-    finalAmount = Math.max(0, eligibleSubtotal - discountAmount);
+    discountAmount = (discountBase * coupon.DescontoValor) / 100;
+    finalAmount = Math.max(0, discountBase - discountAmount);
   } else if (coupon.DescontoTipo === 'valor_fixo') {
-    discountAmount = Math.min(coupon.DescontoValor, eligibleSubtotal);
-    finalAmount = Math.max(0, eligibleSubtotal - discountAmount);
+    discountAmount = Math.min(coupon.DescontoValor, discountBase);
+    finalAmount = Math.max(0, discountBase - discountAmount);
   } else if (coupon.DescontoTipo === 'frete_gratis') {
     // Free shipping discount will be calculated at checkout
     discountAmount = 0;
-    finalAmount = eligibleSubtotal;
+    finalAmount = discountBase;
   }
 
   return {
     eligibleSubtotal: eligibleSubtotal,
     discountAmount: discountAmount,
     finalAmount: finalAmount,
-    eligibleItems: eligibleItems
+    eligibleItems: eligibleItems,
+    discountBase: discountBase
   };
 };
 
 export default {
   validateCouponState,
-  analyzeCartEligibility
+  analyzeItemEligibility,
+  checkItemEligibility
 };

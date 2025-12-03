@@ -430,7 +430,13 @@ function CheckoutPage() {
         descontoVista: getCurrentDiscountPercentage(),
         valorDescontoVista: orderData.discountAmount || 0,
         observacoes: '',
-        cupomCodigos: appliedCoupons.map(coupon => coupon.Codigo)
+        cuponsAplicados: appliedCoupons.map(coupon => ({
+          codigo: coupon.Codigo,
+          itensAplicados: coupon.discountDetails?.itemDiscounts?.map(discount => ({
+            produtoId: discount.productId,
+            descontoAplicado: discount.discountAmount
+          })) || []
+        }))
       };
 
       console.log('[DEBUG] Dados do pedido preparados:', {

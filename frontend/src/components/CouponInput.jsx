@@ -1,10 +1,58 @@
 import { useState, useEffect } from 'react';
 import { FaTicketAlt, FaCheck, FaTimes, FaExclamationTriangle } from 'react-icons/fa';
-import { useCupom } from '../hooks/useCupom';
+import { useCart } from '../context/CartContext';
 
 function CouponInput({ cartItems, cartTotal, onCouponApplied, disabled = false }) {
   const [couponCode, setCouponCode] = useState('');
-  const { couponState, couponReason, couponDetails, aplicarCupom, validarCupomEmTempoReal, removerCupom } = useCupom();
+  const [couponState, setCouponState] = useState('idle'); // 'idle', 'loading', 'active', 'grayed_out', 'inactive'
+  const [couponReason, setCouponReason] = useState(null);
+  const [couponDetails, setCouponDetails] = useState(null);
+  const { applyCoupon, removeCoupon, couponLoading, couponError } = useCart();
+
+  // Real-time validation function
+  const validarCupomEmTempoReal = async (code, items, total) => {
+    if (!code.trim()) {
+      setCouponState('idle');
+      setCouponReason(null);
+      setCouponDetails(null);
+      return;
+    }
+
+    setCouponState('loading');
+
+    try {
+      const response = await fetch('/api/cupons/validar', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          codigo: code.trim().toUpperCase(),
+          itensCarrinho: items.map(item => ({
+            ProdutoID: item.id,
+            PrecoUnitario: item.price,
+            Quantidade: item.quantity
+          }))
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao validar cupom');
+      }
+
+      setCouponState(data.state);
+      setCouponReason(data.reason || null);
+      setCouponDetails(data.state === 'active' ? data.coupon : null);
+    } catch (error) {
+      console.error('Erro na validação em tempo real:', error);
+      setCouponState('inactive');
+      setCouponReason(error.message || 'Erro ao validar cupom');
+      setCouponDetails(null);
+    }
+  };
 
   // Real-time validation when cart changes or code changes
   useEffect(() => {
@@ -157,6 +205,13 @@ function CouponInput({ cartItems, cartTotal, onCouponApplied, disabled = false }
               ({stateDisplay.discountText})
             </span>
           )}
+        </div>
+      )}
+
+      {/* Error message for inactive state */}
+      {couponState === 'inactive' && couponReason && (
+        <div className="text-xs text-red-700 bg-red-50 p-2 rounded border border-red-200">
+          {couponReason}
         </div>
       )}
 

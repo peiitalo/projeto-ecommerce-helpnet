@@ -332,9 +332,6 @@ export function CartProvider({ children }) {
     setCouponError(null);
 
     const itemsToUse = selectedItems || items;
-    const itemsTotal = selectedItems ? selectedItems.reduce((total, item) => {
-      return total + (item.price * item.quantity);
-    }, 0) : subtotal;
 
     try {
       const response = await fetch('/api/cupons/validar', {
@@ -345,8 +342,11 @@ export function CartProvider({ children }) {
         },
         body: JSON.stringify({
           codigo: trimmedCode,
-          itensCarrinho: itemsToUse.map(item => item.id), // Send just product IDs for validation
-          valorTotal: itemsTotal
+          itensCarrinho: itemsToUse.map(item => ({
+            ProdutoID: item.id,
+            PrecoUnitario: item.price,
+            Quantidade: item.quantity
+          }))
         })
       });
 
@@ -356,29 +356,40 @@ export function CartProvider({ children }) {
         throw new Error(data.error || 'Erro ao validar cupom');
       }
 
-      if (!data.valido) {
-        throw new Error(data.error || 'Cupom inválido');
+      if (data.state !== 'active') {
+        throw new Error(data.reason || 'Cupom não pode ser aplicado');
       }
 
       // Verificar se o cupom já está aplicado
-      const isAlreadyApplied = appliedCoupons.some(coupon => coupon.Codigo === data.cupom.Codigo);
+      const isAlreadyApplied = appliedCoupons.some(coupon => coupon.Codigo === data.coupon.Codigo);
       if (isAlreadyApplied) {
         throw new Error('Este cupom já está aplicado');
       }
 
-      // Transform API response to match expected format
+      // Transform API response to match expected format with item-specific data
       const transformedCoupon = {
-        ...data.cupom,
-        TipoDesconto: data.cupom.DescontoTipo,
-        ValorDesconto: data.cupom.DescontoValor,
-        ValorMinimo: data.cupom.Restricoes?.valorMinimo || 0,
-        Codigo: data.cupom.Codigo,
-        Nome: data.cupom.Nome,
-        descontoAplicado: data.desconto,
-        valorFinal: data.valorFinal
+        ...data.coupon,
+        TipoDesconto: data.coupon.DescontoTipo,
+        ValorDesconto: data.coupon.DescontoValor,
+        ValorMinimo: data.coupon.Restricoes?.valorMinimo || 0,
+        Codigo: data.coupon.Codigo,
+        Nome: data.coupon.Nome,
+        discountDetails: data.discountDetails, // Item-specific discount details
+        descontoAplicado: data.discountDetails?.totalDiscount || 0,
+        valorFinal: data.discountDetails?.eligibleItems ?
+          data.discountDetails.eligibleItems.reduce((total, item) => total + item.finalAmount, 0) : 0
       };
 
       setAppliedCoupons(prev => [...prev, transformedCoupon]);
+
+      // Se o cupom for de frete grátis, recalcular frete automaticamente
+      if (transformedCoupon.TipoDesconto === 'frete_gratis') {
+        // Recalcular frete para mostrar frete grátis
+        if (selectedAddress) {
+          await calculateFreight(selectedAddress.EnderecoID, itemsToUse.map(item => item.id));
+        }
+      }
+
       return true;
     } catch (error) {
       console.error('Erro ao aplicar cupom:', error);
@@ -401,34 +412,24 @@ export function CartProvider({ children }) {
     setCouponError(null);
   };
 
-  // Calcular desconto total dos cupons aplicados
+  // Calcular desconto total dos cupons aplicados (item-specific)
   const couponDiscount = useMemo(() => {
     if (!appliedCoupons || appliedCoupons.length === 0) return 0;
 
     let totalDiscount = 0;
-    let currentSubtotal = subtotal;
 
-    // Process discount coupons first (percentage and fixed value)
-    const discountCoupons = appliedCoupons.filter(coupon =>
-      coupon.TipoDesconto === 'porcentagem' || coupon.TipoDesconto === 'valor_fixo'
-    );
-
-    for (const coupon of discountCoupons) {
-      if (currentSubtotal < (coupon.ValorMinimo || 0)) continue;
-
-      if (coupon.TipoDesconto === 'porcentagem') {
-        const discount = (currentSubtotal * coupon.ValorDesconto) / 100;
-        totalDiscount += discount;
-        currentSubtotal -= discount; // Reduce subtotal for next coupon calculation
-      } else if (coupon.TipoDesconto === 'valor_fixo') {
-        const discount = Math.min(coupon.ValorDesconto, currentSubtotal);
-        totalDiscount += discount;
-        currentSubtotal -= discount;
+    // Each coupon now has item-specific discount details
+    for (const coupon of appliedCoupons) {
+      if (coupon.discountDetails?.totalDiscount) {
+        totalDiscount += coupon.discountDetails.totalDiscount;
+      } else if (coupon.descontoAplicado) {
+        // Fallback for backward compatibility
+        totalDiscount += coupon.descontoAplicado;
       }
     }
 
     return totalDiscount;
-  }, [appliedCoupons, subtotal]);
+  }, [appliedCoupons]);
   
   const total = useMemo(() => {
     const hasFreeShipping = appliedCoupons.some(coupon => coupon.TipoDesconto === 'frete_gratis');
@@ -470,3 +471,4 @@ export function useCart() {
   if (!ctx) throw new Error('useCart deve ser usado dentro de CartProvider');
   return ctx;
 }
+

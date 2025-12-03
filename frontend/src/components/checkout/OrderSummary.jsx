@@ -30,11 +30,21 @@ function OrderSummary({
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 sticky top-24">
       <h2 className="text-xl font-semibold text-slate-900 mb-4">Resumo do Pedido</h2>
 
-      {/* Applied Coupons */}
+      {/* Coupon Input - Always visible first */}
+      <div className="mb-6">
+        <CouponInput
+          cartItems={selectedItems}
+          cartTotal={orderData?.subtotal || 0}
+          onCouponApplied={() => {}} // CartContext handles this
+          disabled={false}
+        />
+      </div>
+
+      {/* Applied Coupons - Below the input */}
       {appliedCoupons.length > 0 && (
         <div className="mb-6">
           <h3 className="text-sm font-medium text-slate-900 mb-3">Cupons Aplicados</h3>
-          <div className="space-y-2">
+          <div className="space-y-3">
             {appliedCoupons.map((coupon, index) => (
               <div
                 key={index}
@@ -44,33 +54,96 @@ function OrderSummary({
                     : 'border-blue-500 bg-blue-50'
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
                       <p className="font-medium text-slate-900 text-sm">{coupon.Codigo}</p>
-                      <p className="text-xs text-slate-600">
-                        {coupon.TipoDesconto === 'porcentagem' ? `${coupon.ValorDesconto}% de desconto` :
-                         coupon.TipoDesconto === 'valor_fixo' ? `R$ ${coupon.ValorDesconto} de desconto` :
+                      <span className={`text-xs px-2 py-1 rounded ${
+                        coupon.TipoDesconto === 'frete_gratis'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {coupon.TipoDesconto === 'porcentagem' ? `${coupon.ValorDesconto}% desconto` :
+                         coupon.TipoDesconto === 'valor_fixo' ? `R$ ${coupon.ValorDesconto} desconto` :
                          coupon.TipoDesconto === 'frete_gratis' ? 'Frete grátis' :
-                         'Desconto aplicado'}
-                      </p>
+                         'Desconto'}
+                      </span>
                     </div>
+
+                    {/* Coupon Information and Restrictions */}
+                    <div className="text-xs text-slate-600 mb-2 space-y-1">
+                      <p><strong>Descrição:</strong> {coupon.Nome}</p>
+                      {coupon.ValorMinimo > 0 && (
+                        <p><strong>Valor mínimo:</strong> {formatPrice(coupon.ValorMinimo)}</p>
+                      )}
+                      {coupon.Restricoes?.categoriaId && (
+                        <p><strong>Categoria:</strong> Restrito a categoria específica</p>
+                      )}
+                      {coupon.DataExpiracao && (
+                        <p><strong>Expira em:</strong> {new Date(coupon.DataExpiracao).toLocaleDateString('pt-BR')}</p>
+                      )}
+                      {coupon.UsoPorCliente && (
+                        <p><strong>Uso por cliente:</strong> {coupon.UsoPorCliente} vez(es)</p>
+                      )}
+                    </div>
+
+                    {/* Show which items this coupon applies to */}
+                    {coupon.discountDetails?.eligibleItems && coupon.discountDetails.eligibleItems.length > 0 && (
+                      <div className="text-xs text-slate-600 mb-2">
+                        <p className="font-medium mb-1">✅ Aplica-se a:</p>
+                        <ul className="space-y-1">
+                          {coupon.discountDetails.eligibleItems.map((item, itemIndex) => {
+                            const cartItem = items.find(cartItem => cartItem.id === item.ProdutoID || cartItem.id === item.produtoId || cartItem.id === item.id);
+                            return (
+                              <li key={itemIndex} className="flex justify-between">
+                                <span>{cartItem?.name || `Produto ${item.ProdutoID || item.produtoId || item.id}`}</span>
+                                <span className="text-green-600 font-medium">
+                                  -{formatPrice(coupon.discountDetails.itemDiscounts?.[itemIndex]?.discountAmount || 0)}
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Show ineligible items if any */}
+                    {coupon.discountDetails?.ineligibleItems && coupon.discountDetails.ineligibleItems.length > 0 && (
+                      <div className="text-xs text-orange-600">
+                        <p className="font-medium mb-1">❌ Não se aplica a:</p>
+                        <ul className="space-y-1">
+                          {coupon.discountDetails.ineligibleItems.map((item, itemIndex) => {
+                            const cartItem = items.find(cartItem => cartItem.id === item.ProdutoID || cartItem.id === item.produtoId || cartItem.id === item.id);
+                            return (
+                              <li key={itemIndex}>
+                                {cartItem?.name || `Produto ${item.ProdutoID || item.produtoId || item.id}`}
+                                {item.ineligibilityReason && (
+                                  <span className="text-slate-500 ml-1">({item.ineligibilityReason})</span>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-sm font-medium ${
-                      coupon.TipoDesconto === 'frete_gratis' ? 'text-green-600' : 'text-blue-600'
-                    }`}>
-                      {coupon.TipoDesconto === 'frete_gratis' ? 'GRÁTIS' :
-                       coupon.TipoDesconto === 'porcentagem' ? `-${coupon.ValorDesconto}%` :
-                       `-${formatPrice(coupon.ValorDesconto)}`}
-                    </span>
-                    <button
-                      onClick={() => removeCoupon(coupon.Codigo)}
-                      className="p-1 rounded-full hover:bg-slate-200 transition-colors"
-                      title="Remover cupom"
-                    >
-                      <FaTimes className="text-slate-500 text-xs" />
-                    </button>
+
+                  <div className="flex items-start gap-2 ml-4">
+                    <div className="text-right">
+                      <span className={`text-sm font-medium block ${
+                        coupon.TipoDesconto === 'frete_gratis' ? 'text-green-600' : 'text-blue-600'
+                      }`}>
+                        {coupon.TipoDesconto === 'frete_gratis' ? 'GRÁTIS' :
+                         `-${formatPrice(coupon.discountDetails?.totalDiscount || coupon.descontoAplicado || 0)}`}
+                      </span>
+                      <button
+                        onClick={() => removeCoupon(coupon.Codigo)}
+                        className="mt-2 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 rounded border border-red-200 transition-colors"
+                        title="Remover cupom"
+                      >
+                        Remover
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -78,16 +151,6 @@ function OrderSummary({
           </div>
         </div>
       )}
-
-      {/* Coupon Input */}
-      <div className="mb-6">
-        <CouponInput
-          cartItems={selectedItems}
-          cartTotal={orderData?.subtotal || 0}
-          onCouponApplied={() => {}} // CartContext handles this
-          disabled={false}
-        />
-      </div>
 
       <div className="space-y-3 mb-6">
         <div className="flex justify-between text-sm">

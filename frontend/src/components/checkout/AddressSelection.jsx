@@ -60,47 +60,70 @@ function AddressSelection({
           {/* Opções de Frete */}
           {selectedAddress && (
             <div className="mt-4 space-y-4">
-              {(!appliedCoupons.some(coupon => coupon.TipoDesconto === 'frete_gratis')) && freightOptions.length > 0 && (
-                <>
-                  <div className="flex items-center gap-2 mb-3">
-                    <FaTruck className="text-blue-600" />
-                    <span className="text-sm font-medium text-blue-900">Opções de Frete</span>
-                  </div>
+              <div className="flex items-center gap-2 mb-3">
+                <FaTruck className="text-blue-600" />
+                <span className="text-sm font-medium text-blue-900">Opções de Frete</span>
+              </div>
 
-                  {/* Mostrar opções de frete */}
-                  {freightOptions.map((option) => (
-                    <div
-                      key={option.id}
-                      onClick={() => setSelectedFreight(option)}
-                      className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                        selectedFreight?.id === option.id
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <FaTruck className="text-slate-400" />
-                          <div>
-                            <h4 className="font-medium text-slate-900">{option.nome}</h4>
-                            <p className="text-sm text-slate-600">{option.transportadora}</p>
-                            <p className="text-sm text-slate-600">{option.descricao}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-medium text-blue-600">{formatPrice(option.valor)}</p>
-                          <p className="text-sm text-slate-600">{option.prazo}</p>
+              {/* Verificar se há cupom de frete grátis */}
+              {appliedCoupons.some(coupon => coupon.TipoDesconto === 'frete_gratis') ? (
+                <div className="p-4 border rounded-lg bg-green-50 border-green-300">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <FaTruck className="text-green-600" />
+                      <div>
+                        <h4 className="font-medium text-green-900">Frete Grátis</h4>
+                        <p className="text-sm text-green-700">Aplicado via cupom de desconto</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-green-600">GRÁTIS</p>
+                      <p className="text-sm text-green-600">Cupom aplicado</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <FaCheck className="text-green-600" />
+                    <span className="text-sm text-green-600">Selecionado automaticamente</span>
+                  </div>
+                </div>
+              ) : freightOptions.length > 0 ? (
+                /* Mostrar opções de frete normais */
+                freightOptions.map((option) => (
+                  <div
+                    key={option.id}
+                    onClick={() => setSelectedFreight(option)}
+                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                      selectedFreight?.id === option.id
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <FaTruck className="text-slate-400" />
+                        <div>
+                          <h4 className="font-medium text-slate-900">{option.nome}</h4>
+                          <p className="text-sm text-slate-600">{option.transportadora}</p>
+                          <p className="text-sm text-slate-600">{option.descricao}</p>
                         </div>
                       </div>
-                      {selectedFreight?.id === option.id && (
-                        <div className="flex items-center gap-2 mt-2">
-                          <FaCheck className="text-blue-600" />
-                          <span className="text-sm text-blue-600">Selecionado</span>
-                        </div>
-                      )}
+                      <div className="text-right">
+                        <p className="font-medium text-blue-600">{formatPrice(option.valor)}</p>
+                        <p className="text-sm text-slate-600">{option.prazo}</p>
+                      </div>
                     </div>
-                  ))}
-                </>
+                    {selectedFreight?.id === option.id && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <FaCheck className="text-blue-600" />
+                        <span className="text-sm text-blue-600">Selecionado</span>
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-4 text-slate-500">
+                  <p>Nenhuma opção de frete disponível</p>
+                </div>
               )}
 
               {/* Exibir erro de cálculo de frete */}
