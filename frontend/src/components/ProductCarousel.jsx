@@ -14,7 +14,8 @@ import {
   FaPercent,
   FaCheck,
   FaRegHeart,
-  FaEye
+  FaEye,
+  FaImage
 } from 'react-icons/fa';
 
 function ProductCarousel({ title, products, loading, favorites = [], favoriteLoading = null, onToggleFavorite, setProductModalId, setShowProductModal, onRequireAuth }) {
@@ -94,12 +95,21 @@ function ProductCarousel({ title, products, loading, favorites = [], favoriteLoa
                 className="relative aspect-square overflow-hidden block cursor-pointer"
                 onClick={() => console.log('[ProductCarousel] Product link clicked:', product.id)}
               >
-                <LazyImage
-                  src={product.image || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?q=80&w=400&auto=format&fit=crop'}
-                  alt={product.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  fallback="https://images.unsplash.com/photo-1560472354-b33ff0c44a43?q=80&w=400&auto=format&fit=crop"
-                />
+                {product.images && product.images.length > 0 ? (
+                  <LazyImage
+                    src={product.image}
+                    alt={product.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    fallback="/placeholder-image.svg"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-slate-100 flex items-center justify-center">
+                    <div className="text-center text-slate-500">
+                      <FaImage className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">Sem imagem</p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="absolute top-2 left-2 flex flex-col gap-1">
                   {product.discount > 0 && (

@@ -195,7 +195,22 @@ function Home() {
       log.info('home_products_fetch_start');
       const response = await produtoService.listar({ status: 'ativo' });
 
-      const produtosMapeados = (response.produtos || response).map(produto => ({
+      // Robustly extract the products array from various possible response formats
+      let produtosArray = [];
+      if (Array.isArray(response)) {
+        produtosArray = response;
+      } else if (response.data && Array.isArray(response.data)) {
+        produtosArray = response.data;
+      } else if (response.produtos && Array.isArray(response.produtos)) {
+        produtosArray = response.produtos;
+      } else if (response.data?.produtos && Array.isArray(response.data.produtos)) {
+        produtosArray = response.data.produtos;
+      } else {
+        console.error('Formato de resposta inválido para produtos:', response);
+        throw new Error('Formato de resposta inválido');
+      }
+
+      const produtosMapeados = produtosArray.map(produto => ({
         id: produto.ProdutoID || produto.id,
         name: produto.Nome || produto.name,
         price: produto.Preco || produto.price,
@@ -497,14 +512,18 @@ function Home() {
               </div>
 
               <div className="hidden lg:flex lg:col-span-1 flex-col gap-3 h-[200px] sm:h-[240px] lg:h-[280px]">
-                <PromotionalCard
-                  type="offers"
-                  onRequireAuth={() => setShowLoginModal(true)}
-                />
-                <PromotionalCard
-                  type="free_shipping"
-                  onRequireAuth={() => setShowLoginModal(true)}
-                />
+                <div onClick={() => navigate('/products?discount=true')} className="cursor-pointer hover:opacity-80 transition-opacity">
+                  <PromotionalCard
+                    type="offers"
+                    onRequireAuth={() => setShowLoginModal(true)}
+                  />
+                </div>
+                <div onClick={() => navigate('/products?freeShipping=true')} className="cursor-pointer hover:opacity-80 transition-opacity">
+                  <PromotionalCard
+                    type="free_shipping"
+                    onRequireAuth={() => setShowLoginModal(true)}
+                  />
+                </div>
               </div>
             </div>
 

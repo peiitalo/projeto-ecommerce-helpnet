@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FaTimes, FaEye, FaSpinner } from 'react-icons/fa';
+import { FaTimes, FaEye, FaSpinner, FaImage } from 'react-icons/fa';
 import LazyImage from './LazyImage';
 import { produtoService } from '../services/api';
 import { buildImageUrl } from '../utils/imageUtils';
@@ -91,12 +91,21 @@ const ProductDetailsModal = ({ productId, isOpen, onClose }) => {
               <div className="space-y-4">
                 {/* Main Image */}
                 <div className="aspect-square bg-gray-100 relative rounded-lg overflow-hidden">
-                  <LazyImage
-                    src={buildImageUrl(product.Imagens?.[currentImageIndex])}
-                    alt={product.Nome}
-                    className="w-full h-full object-cover"
-                    fallback="/placeholder-image.svg"
-                  />
+                  {product.Imagens && product.Imagens.length > 0 ? (
+                    <LazyImage
+                      src={buildImageUrl(product.Imagens?.[currentImageIndex])}
+                      alt={product.Nome}
+                      className="w-full h-full object-cover"
+                      fallback="/placeholder-image.svg"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-slate-100 flex items-center justify-center">
+                      <div className="text-center text-slate-500">
+                        <FaImage className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">Sem imagem</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Thumbnail Images */}

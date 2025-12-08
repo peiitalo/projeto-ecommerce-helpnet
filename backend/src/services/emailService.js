@@ -203,16 +203,32 @@ const smtpTransporter = nodemailer.createTransport({
   }
 });
 
-// Fallback para Ethereal se não houver configuração SMTP
-const etherealTransporter = nodemailer.createTransport({
-  host: 'smtp.ethereal.email',
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.ETHEREAL_USER || 'your-ethereal-user',
-    pass: process.env.ETHEREAL_PASS || 'your-ethereal-pass'
+// Função para obter transporter Ethereal (com geração dinâmica de credenciais se necessário)
+const getEtherealTransporter = async () => {
+  let user = process.env.ETHEREAL_USER;
+  let pass = process.env.ETHEREAL_PASS;
+
+  // Se não houver credenciais configuradas, gerar dinamicamente
+  if (!user || user === 'your-ethereal-user' || !pass || pass === 'your-ethereal-pass') {
+    console.log('Gerando credenciais Ethereal dinamicamente...');
+    try {
+      const testAccount = await nodemailer.createTestAccount();
+      user = testAccount.user;
+      pass = testAccount.pass;
+      console.log('Credenciais Ethereal geradas:', { user, pass });
+    } catch (error) {
+      console.error('Erro ao gerar credenciais Ethereal:', error);
+      throw error;
+    }
   }
-});
+
+  return nodemailer.createTransporter({
+    host: 'smtp.ethereal.email',
+    port: 587,
+    secure: false,
+    auth: { user, pass }
+  });
+};
 
 // Função auxiliar para carregar e compilar templates
 const loadTemplate = (templateName) => {
@@ -289,7 +305,10 @@ const sendEmail = async (to, subject, htmlContent) => {
     console.log('NODE_ENV:', process.env.NODE_ENV);
     console.log('==================================');
 
-    // Tentar SendGrid primeiro
+    // Unified email sending logic: SendGrid -> SMTP -> Ethereal
+    console.log('=== ENVIANDO EMAIL: SendGrid -> SMTP -> Ethereal ===');
+
+    // Try SendGrid first
     if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_API_KEY !== 'your-sendgrid-api-key') {
       console.log('Tentando enviar via SendGrid...');
       try {
@@ -298,13 +317,11 @@ const sendEmail = async (to, subject, htmlContent) => {
         return { success: true, messageId: result[0]?.headers?.['x-message-id'], provider: 'sendgrid' };
       } catch (sendgridError) {
         console.error('❌ Erro ao enviar via SendGrid:', sendgridError.message);
-        console.log('Continuando para próximos provedores...');
+        console.log('Continuando para SMTP...');
       }
-    } else {
-      console.log('SendGrid não configurado ou chave padrão detectada, pulando...');
     }
 
-    // Tentar SMTP
+    // Then SMTP
     if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_USER !== 'your-email@gmail.com') {
       console.log('Tentando enviar via SMTP...');
       try {
@@ -316,32 +333,27 @@ const sendEmail = async (to, subject, htmlContent) => {
         return { success: true, messageId: info.messageId, provider: 'smtp' };
       } catch (smtpError) {
         console.error('❌ Erro ao enviar via SMTP:', smtpError.message);
-        console.log('Continuando para próximos provedores...');
+        console.log('Continuando para Ethereal...');
       }
-    } else {
-      console.log('SMTP não configurado ou usuário padrão detectado, pulando...');
     }
 
-    // Fallback para Ethereal
-    if (process.env.ETHEREAL_USER && process.env.ETHEREAL_USER !== 'your-ethereal-user') {
+    // Then Ethereal
+    try {
       console.log('Tentando enviar via Ethereal...');
-      try {
-        const info = await etherealTransporter.sendMail({
-          ...mailOptions,
-          from: '"HelpNet" <noreply@helpnet.com>'
-        });
-        console.log('✅ Email enviado com sucesso via Ethereal:', info.messageId);
-        console.log('Preview URL:', nodemailer.getTestMessageUrl(info));
-        return { success: true, messageId: info.messageId, provider: 'ethereal' };
-      } catch (etherealError) {
-        console.error('❌ Erro ao enviar via Ethereal:', etherealError.message);
-        console.log('Continuando para modo desenvolvimento...');
-      }
-    } else {
-      console.log('Ethereal não configurado ou usuário padrão detectado, pulando...');
+      const etherealTransporter = await getEtherealTransporter();
+      const info = await etherealTransporter.sendMail({
+        ...mailOptions,
+        from: '"HelpNet" <noreply@helpnet.com>'
+      });
+      console.log('✅ Email enviado com sucesso via Ethereal:', info.messageId);
+      console.log('Preview URL:', nodemailer.getTestMessageUrl(info));
+      return { success: true, messageId: info.messageId, provider: 'ethereal' };
+    } catch (etherealError) {
+      console.error('❌ Erro ao enviar via Ethereal:', etherealError.message);
+      console.log('Continuando para modo desenvolvimento...');
     }
 
-    // Desenvolvimento: apenas logar
+    // Fallback: apenas logar
     console.log('=== EMAIL (MODO DESENVOLVIMENTO) ===');
     console.log('Para:', to);
     console.log('Assunto:', subject);

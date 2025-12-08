@@ -87,6 +87,7 @@ function App() {
             <Route path="/favoritos" element={<FavoritesPage />} />
             <Route path="/notificacoes" element={<NotificationsPage />} />
             <Route path="/produto/:id" element={<ProductPage />} />
+            <Route path="/products" element={<ExplorePage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/cadastro" element={<Cadastro />} />
             <Route path="/esqueci-senha" element={<ForgotPasswordPage />} />

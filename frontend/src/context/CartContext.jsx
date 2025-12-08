@@ -56,13 +56,21 @@ export function CartProvider({ children }) {
 
   // Limpa carrinho quando usuário muda (logout/login com outra conta)
   useEffect(() => {
-    const prevUserId = localStorage.getItem('cart_prev_user_id');
-    const currentUserId = user?.id || null;
+    const prevUserId = localStorage.getItem('cart_prev_user_id') || '';
+    const currentUserId = user?.id ? user.id.toString() : '';
 
-    if (prevUserId !== currentUserId?.toString()) {
+    if (prevUserId !== currentUserId) {
+      // If logging out (prev was user, now null), save current cart to backup
+      if (prevUserId && !currentUserId) {
+        safeStorageSet(`helpnet_cart_backup_${prevUserId}`, items);
+      }
+      // Clear backup for previous user if changing users
+      if (prevUserId) {
+        localStorage.removeItem(`helpnet_cart_backup_${prevUserId}`);
+      }
       // Usuário mudou, limpa carrinho local
       setItems([]);
-      localStorage.setItem('cart_prev_user_id', currentUserId || '');
+      localStorage.setItem('cart_prev_user_id', currentUserId);
     }
   }, [user?.id]);
 
@@ -70,7 +78,7 @@ export function CartProvider({ children }) {
   useEffect(() => {
     if (user) {
       // Sempre carrega do backend quando usuário está logado
-      carrinhoService.listar().then(data => {
+      carrinhoService.listar().then(async (data) => {
         const backendItems = (data.itens || []).map(item => ({
           id: item.produto.ProdutoID,
           name: item.produto.Nome,
@@ -84,7 +92,26 @@ export function CartProvider({ children }) {
           estoque: item.produto.Estoque,
           quantity: item.Quantidade,
         }));
-        setItems(backendItems);
+        if (backendItems.length === 0) {
+          // Check for backup
+          const backupKey = `helpnet_cart_backup_${user.id}`;
+          const backupItems = safeStorageGet(backupKey, []);
+          if (backupItems.length > 0) {
+            setItems(backupItems);
+            // Save to backend
+            try {
+              await Promise.all(backupItems.map(item => carrinhoService.adicionar(item.id, item.quantity)));
+            } catch (error) {
+              console.error('Erro ao salvar backup no backend:', error);
+            }
+            // Clear backup
+            localStorage.removeItem(backupKey);
+          } else {
+            setItems([]);
+          }
+        } else {
+          setItems(backendItems);
+        }
       }).catch(error => {
         console.error('Erro ao carregar carrinho:', error);
         setItems([]);
@@ -205,6 +232,8 @@ export function CartProvider({ children }) {
           // Clear all items
           await carrinhoService.limpar();
           setItems([]);
+          // Clear backup to prevent restore
+          localStorage.removeItem(`helpnet_cart_backup_${user.id}`);
         }
       } catch (error) {
         console.error('Erro ao limpar carrinho:', error);
@@ -240,39 +269,16 @@ export function CartProvider({ children }) {
       return;
     }
 
-    // Filtrar apenas produtos que NÃO têm frete grátis para cálculo
-    const produtosQuePagamFrete = itemsParaCalculo.filter(item => !item.freeShipping);
-    const idsProdutosQuePagamFrete = produtosQuePagamFrete.map(item => item.id);
-
     console.log('[CartContext] Produtos no carrinho:', itemsParaCalculo.length);
-    console.log('[CartContext] Produtos que pagam frete:', produtosQuePagamFrete.length);
-    console.log('[CartContext] IDs produtos que pagam frete:', idsProdutosQuePagamFrete);
+    console.log('[CartContext] IDs produtos para cálculo:', idsParaCalculo);
 
-    // Se nenhum produto paga frete (todos têm frete grátis), mostrar frete grátis
-    if (produtosQuePagamFrete.length === 0) {
-      const freteGratisOption = {
-        id: 'frete-gratis',
-        nome: 'Frete Grátis',
-        transportadora: 'HelpNet',
-        valor: 0,
-        prazo: '3-5 dias úteis',
-        descricao: 'Todos os produtos selecionados têm frete grátis',
-        ativo: true
-      };
-      setFreightOptions([freteGratisOption]);
-      setSelectedFreight(freteGratisOption);
-      setFreightLoading(false);
-      setFreightError(null);
-      return;
-    }
-
-    // Se alguns produtos têm frete grátis, calcular apenas para os que pagam
+    // Sempre calcular frete para todos os produtos
     setFreightLoading(true);
     setFreightError(null);
 
     try {
-      console.log('[CartContext] Calling freteService.calcular with:', user.id, enderecoId, idsProdutosQuePagamFrete);
-      const freteResult = await freteService.calcular(user.id, enderecoId, idsProdutosQuePagamFrete);
+      console.log('[CartContext] Calling freteService.calcular with:', user.id, enderecoId, idsParaCalculo);
+      const freteResult = await freteService.calcular(user.id, enderecoId, idsParaCalculo);
       console.log('[CartContext] freteService.calcular result:', freteResult);
 
       const options = freteResult.opcoes || [];
