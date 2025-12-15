@@ -28,7 +28,7 @@ export function AuthProvider({ children }) {
           role: parsedUser.role,
           nome: parsedUser.nome,
           empresaId: parsedUser.empresaId
-        });
+        }, 'timestamp:', Date.now());
         setUser(parsedUser);
       } else {
         console.log('[AuthContext] Nenhum usuário encontrado no localStorage');
@@ -42,7 +42,7 @@ export function AuthProvider({ children }) {
   const login = (data) => {
     // data deve conter { id, nome, email, role, empresaId?, token? }
     console.log('[AuthContext] Salvando dados do usuário no localStorage:', data);
-    console.log('[AuthContext] Dados recebidos - id:', data?.id, 'nome:', data?.nome, 'email:', data?.email, 'role:', data?.role);
+    console.log('[AuthContext] Dados recebidos - id:', data?.id, 'nome:', data?.nome, 'email:', data?.email, 'role:', data?.role, 'timestamp:', Date.now());
 
     if (!data || typeof data !== 'object') {
       console.error('[AuthContext] Dados inválidos recebidos no login:', data);

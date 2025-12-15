@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
 import { FaMapMarkerAlt, FaTruck, FaCheck } from 'react-icons/fa';
 import { FiTag } from 'react-icons/fi';
 
@@ -17,6 +18,22 @@ function AddressSelection({
     return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
+  // useEffect para monitorar mudanças de endereço selecionado
+  useEffect(() => {
+    if (selectedAddress) {
+      console.log('[AddressSelection] Endereço selecionado mudou:', {
+        enderecoId: selectedAddress.EnderecoID,
+        nome: selectedAddress.Nome,
+        cep: selectedAddress.CEP,
+        cidade: selectedAddress.Cidade,
+        uf: selectedAddress.UF,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      console.log('[AddressSelection] Nenhum endereço selecionado');
+    }
+  }, [selectedAddress]);
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
       <h2 className="text-xl font-semibold text-slate-900 mb-4">Endereço de Entrega</h2>
@@ -25,7 +42,18 @@ function AddressSelection({
           {addresses.map((address) => (
             <div
               key={address.EnderecoID}
-              onClick={() => handleAddressChange(address)}
+              onClick={() => {
+                console.log('[AddressSelection] Endereço clicado:', {
+                  enderecoId: address.EnderecoID,
+                  nome: address.Nome,
+                  cep: address.CEP,
+                  cidade: address.Cidade,
+                  uf: address.UF,
+                  timestamp: new Date().toISOString()
+                });
+                console.log('[AddressSelection] Chamando handleAddressChange - calculateFreight será chamado no CheckoutPage');
+                handleAddressChange(address);
+              }}
               className={`p-4 border rounded-lg cursor-pointer transition-colors ${
                 selectedAddress?.EnderecoID === address.EnderecoID
                   ? 'border-blue-500 bg-blue-50'
@@ -88,38 +116,41 @@ function AddressSelection({
                 </div>
               ) : freightOptions.length > 0 ? (
                 /* Mostrar opções de frete normais */
-                freightOptions.map((option) => (
-                  <div
-                    key={option.id}
-                    onClick={() => setSelectedFreight(option)}
-                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                      selectedFreight?.id === option.id
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <FaTruck className="text-slate-400" />
-                        <div>
-                          <h4 className="font-medium text-slate-900">{option.nome}</h4>
-                          <p className="text-sm text-slate-600">{option.transportadora}</p>
-                          <p className="text-sm text-slate-600">{option.descricao}</p>
+                freightOptions.map((option) => {
+                  console.log('[AddressSelection] Renderizando opções de frete:', freightOptions.length, freightOptions.map(o => ({ id: o.id, nome: o.nome, valor: o.valor })));
+                  return (
+                    <div
+                      key={option.id}
+                      onClick={() => setSelectedFreight(option)}
+                      className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                        selectedFreight?.id === option.id
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <FaTruck className="text-slate-400" />
+                          <div>
+                            <h4 className="font-medium text-slate-900">{option.nome}</h4>
+                            <p className="text-sm text-slate-600">{option.transportadora}</p>
+                            <p className="text-sm text-slate-600">{option.descricao}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium text-blue-600">{formatPrice(option.valor)}</p>
+                          <p className="text-sm text-slate-600">{option.prazo}</p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-medium text-blue-600">{formatPrice(option.valor)}</p>
-                        <p className="text-sm text-slate-600">{option.prazo}</p>
-                      </div>
+                      {selectedFreight?.id === option.id && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <FaCheck className="text-blue-600" />
+                          <span className="text-sm text-blue-600">Selecionado</span>
+                        </div>
+                      )}
                     </div>
-                    {selectedFreight?.id === option.id && (
-                      <div className="flex items-center gap-2 mt-2">
-                        <FaCheck className="text-blue-600" />
-                        <span className="text-sm text-blue-600">Selecionado</span>
-                      </div>
-                    )}
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="text-center py-4 text-slate-500">
                   <FaTruck className="mx-auto h-8 w-8 text-slate-400 mb-2" />
@@ -135,6 +166,36 @@ function AddressSelection({
                     <span className="text-sm font-medium text-red-900">Erro no cálculo do frete</span>
                   </div>
                   <p className="text-sm text-red-800">{freightError}</p>
+                  <button
+                    onClick={() => {
+                      if (selectedAddress && window.location.reload) {
+                        window.location.reload(); // Recarregar página como fallback
+                      }
+                    }}
+                    className="mt-2 px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                  >
+                    Tentar novamente
+                  </button>
+                </div>
+              )}
+
+              {/* Debug info - mostrar apenas se não há opções e não há erro */}
+              {freightOptions.length === 0 && !freightError && !freightLoading && selectedAddress && (
+                <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-sm font-medium text-yellow-900">Debug: Frete não calculado</span>
+                  </div>
+                  <p className="text-sm text-yellow-800">
+                    Verifique se há produtos no carrinho e se o endereço está selecionado corretamente.
+                  </p>
+                  <details className="mt-2">
+                    <summary className="text-xs text-yellow-700 cursor-pointer">Detalhes técnicos</summary>
+                    <div className="mt-1 text-xs text-yellow-600">
+                      <p>Endereço selecionado: {selectedAddress.EnderecoID}</p>
+                      <p>Produtos no carrinho: {JSON.stringify(appliedCoupons)}</p>
+                      <p>Status do frete: {freightLoading ? 'Carregando' : 'Pronto'}</p>
+                    </div>
+                  </details>
                 </div>
               )}
             </div>

@@ -194,10 +194,17 @@ function CheckoutPage() {
         setSelectedAddress(selectedAddressToUse);
         // Calcular frete automaticamente para o endereço selecionado e itens selecionados
         console.log('[CheckoutPage] Calling calculateFreight with:', selectedAddressToUse.EnderecoID, selectedItemIds);
-        await calculateFreight(selectedAddressToUse.EnderecoID, selectedItemIds);
+        try {
+          await calculateFreight(selectedAddressToUse.EnderecoID, selectedItemIds);
+          console.log('[CheckoutPage] calculateFreight completed successfully');
+        } catch (error) {
+          console.error('[CheckoutPage] Error in calculateFreight:', error);
+          showError('Erro ao calcular frete: ' + error.message);
+        }
         setSelectedFreight(null); // Não selecionar frete automaticamente
       } else {
         console.log('[CheckoutPage] No address selected, skipping freight calculation');
+        showInfo('Selecione um endereço para calcular o frete');
       }
 
       // Calcular subtotal apenas dos itens selecionados (usando preços já com desconto)
@@ -337,11 +344,38 @@ function CheckoutPage() {
 
   // Atualizar endereço selecionado e recalcular frete
   const handleAddressChange = async (endereco) => {
+    console.log('[CheckoutPage] handleAddressChange chamado:', {
+      enderecoId: endereco.EnderecoID,
+      nome: endereco.Nome,
+      cep: endereco.CEP,
+      timestamp: new Date().toISOString()
+    });
+
     setSelectedAddress(endereco);
 
     if (endereco) {
       const selectedItemIds = getSelectedItems();
+      console.log('[CheckoutPage] Verificando produtos no carrinho antes de calcular frete:', {
+        selectedItemIds,
+        totalItens: selectedItemIds.length,
+        hasItems: selectedItemIds.length > 0
+      });
+
+      if (selectedItemIds.length === 0) {
+        console.log('[CheckoutPage] Nenhum produto no carrinho - pulando cálculo de frete');
+        return;
+      }
+
+      console.log('[CheckoutPage] Chamando calculateFreight:', {
+        enderecoId: endereco.EnderecoID,
+        produtoIds: selectedItemIds,
+        timestamp: new Date().toISOString()
+      });
+
       await calculateFreight(endereco.EnderecoID, selectedItemIds);
+
+      console.log('[CheckoutPage] calculateFreight concluído para endereço:', endereco.EnderecoID);
+
       // Aguardar um pouco para garantir que calculateFreight terminou de definir
       setTimeout(() => setSelectedFreight(null), 10);
 

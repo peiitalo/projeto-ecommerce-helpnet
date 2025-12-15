@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { favoritoService, notificacaoService } from '../services/api';
+import { useAuth } from './AuthContext';
 
 const CountersContext = createContext();
 
@@ -12,16 +13,30 @@ export const useCounters = () => {
 };
 
 export const CountersProvider = ({ children }) => {
+  const { user } = useAuth();
   const [favoritesCount, setFavoritesCount] = useState(0);
   const [notificationsCount, setNotificationsCount] = useState(0);
   const [cartCount, setCartCount] = useState(0);
 
   // Carregar contadores iniciais
   useEffect(() => {
-    loadCounters();
-  }, []);
+    if (user) {
+      loadCounters();
+    } else {
+      // Reset counters when not logged in
+      setFavoritesCount(0);
+      setNotificationsCount(0);
+      setCartCount(0);
+    }
+  }, [user]);
 
   const loadCounters = async () => {
+    if (!user) {
+      setFavoritesCount(0);
+      setNotificationsCount(0);
+      return;
+    }
+
     try {
       // Carregar favoritos
       const favoritesResponse = await favoritoService.listar();

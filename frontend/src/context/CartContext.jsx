@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useAuth } from './AuthContext.jsx';
 import { carrinhoService, freteService } from '../services/api.js';
 
@@ -29,10 +29,19 @@ function safeStorageSet(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
 }
 
+// Função para comparação profunda de arrays de objetos
+function deepEqualArrays(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (JSON.stringify(a[i]) !== JSON.stringify(b[i])) return false;
+  }
+  return true;
+}
+
 export function CartProvider({ children }) {
   const { user } = useAuth();
-  const STORAGE_KEY = user ? `helpnet_cart_${user.id}` : 'helpnet_cart_guest';
-  const COUPON_STORAGE_KEY = user ? `helpnet_coupon_${user.id}` : 'helpnet_coupon_guest';
+  const STORAGE_KEY = useMemo(() => user ? `helpnet_cart_${user.id}` : 'helpnet_cart_guest', [user]);
+  const COUPON_STORAGE_KEY = useMemo(() => user ? `helpnet_coupon_${user.id}` : 'helpnet_coupon_guest', [user]);
 
   const [items, setItems] = useState([]);
   const [freightOptions, setFreightOptions] = useState([]);
@@ -43,6 +52,9 @@ export function CartProvider({ children }) {
   const [appliedCoupons, setAppliedCoupons] = useState([]);
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponError, setCouponError] = useState(null);
+
+  // Ref para debounce da sincronização
+  const syncTimeoutRef = useRef(null);
 
   // Persiste mudanças
   useEffect(() => {
@@ -75,10 +87,14 @@ export function CartProvider({ children }) {
   }, [user?.id]);
 
   // Sync cart when user logs in
-  useEffect(() => {
+  const syncCart = useCallback(async () => {
+    console.log('[CartContext] Sync cart called, user:', !!user, 'user.id:', user?.id, 'timestamp:', Date.now());
+    const couponKey = user ? `helpnet_coupon_${user.id}` : 'helpnet_coupon_guest';
     if (user) {
       // Sempre carrega do backend quando usuário está logado
-      carrinhoService.listar().then(async (data) => {
+      try {
+        const data = await carrinhoService.listar();
+        console.log('[CartContext] Backend cart data received:', data);
         const backendItems = (data.itens || []).map(item => ({
           id: item.produto.ProdutoID,
           name: item.produto.Nome,
@@ -92,12 +108,28 @@ export function CartProvider({ children }) {
           estoque: item.produto.Estoque,
           quantity: item.Quantidade,
         }));
+        console.log('[CartContext] Mapped backend items:', backendItems);
+
+        // Usar comparação profunda para evitar setItems desnecessário
+        setItems(prevItems => {
+          if (deepEqualArrays(prevItems, backendItems)) {
+            return prevItems; // Não mudar se igual
+          }
+          return backendItems;
+        });
+
         if (backendItems.length === 0) {
           // Check for backup
           const backupKey = `helpnet_cart_backup_${user.id}`;
           const backupItems = safeStorageGet(backupKey, []);
           if (backupItems.length > 0) {
-            setItems(backupItems);
+            console.log('[CartContext] Using backup items:', backupItems);
+            setItems(prevItems => {
+              if (deepEqualArrays(prevItems, backupItems)) {
+                return prevItems;
+              }
+              return backupItems;
+            });
             // Save to backend
             try {
               await Promise.all(backupItems.map(item => carrinhoService.adicionar(item.id, item.quantity)));
@@ -107,29 +139,70 @@ export function CartProvider({ children }) {
             // Clear backup
             localStorage.removeItem(backupKey);
           } else {
-            setItems([]);
+            console.log('[CartContext] Setting empty cart');
+            setItems(prevItems => {
+              if (prevItems.length === 0) return prevItems;
+              return [];
+            });
           }
-        } else {
-          setItems(backendItems);
         }
-      }).catch(error => {
+      } catch (error) {
         console.error('Erro ao carregar carrinho:', error);
-        setItems([]);
-      });
+        setItems(prevItems => {
+          if (prevItems.length === 0) return prevItems;
+          return [];
+        });
+      }
 
       // Carrega cupons aplicados do localStorage
-      const savedCoupons = safeStorageGet(COUPON_STORAGE_KEY, []);
-      setAppliedCoupons(Array.isArray(savedCoupons) ? savedCoupons : []);
+      const savedCoupons = safeStorageGet(couponKey, []);
+      setAppliedCoupons(prevCoupons => {
+        const newCoupons = Array.isArray(savedCoupons) ? savedCoupons : [];
+        if (deepEqualArrays(prevCoupons, newCoupons)) {
+          return prevCoupons;
+        }
+        return newCoupons;
+      });
     } else {
       // Usuário não logado, carrega do localStorage guest
       const guestItems = safeStorageGet('helpnet_cart_guest', []);
-      setItems(guestItems);
+      console.log('[CartContext] Setting guest items:', guestItems);
+      setItems(prevItems => {
+        if (deepEqualArrays(prevItems, guestItems)) {
+          return prevItems;
+        }
+        return guestItems;
+      });
 
       // Carrega cupons aplicados do localStorage guest
       const guestCoupons = safeStorageGet('helpnet_coupon_guest', []);
-      setAppliedCoupons(Array.isArray(guestCoupons) ? guestCoupons : []);
+      setAppliedCoupons(prevCoupons => {
+        const newCoupons = Array.isArray(guestCoupons) ? guestCoupons : [];
+        if (deepEqualArrays(prevCoupons, newCoupons)) {
+          return prevCoupons;
+        }
+        return newCoupons;
+      });
     }
-  }, [user, COUPON_STORAGE_KEY]);
+  }, [user]);
+
+  useEffect(() => {
+    // Limpar timeout anterior
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
+    }
+    // Debounce: aguardar 300ms antes de sync
+    syncTimeoutRef.current = setTimeout(() => {
+      syncCart();
+    }, 300);
+
+    // Cleanup
+    return () => {
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+    };
+  }, [syncCart]);
 
   // Adiciona item (soma quantidade se já existir)
   const addItem = async (product, quantity = 1) => {
@@ -251,9 +324,22 @@ export function CartProvider({ children }) {
 
   // Calcular frete baseado no endereço selecionado e produtos específicos
   const calculateFreight = async (enderecoId, produtoIds = null) => {
-    console.log('[CartContext] calculateFreight called:', { user: !!user, enderecoId, produtoIds });
+    console.log('[DEBUG CartContext] calculateFreight called:', {
+      user: !!user,
+      userId: user?.id,
+      enderecoId,
+      produtoIds,
+      itemsCount: items.length,
+      timestamp: Date.now()
+    });
+
     if (!user || !enderecoId) {
-      console.log('[CartContext] calculateFreight early return - no user or enderecoId');
+      console.log('[DEBUG CartContext] calculateFreight early return - no user or enderecoId', {
+        hasUser: !!user,
+        userId: user?.id,
+        enderecoId
+      });
+      console.log('[CartContext] freightOptions limpo - sem usuário ou endereço');
       setFreightOptions([]);
       setSelectedFreight(null);
       return;
@@ -263,40 +349,71 @@ export function CartProvider({ children }) {
     const idsParaCalculo = produtoIds || items.map(item => item.id);
     const itemsParaCalculo = items.filter(item => idsParaCalculo.includes(item.id));
 
+    console.log('[DEBUG CartContext] Items para cálculo:', {
+      idsParaCalculo,
+      itemsParaCalculoCount: itemsParaCalculo.length,
+      itemsParaCalculo: itemsParaCalculo.map(i => ({ id: i.id, name: i.name, quantity: i.quantity }))
+    });
+
     if (idsParaCalculo.length === 0) {
+      console.log('[DEBUG CartContext] Nenhum produto para calcular frete');
+      console.log('[CartContext] freightOptions limpo - nenhum produto para calcular frete');
       setFreightOptions([]);
       setSelectedFreight(null);
       return;
     }
 
-    console.log('[CartContext] Produtos no carrinho:', itemsParaCalculo.length);
-    console.log('[CartContext] IDs produtos para cálculo:', idsParaCalculo);
-
-    // Sempre calcular frete para todos os produtos
+    console.log('[DEBUG CartContext] Iniciando cálculo de frete...');
     setFreightLoading(true);
     setFreightError(null);
 
     try {
-      console.log('[CartContext] Calling freteService.calcular with:', user.id, enderecoId, idsParaCalculo);
+      console.log('[DEBUG CartContext] Chamando freteService.calcular:', {
+        clienteId: user.id,
+        enderecoId,
+        produtoIds: idsParaCalculo,
+        timestamp: Date.now()
+      });
+
       const freteResult = await freteService.calcular(user.id, enderecoId, idsParaCalculo);
-      console.log('[CartContext] freteService.calcular result:', freteResult);
+
+      console.log('[DEBUG CartContext] Resposta do freteService:', {
+        freteResult,
+        hasOpcoes: !!freteResult?.opcoes,
+        opcoesLength: freteResult?.opcoes?.length || 0,
+        endereco: freteResult?.endereco,
+        timestamp: Date.now()
+      });
 
       const options = freteResult.opcoes || [];
-      console.log('[CartContext] Setting freight options:', options);
+      console.log('[DEBUG CartContext] Definindo opções de frete:', {
+        optionsCount: options.length,
+        options: options.map(o => ({ id: o.id, nome: o.nome, valor: o.valor, prazo: o.prazo }))
+      });
+
+      console.log('[CartContext] freightOptions atualizado com opções:', options.length);
       setFreightOptions(options);
 
       // Selecionar primeira opção como padrão se disponível
       if (options.length > 0) {
+        console.log('[DEBUG CartContext] Selecionando primeira opção de frete:', options[0]);
         setSelectedFreight(options[0]);
       } else {
+        console.log('[DEBUG CartContext] Nenhuma opção de frete disponível');
         setSelectedFreight(null);
       }
     } catch (error) {
-      console.error('Erro ao calcular frete:', error);
+      console.error('[DEBUG CartContext] Erro ao calcular frete:', {
+        error: error.message,
+        stack: error.stack,
+        timestamp: Date.now()
+      });
       setFreightError(error.message || 'Erro ao calcular frete');
+      console.log('[CartContext] freightOptions limpo devido a erro no cálculo');
       setFreightOptions([]);
       setSelectedFreight(null);
     } finally {
+      console.log('[DEBUG CartContext] Finalizando cálculo de frete');
       setFreightLoading(false);
     }
   };

@@ -6,6 +6,14 @@ import { calcularFrete as calcularFreteService, validarCEP } from "../services/f
 // Função para calcular frete baseado na distância entre vendedor e cliente
 const calcularFrete = async (req, res) => {
   try {
+    console.log('[DEBUG Backend] calcularFrete chamado:', {
+      method: req.method,
+      url: req.url,
+      headers: req.headers,
+      body: req.body,
+      timestamp: new Date().toISOString()
+    });
+
     const { clienteId, enderecoId, produtoIds } = req.body;
 
     logger.info('frete_calculo_request', {
@@ -16,7 +24,8 @@ const calcularFrete = async (req, res) => {
       clienteIdType: typeof clienteId,
       enderecoIdType: typeof enderecoId,
       produtoIdsType: typeof produtoIds,
-      produtoIdsIsArray: Array.isArray(produtoIds)
+      produtoIdsIsArray: Array.isArray(produtoIds),
+      timestamp: new Date().toISOString()
     });
 
     if (!clienteId || !enderecoId || !produtoIds || !Array.isArray(produtoIds)) {
@@ -262,16 +271,29 @@ const calcularFrete = async (req, res) => {
       });
     }
 
-    res.json({
+    const responseData = {
       opcoes: opcoesFrete,
       endereco: {
         cep: endereco.CEP,
         cidade: endereco.Cidade,
         uf: endereco.UF
       }
+    };
+
+    console.log('[DEBUG Backend] calcularFrete retornando sucesso:', {
+      opcoesCount: opcoesFrete.length,
+      endereco: responseData.endereco,
+      timestamp: new Date().toISOString()
     });
 
+    res.json(responseData);
+
   } catch (error) {
+    console.log('[DEBUG Backend] calcularFrete erro:', {
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    });
     logControllerError('calcular_frete_error', error, req);
     res.status(500).json({ erro: "Erro interno do servidor" });
   }
@@ -281,14 +303,14 @@ const calcularFrete = async (req, res) => {
 const getCepEmpresaPadrao = (empresaId) => {
   // Mapeamento de empresas para CEPs padrão (em produção, cada empresa teria endereço real)
   const cepPorEmpresa = {
-    1: '01000000', // São Paulo - Empresa ABC Ltda
+    1: '60000000', // Fortaleza - Empresa ABC Ltda
     2: '20000000', // Rio de Janeiro - Tech Solutions S.A.
     3: '30000000', // Belo Horizonte - Comércio Geral Ltda
     4: '40000000', // Salvador - Indústria XYZ Ltda
     5: '80000000', // Curitiba - Serviços Digitais Ltda
   };
 
-  return cepPorEmpresa[empresaId] || '01000000'; // CEP padrão de São Paulo
+  return cepPorEmpresa[empresaId] || '60000000'; // CEP padrão de Fortaleza
 };
 
 // Função auxiliar para calcular prazo baseado na distância

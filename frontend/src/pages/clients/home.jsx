@@ -145,33 +145,46 @@ function Home() {
   };
 
   useEffect(() => {
+    console.log('[Home] Carousel effect triggered');
     const container = carouselRef.current;
     if (container) {
+      console.log('[Home] Adding scroll listener to carousel');
       container.addEventListener('scroll', updateCurrentSlide);
-      return () => container.removeEventListener('scroll', updateCurrentSlide);
+      return () => {
+        console.log('[Home] Removing scroll listener from carousel');
+        container.removeEventListener('scroll', updateCurrentSlide);
+      };
     }
   }, []);
 
   useEffect(() => {
+    console.log('[Home] Carousel interval effect triggered');
     const interval = setInterval(() => {
+      console.log('[Home] Carousel interval tick');
       if (carouselRef.current) {
         const container = carouselRef.current;
         const slideWidth = container.clientWidth;
         const maxScroll = container.scrollWidth - container.clientWidth;
 
         if (container.scrollLeft >= maxScroll - slideWidth / 2) {
+          console.log('[Home] Carousel going back to first slide');
           // Go back to first slide
           container.scrollTo({ left: 0, behavior: 'smooth' });
         } else {
+          console.log('[Home] Carousel scrolling to next slide');
           // Scroll to next slide
           container.scrollBy({ left: slideWidth, behavior: 'smooth' });
         }
       }
     }, 5000);
-    return () => clearInterval(interval);
+    return () => {
+      console.log('[Home] Clearing carousel interval');
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
+    console.log('[Home] Initial load effect triggered');
     carregarProdutos();
     carregarFavoritos();
   }, []);
@@ -181,9 +194,11 @@ function Home() {
   }, [debouncedQuery, selectedFilters, sortBy]);
 
   const carregarProdutos = async () => {
+    console.log('[Home] carregarProdutos called');
     const cacheKey = 'home_products';
     const cachedProducts = apiCache.get(cacheKey);
     if (cachedProducts) {
+      console.log('[Home] Using cached products:', cachedProducts.length);
       setProducts(cachedProducts);
       setLoading(false);
       log.info('home_products_cache_hit', { total: cachedProducts.length });
@@ -191,9 +206,11 @@ function Home() {
     }
 
     try {
+      console.log('[Home] Fetching products from API');
       setLoading(true);
       log.info('home_products_fetch_start');
       const response = await produtoService.listar({ status: 'ativo' });
+      console.log('[Home] Products API response:', response);
 
       // Robustly extract the products array from various possible response formats
       let produtosArray = [];
@@ -258,9 +275,11 @@ function Home() {
   };
 
   const carregarFavoritos = async () => {
+    console.log('[Home] carregarFavoritos called');
     const cacheKey = 'home_favorites';
     const cachedFavorites = apiCache.get(cacheKey);
     if (cachedFavorites) {
+      console.log('[Home] Using cached favorites:', cachedFavorites.length);
       setFavorites(cachedFavorites);
       setFavoritesLoading(false);
       log.info('home_favorites_cache_hit', { total: cachedFavorites.length });
@@ -268,12 +287,16 @@ function Home() {
     }
 
     try {
+      console.log('[Home] Fetching favorites from API');
       setFavoritesLoading(true);
       const response = await favoritoService.listar();
+      console.log('[Home] Favorites API response:', response);
       const favoritesData = response.favoritos || [];
+      console.log('[Home] Setting favorites:', favoritesData.length);
       setFavorites(favoritesData);
       apiCache.set(cacheKey, favoritesData, 2 * 60 * 1000);
     } catch (error) {
+      console.error('[Home] Error loading favorites:', error);
       log.error('home_favorites_fetch_error', { error: error.message });
       setFavorites([]);
     } finally {
