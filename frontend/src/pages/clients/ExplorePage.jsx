@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { categoriaService, produtoService, favoritoService } from '../../services/api';
 import { log } from '../../utils/logger';
 import { useCart } from '../../context/CartContext.jsx';
@@ -68,6 +68,8 @@ function ExplorePage() {
   const [searchTimeout, setSearchTimeout] = useState(null);
   const [productModalId, setProductModalId] = useState(null);
   const [showProductModal, setShowProductModal] = useState(false);
+  const location = useLocation();
+  const [globalFilters, setGlobalFilters] = useState({ discount: false, freeShipping: false });
 
   // Logo configuration
   const logoConfig = {
@@ -158,6 +160,16 @@ function ExplorePage() {
       }
     }
   }, [selectedCategory, searchParams]);
+
+  // Read global filters for /products
+  useEffect(() => {
+    if (location.pathname === '/products') {
+      const discount = searchParams.get('discount') === 'true';
+      const freeShipping = searchParams.get('freeShipping') === 'true';
+      setGlobalFilters({ discount, freeShipping });
+      fetchProductsWithGlobalFilters();
+    }
+  }, [location.pathname, searchParams]);
 
   // Aplicar filtros e ordenação quando produtos mudam
   useEffect(() => {
@@ -445,6 +457,67 @@ function ExplorePage() {
     }
   };
 
+  const fetchProductsWithGlobalFilters = async () => {
+    setLoadingProducts(true);
+
+    try {
+      log.info('explore_global_products_fetch_start');
+
+      const filtros = {
+        status: 'ativo',
+      };
+
+      const response = await produtoService.listar(filtros);
+
+      let produtosMapeados = (response.produtos || response).map(produto => {
+        let rating = 0;
+        let reviewCount = 0;
+        if (produto.avaliacoes && produto.avaliacoes.length > 0) {
+          const somaNotas = produto.avaliacoes.reduce((acc, av) => acc + av.Nota, 0);
+          rating = somaNotas / produto.avaliacoes.length;
+          reviewCount = produto.avaliacoes.length;
+        }
+
+        return {
+          id: produto.ProdutoID || produto.id,
+          name: produto.Nome || produto.name,
+          price: produto.Preco || produto.price,
+          originalPrice: produto.PrecoOriginal || produto.originalPrice,
+          image: buildImageUrl(produto.Imagens && produto.Imagens[0]) || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?q=80&w=400&auto=format&fit=crop',
+          images: (produto.Imagens || []).map(img => buildImageUrl(img)),
+          rating: rating || 0,
+          reviewCount: reviewCount,
+          sales: reviewCount * 10 + Math.floor(Math.random() * 100),
+          category: produto.categoria?.Nome || produto.category || 'Geral',
+          freeShipping: produto.FreteGratis || produto.freeShipping || false,
+          discount: produto.Desconto || produto.discount || 0,
+          breveDescricao: produto.BreveDescricao || produto.breveDescricao || '',
+          vendedorNome: produto.vendedor?.Nome || null,
+          empresaNome: produto.empresa?.Nome || null,
+          estoque: produto.Estoque || 0
+        };
+      });
+
+      // Apply global filters
+      if (globalFilters.discount) {
+        produtosMapeados = produtosMapeados.filter(p => p.discount > 0);
+      }
+      if (globalFilters.freeShipping) {
+        produtosMapeados = produtosMapeados.filter(p => p.freeShipping);
+      }
+
+      setProducts(produtosMapeados);
+      setFilteredProducts(produtosMapeados);
+      log.info('explore_global_products_fetch_success', { total: produtosMapeados.length });
+    } catch (error) {
+      log.error('explore_global_products_fetch_error', { error: error.message });
+      setProducts([]);
+      setFilteredProducts([]);
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
   const handleBackToCategories = () => {
     setSelectedCategory(null);
     setProducts([]);
@@ -457,7 +530,7 @@ function ExplorePage() {
 
   // Função para logout
   const handleLogout = () => {
-    if (window.confirm('Deseja realmente sair?')) {
+    if (window.confirm('Tem certeza que deseja sair da conta?')) {
       logout();
       navigate('/login');
     }
@@ -472,6 +545,10 @@ function ExplorePage() {
     if (priceMax) params.set('precoMax', priceMax);
     if (stockMin) params.set('estoqueMin', stockMin);
     if (stockMax) params.set('estoqueMax', stockMax);
+    if (location.pathname === '/products') {
+      if (globalFilters.discount) params.set('discount', 'true');
+      if (globalFilters.freeShipping) params.set('freeShipping', 'true');
+    }
     setSearchParams(params);
   };
 
@@ -703,21 +780,31 @@ function ExplorePage() {
         <main className="flex-1 bg-slate-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {/* Breadcrumb */}
-            {selectedCategory && (
+            {(selectedCategory || location.pathname === '/products') && (
               <div className="mb-6">
-                <button
-                  onClick={handleBackToCategories}
-                  className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4"
-                >
-                  <FaArrowLeft />
-                  <span>Voltar</span>
-                </button>
-                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{selectedCategory.name}</h1>
-                <p className="text-slate-600 mt-1">{selectedCategory.description}</p>
+                {selectedCategory ? (
+                  <button
+                    onClick={handleBackToCategories}
+                    className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4"
+                  >
+                    <FaArrowLeft />
+                    <span>Voltar</span>
+                  </button>
+                ) : (
+                  <Link
+                    to="/home"
+                    className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4"
+                  >
+                    <FaArrowLeft />
+                    <span>Voltar para home</span>
+                  </Link>
+                )}
+                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{selectedCategory ? selectedCategory.name : 'Produtos'}</h1>
+                <p className="text-slate-600 mt-1">{selectedCategory ? selectedCategory.description : 'Explore todos os produtos disponíveis'}</p>
               </div>
             )}
 
-            {!selectedCategory ? (
+            {!selectedCategory && location.pathname !== '/products' ? (
               /* Grid de Categorias */
               <>
                 <div className="mb-8">
@@ -769,7 +856,7 @@ function ExplorePage() {
                   <LoadingSkeleton type="product-grid" />
                 ) : (
                   <>
-                    {/* Barra de busca e filtros para categoria */}
+                    {/* Barra de busca e filtros para categoria ou produtos globais */}
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
                       <div className="flex flex-col lg:flex-row gap-4">
                         {/* Barra de busca */}
@@ -778,7 +865,7 @@ function ExplorePage() {
                             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                             <input
                               type="search"
-                              placeholder={`Buscar em ${selectedCategory.name}...`}
+                              placeholder={`Buscar em ${selectedCategory ? selectedCategory.name : 'todos os produtos'}...`}
                               value={categorySearchQuery}
                               onChange={(e) => handleSearchChange(e.target.value)}
                               className="w-full pl-10 pr-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"

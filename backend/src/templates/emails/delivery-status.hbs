@@ -1,64 +1,320 @@
-<div style="text-align: center; margin-bottom: 30px;">
-  <div style="font-size: 48px; margin-bottom: 15px;">
-    {{#if isDelivered}}✅{{else}}📦{{/if}}
-  </div>
+<style type="text/css">
+  /* Email-specific styles */
+  body, table, td, p, a, li, blockquote {
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+  }
+  table, td {
+    mso-table-lspace: 0pt;
+    mso-table-rspace: 0pt;
+  }
+  img {
+    -ms-interpolation-mode: bicubic;
+    border: 0;
+    height: auto;
+    line-height: 100%;
+    outline: none;
+    text-decoration: none;
+  }
+
+  /* Base styles */
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: linear-gradient(135deg, #F8FAFC 0%, #E2E8F0 100%) !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Roboto', 'Helvetica Neue', Arial, sans-serif !important;
+    font-size: 16px !important;
+    line-height: 1.6 !important;
+    color: #1E293B !important;
+  }
+
+  /* Email wrapper */
+  .email-wrapper {
+    width: 100% !important;
+    background: linear-gradient(135deg, #F8FAFC 0%, #E2E8F0 100%) !important;
+    padding: 32px 0 !important;
+  }
+
+  /* Main container */
+  .email-container {
+    max-width: 600px !important;
+    margin: 0 auto !important;
+    background-color: #FFFFFF !important;
+    border-radius: 12px !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+    overflow: hidden !important;
+    border: 1px solid rgba(226, 232, 240, 0.8) !important;
+  }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%) !important;
+    padding: 40px 32px !important;
+    text-align: center !important;
+  }
+
+  .logo {
+    font-size: 36px !important;
+    font-weight: 700 !important;
+    color: #FFFFFF !important;
+    margin: 0 !important;
+    letter-spacing: -0.025em !important;
+  }
+
+  .title {
+    font-size: 28px !important;
+    font-weight: 600 !important;
+    color: #FFFFFF !important;
+    margin: 16px 0 0 0 !important;
+    letter-spacing: -0.025em !important;
+  }
+
+  /* Content */
+  .content {
+    padding: 48px 32px !important;
+  }
+
+  .content h1 {
+    font-size: 28px !important;
+    font-weight: 700 !important;
+    color: #1E293B !important;
+    margin: 0 0 24px 0 !important;
+    letter-spacing: -0.025em !important;
+    line-height: 1.2 !important;
+  }
+
+  .content h2 {
+    font-size: 20px !important;
+    font-weight: 600 !important;
+    color: #334155 !important;
+    margin: 32px 0 16px 0 !important;
+    letter-spacing: -0.025em !important;
+  }
+
+  .content p {
+    font-size: 16px !important;
+    line-height: 1.7 !important;
+    color: #64748B !important;
+    margin: 0 0 20px 0 !important;
+  }
+
+  .content strong {
+    color: #1E293B !important;
+    font-weight: 600 !important;
+  }
+
+  /* Button */
+  .button {
+    display: inline-block !important;
+    background: linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%) !important;
+    color: #FFFFFF !important;
+    padding: 16px 32px !important;
+    text-decoration: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    font-size: 16px !important;
+    margin: 24px 0 !important;
+    box-shadow: 0 4px 14px 0 rgba(79, 70, 229, 0.25) !important;
+    min-height: 44px !important;
+    line-height: 1.2 !important;
+  }
+
+  /* Order details */
+  .order-details {
+    background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%) !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 12px !important;
+    padding: 24px !important;
+    margin: 24px 0 !important;
+  }
+
+  .order-details h3 {
+    margin: 0 0 16px 0 !important;
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    color: #1E293B !important;
+  }
+
+  .order-details p {
+    margin: 10px 0 !important;
+    font-size: 15px !important;
+    color: #64748B !important;
+    line-height: 1.6 !important;
+  }
+
+  .order-details strong {
+    color: #1E293B !important;
+    font-weight: 600 !important;
+  }
+
+  /* Footer */
+  .footer {
+    background: linear-gradient(135deg, #1E293B 0%, #334155 100%) !important;
+    padding: 48px 32px !important;
+    text-align: center !important;
+    color: #FFFFFF !important;
+  }
+
+  .footer h4 {
+    font-size: 20px !important;
+    font-weight: 700 !important;
+    margin: 0 0 20px 0 !important;
+    color: #FFFFFF !important;
+  }
+
+  .footer p {
+    font-size: 15px !important;
+    line-height: 1.6 !important;
+    margin: 0 0 12px 0 !important;
+    color: #CBD5E1 !important;
+  }
+
+  /* Mobile responsive */
+  @media only screen and (max-width: 600px) {
+    .email-wrapper {
+      padding: 16px 0 !important;
+    }
+
+    .email-container {
+      margin: 0 16px !important;
+      border-radius: 8px !important;
+    }
+
+    .header {
+      padding: 32px 24px !important;
+    }
+
+    .logo {
+      font-size: 32px !important;
+    }
+
+    .title {
+      font-size: 24px !important;
+    }
+
+    .content {
+      padding: 32px 24px !important;
+    }
+
+    .content h1 {
+      font-size: 24px !important;
+    }
+
+    .button {
+      display: block !important;
+      width: 100% !important;
+      text-align: center !important;
+      padding: 18px 24px !important;
+    }
+
+    .footer {
+      padding: 32px 24px !important;
+    }
+
+    .footer h4 {
+      font-size: 18px !important;
+    }
+  }
+</style>
+
+<!-- Hero Section -->
+<div style="text-align: center; padding: 30px 20px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 12px; margin-bottom: 30px;">
+  <div style="font-size: 48px; margin: 0 0 20px 0; display: block;">🚚</div>
+  <h1 style="font-size: 28px; font-weight: 700; color: #2c3e50; margin: 0 0 15px 0; line-height: 1.2;">Atualização de Entrega</h1>
+  <p style="font-size: 16px; color: #666666; margin: 0; font-style: italic;">Seu pedido está a caminho!</p>
 </div>
 
-<h1>Atualização do seu pedido</h1>
+<!-- Status Bar -->
+{{> statusBar currentStatus=currentStatus statusLabels=(array "Pedido Confirmado" "Pagamento Aprovado" "A Caminho" "Entregue")}}
 
-<p>Olá, <strong>{{clienteNome}}</strong>!</p>
-
-<p>Temos uma atualização importante sobre seu pedido. Confira os detalhes abaixo:</p>
-
-<div class="order-details">
-  <h3>📋 Detalhes do Pedido</h3>
-  <p><strong>Pedido:</strong> #{{pedidoId}}</p>
-  <p><strong>Status Atual:</strong> <span style="color: #1E90FF; font-weight: 600;">{{status}}</span></p>
-  
+<!-- Order Details -->
+<div style="background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%); border: 1px solid #E2E8F0; border-radius: 12px; padding: 24px; margin: 24px 0;">
+  <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #1E293B;">Detalhes do Pedido</h3>
+  <p style="margin: 10px 0; font-size: 15px; color: #64748B; line-height: 1.6;"><strong style="color: #1E293B; font-weight: 600;">Número do Pedido:</strong> #{{pedidoId}}</p>
+  <p style="margin: 10px 0; font-size: 15px; color: #64748B; line-height: 1.6;"><strong style="color: #1E293B; font-weight: 600;">Status Atual:</strong> {{status}}</p>
   {{#if codigoRastreio}}
-  <p><strong>Código de Rastreio:</strong> {{codigoRastreio}}</p>
+  <p style="margin: 10px 0; font-size: 15px; color: #64748B; line-height: 1.6;"><strong style="color: #1E293B; font-weight: 600;">Código de Rastreio:</strong> {{codigoRastreio}}</p>
   {{/if}}
-  
   {{#if previsaoEntrega}}
-  <p><strong>Previsão de Entrega:</strong> {{previsaoEntrega}}</p>
+  <p style="margin: 10px 0; font-size: 15px; color: #64748B; line-height: 1.6;"><strong style="color: #1E293B; font-weight: 600;">Previsão de Entrega:</strong> {{previsaoEntrega}}</p>
   {{/if}}
-  
   {{#if local}}
-  <p><strong>Localização Atual:</strong> {{local}}</p>
+  <p style="margin: 10px 0; font-size: 15px; color: #64748B; line-height: 1.6;"><strong style="color: #1E293B; font-weight: 600;">Localização:</strong> {{local}}</p>
   {{/if}}
-  
-  <p><strong>Última Atualização:</strong> {{dataAtualizacao}}</p>
+  <p style="margin: 10px 0; font-size: 15px; color: #64748B; line-height: 1.6;"><strong style="color: #1E293B; font-weight: 600;">Data da Atualização:</strong> {{dataAtualizacao}}</p>
 </div>
 
-{{#if showTrackingButton}}
-<div style="text-align: center; margin: 40px 0;">
-  <a href="{{frontendUrl}}/entregas/{{pedidoId}}" class="button">RASTREAR PEDIDO</a>
+<!-- Products Section -->
+<div style="margin: 30px 0;">
+  <h2 style="font-size: 20px; font-weight: 700; color: #2c3e50; margin: 0 0 20px 0; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 3px solid #1E90FF; padding-bottom: 10px;">Produtos do Pedido</h2>
+
+  {{#each produtos}}
+    {{> productItem produto=.}}
+  {{/each}}
 </div>
-{{/if}}
+
+<!-- Delivery Address -->
+<div style="background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%); border: 1px solid #E2E8F0; border-radius: 12px; padding: 24px; margin: 24px 0;">
+  <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #1E293B;">Endereço de Entrega</h3>
+  <p style="margin: 10px 0; font-size: 15px; color: #64748B; line-height: 1.6;"><strong style="color: #1E293B; font-weight: 600;">Destinatário:</strong> {{clienteNome}}</p>
+  <p style="margin: 10px 0; font-size: 15px; color: #64748B; line-height: 1.6;"><strong style="color: #1E293B; font-weight: 600;">Endereço:</strong><br>
+    {{#if enderecoEntrega.rua}}
+      {{enderecoEntrega.rua}}{{#if enderecoEntrega.numero}}, {{enderecoEntrega.numero}}{{/if}}
+      {{#if enderecoEntrega.bairro}}<br>{{enderecoEntrega.bairro}}{{/if}}
+      {{#if enderecoEntrega.cidade}}<br>{{enderecoEntrega.cidade}}{{/if}}
+      {{#if enderecoEntrega.cep}}<br>CEP: {{enderecoEntrega.cep}}{{/if}}
+    {{else}}
+      {{enderecoEntrega}}
+    {{/if}}
+  </p>
+</div>
+
+<!-- Order Summary -->
+<div style="background-color: #ffffff; border: 2px solid #e9ecef; border-radius: 8px; overflow: hidden; margin: 20px 0;">
+  <table style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 12px 20px; border-bottom: 1px solid #f1f3f4; font-size: 15px; font-weight: 600; color: #34495e; text-align: right;">Subtotal:</td>
+      <td style="padding: 12px 20px; border-bottom: 1px solid #f1f3f4; font-size: 15px; font-weight: 600; color: #2c3e50; text-align: right; width: 120px;">R$ {{subtotal}}</td>
+    </tr>
+    <tr>
+      <td style="padding: 12px 20px; border-bottom: 1px solid #f1f3f4; font-size: 15px; font-weight: 600; color: #34495e; text-align: right;">Frete:</td>
+      <td style="padding: 12px 20px; border-bottom: 1px solid #f1f3f4; font-size: 15px; font-weight: 600; color: #2c3e50; text-align: right; width: 120px;">R$ {{frete}}</td>
+    </tr>
+    <tr style="background-color: #fff5f5; border-top: 2px solid #e53e3e;">
+      <td style="padding: 12px 20px; font-size: 18px; font-weight: 700; color: #e53e3e; text-align: right;">Total do Pedido:</td>
+      <td style="padding: 12px 20px; font-size: 18px; font-weight: 700; color: #e53e3e; text-align: right; width: 120px;">R$ {{total}}</td>
+    </tr>
+  </table>
+</div>
+
+<!-- Message -->
+<p style="margin: 30px 0 20px 0; font-size: 16px; line-height: 1.6; color: #555555;">
+  Olá <strong style="color: #1E293B; font-weight: 600;">{{clienteNome}}</strong>! Temos uma atualização sobre seu pedido na HelpNet.
+</p>
 
 {{#if isDelivered}}
-<div class="summary-box" style="background-color: #e8f5e8; border-color: #4caf50;">
-  <h3 style="color: #2e7d32;">🎉 Pedido Entregue com Sucesso!</h3>
-  <p>Seu pedido foi entregue com sucesso! Esperamos que tenha gostado dos produtos.</p>
-  <p><strong>O que fazer agora:</strong></p>
-  <ul style="margin: 10px 0; padding-left: 20px;">
-    <li>Confira se todos os itens estão corretos</li>
-    <li>Avalie os produtos e vendedores</li>
-    <li>Compartilhe sua experiência conosco</li>
-  </ul>
-</div>
-
-<div style="text-align: center; margin: 30px 0;">
-  <a href="{{frontendUrl}}/meus-pedidos/{{pedidoId}}/avaliar" class="button" style="background-color: #4caf50;">AVALIAR PRODUTOS</a>
-</div>
+<p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; color: #555555;">
+  Seu pedido foi entregue com sucesso! Esperamos que tenha gostado dos produtos. Conte-nos sua experiência avaliando os produtos em seu pedido.
+</p>
 {{else}}
-<div class="summary-box">
-  <h3>📱 Acompanhe seu pedido</h3>
-  <p>Mantenha-se atualizado sobre o status do seu pedido através do nosso sistema de rastreamento em tempo real.</p>
-  <p>Você receberá notificações automáticas a cada mudança de status.</p>
-</div>
+<p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; color: #555555;">
+  {{#if codigoRastreio}}
+  Você pode acompanhar o rastreamento em tempo real através do código fornecido acima.
+  {{else}}
+  Estamos processando seu pedido e enviaremos mais atualizações em breve.
+  {{/if}}
+</p>
 {{/if}}
 
-<p>Se tiver alguma dúvida sobre sua entrega, nossa equipe de suporte está disponível 24/7 para ajudá-lo.</p>
+<p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #666666;">
+  Em caso de dúvidas, nossa equipe está sempre disponível para ajudar.
+</p>
 
-<p><strong>Equipe HelpNet</strong></p>
+<div style="text-align: center; margin: 40px 0;">
+  <a href="{{frontendUrl}}/entregas/{{pedidoId}}" style="display: inline-block; background: linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%); color: #FFFFFF; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 24px 0; box-shadow: 0 4px 14px 0 rgba(79, 70, 229, 0.25); min-height: 44px; line-height: 1.2;">ACOMPANHAR ENTREGA</a>
+</div>
+
+<p style="margin: 20px 0 0 0; font-size: 16px; font-weight: 600; color: #2c3e50;">
+  Atenciosamente,<br>
+  <span style="color: #1E90FF;">Equipe HelpNet</span>
+</p>

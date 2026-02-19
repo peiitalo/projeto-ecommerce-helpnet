@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../hooks/useNotifications';
 import LazyImage from './LazyImage';
 import {
@@ -13,41 +14,14 @@ import {
   FaPercent,
   FaCheck,
   FaRegHeart,
-  FaEye
+  FaEye,
+  FaImage
 } from 'react-icons/fa';
-import {
-  FiChevronLeft,
-  FiChevronRight
-} from 'react-icons/fi';
 
-function ProductCarousel({ title, products, loading, favorites = [], favoriteLoading = null, onToggleFavorite, setProductModalId, setShowProductModal }) {
-  const [activeIndex, setActiveIndex] = useState(0);
+function ProductCarousel({ title, products, loading, favorites = [], favoriteLoading = null, onToggleFavorite, setProductModalId, setShowProductModal, onRequireAuth }) {
   const { addItem, removeItem, items } = useCart();
+  const { user } = useAuth();
   const { showSuccess, showWarning } = useNotifications();
-
-  const getItemsPerView = () => {
-    if (typeof window !== 'undefined') {
-      if (window.innerWidth >= 1024) return 4;
-      if (window.innerWidth >= 768) return 3;
-      if (window.innerWidth >= 640) return 2;
-      return 2;
-    }
-    return 4;
-  };
-
-  const [itemsPerView, setItemsPerView] = useState(getItemsPerView());
-
-  useEffect(() => {
-    const handleResize = () => {
-      setItemsPerView(getItemsPerView());
-      setActiveIndex(0);
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const maxIndex = Math.max(0, Math.ceil(products.length / itemsPerView) - 1);
 
   const renderStars = (rating) => {
     const stars = [];
@@ -63,6 +37,13 @@ function ProductCarousel({ title, products, loading, favorites = [], favoriteLoa
   const formatPrice = (n) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   const handleAddToCart = (product) => {
+    console.log('[ProductCarousel] Add to cart clicked for product:', product.id);
+    if (!user) {
+      console.log('[ProductCarousel] User not logged in, showing auth modal');
+      onRequireAuth && onRequireAuth();
+      return;
+    }
+    console.log('[ProductCarousel] User logged in, adding to cart');
     addItem(product, 1);
     showSuccess(`${product.name} adicionado ao carrinho!`);
   };
@@ -99,45 +80,36 @@ function ProductCarousel({ title, products, loading, favorites = [], favoriteLoa
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-bold text-slate-900">{title}</h3>
-        {products.length > itemsPerView && (
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setActiveIndex(Math.max(0, activeIndex - 1))}
-              disabled={activeIndex === 0}
-              className="p-1.5 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <FiChevronLeft className="text-sm" />
-            </button>
-            <button
-              onClick={() => setActiveIndex(Math.min(maxIndex, activeIndex + 1))}
-              disabled={activeIndex === maxIndex}
-              className="p-1.5 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <FiChevronRight className="text-sm" />
-            </button>
-          </div>
-        )}
-      </div>
+      <h3 className="text-lg font-bold text-slate-900 mb-4">{title}</h3>
 
-      <div className="overflow-hidden">
-        <div className="flex gap-3 transition-transform duration-300 ease-in-out">
-          {products.map((product, index) => (
+      <div className="overflow-x-auto scrollbar-hide">
+        <div className="flex gap-3 pb-2">
+          {products.map((product) => (
             <div
               key={product.id}
               className="flex-shrink-0 bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 w-48"
-              style={{
-                transform: `translateX(-${activeIndex * (192 + 12)}px)`
-              }}
             >
-              <Link to={`/produto/${product.id}`} className="relative aspect-square overflow-hidden block">
-                <LazyImage
-                  src={product.image || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?q=80&w=400&auto=format&fit=crop'}
-                  alt={product.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  fallback="https://images.unsplash.com/photo-1560472354-b33ff0c44a43?q=80&w=400&auto=format&fit=crop"
-                />
+              {/* Container principal do produto - SEMPRE navega para a página */}
+              <Link 
+                to={`/produto/${product.id}`} 
+                className="relative aspect-square overflow-hidden block cursor-pointer"
+                onClick={() => console.log('[ProductCarousel] Product link clicked:', product.id)}
+              >
+                {product.images && product.images.length > 0 ? (
+                  <LazyImage
+                    src={product.image}
+                    alt={product.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    fallback="/placeholder-image.svg"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-slate-100 flex items-center justify-center">
+                    <div className="text-center text-slate-500">
+                      <FaImage className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">Sem imagem</p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="absolute top-2 left-2 flex flex-col gap-1">
                   {product.discount > 0 && (
@@ -154,15 +126,18 @@ function ProductCarousel({ title, products, loading, favorites = [], favoriteLoa
                   )}
                 </div>
 
+                {/* Botão de visualização rápida - APENAS abre o modal */}
                 <button
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
+                    console.log('[ProductCarousel] Quick view button clicked for product:', product.id);
                     setProductModalId && setProductModalId(product.id);
                     setShowProductModal && setShowProductModal(true);
                   }}
-                  className="absolute top-2 right-12 p-1.5 rounded-full bg-white/90 hover:bg-white shadow-sm hover:shadow-md transition-all text-slate-700 hover:text-blue-600"
+                  className="absolute top-2 right-12 p-1.5 rounded-full bg-white/90 hover:bg-white shadow-sm hover:shadow-md transition-all text-slate-700 hover:text-blue-600 z-10"
                   aria-label="Ver detalhes do produto"
+                  title="Visualização rápida"
                 >
                   <FaEye className="text-xs" />
                 </button>
@@ -172,10 +147,17 @@ function ProductCarousel({ title, products, loading, favorites = [], favoriteLoa
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
+                      console.log('[ProductCarousel] Favorite button clicked for product:', product.id);
+                      if (!user) {
+                        console.log('[ProductCarousel] User not logged in for favorite, showing auth modal');
+                        onRequireAuth && onRequireAuth();
+                        return;
+                      }
+                      console.log('[ProductCarousel] User logged in for favorite, toggling');
                       onToggleFavorite(product.id);
                     }}
                     disabled={favoriteLoading === product.id}
-                    className={`absolute top-2 right-2 p-1.5 rounded-full bg-white/90 hover:bg-white shadow-sm hover:shadow-md transition-all ${
+                    className={`absolute top-2 right-2 p-1.5 rounded-full bg-white/90 hover:bg-white shadow-sm hover:shadow-md transition-all z-10 ${
                       isFavorite(product.id) ? 'text-red-500' : 'text-slate-700'
                     } ${favoriteLoading === product.id ? 'opacity-50 cursor-not-allowed' : ''}`}
                     aria-label={isFavorite(product.id) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
@@ -187,7 +169,11 @@ function ProductCarousel({ title, products, loading, favorites = [], favoriteLoa
 
               <div className="p-3">
                 <Link to={`/produto/${product.id}`}>
-                  <h4 className="font-medium text-slate-900 text-sm leading-tight mb-2 line-clamp-2 min-h-[2.5rem] flex-shrink-0 hover:text-blue-700 transition-colors">
+                  <h4 
+                    className="font-medium text-slate-900 text-sm leading-tight mb-2 line-clamp-2 min-h-[2.5rem] flex-shrink-0 hover:text-blue-700 transition-colors cursor-pointer"
+                    title="Clique para ver detalhes completos"
+                    onClick={() => console.log('[ProductCarousel] Product name clicked:', product.id)}
+                  >
                     {product.name}
                   </h4>
                 </Link>
@@ -227,20 +213,6 @@ function ProductCarousel({ title, products, loading, favorites = [], favoriteLoa
           ))}
         </div>
       </div>
-
-      {products.length > itemsPerView && (
-        <div className="flex justify-center gap-1 mt-4">
-          {Array.from({ length: maxIndex + 1 }, (_, i) => (
-            <button
-              key={i}
-              onClick={() => setActiveIndex(i)}
-              className={`h-1.5 rounded-full transition-all ${
-                i === activeIndex ? 'w-4 bg-blue-600' : 'w-1.5 bg-slate-300 hover:bg-slate-400'
-              }`}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }

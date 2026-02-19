@@ -262,6 +262,24 @@ export function calcularFrete(cepVendedor, cepCliente) {
       opcoes: opcoesFrete.length
     });
 
+    // Garantir que sempre retornamos pelo menos uma opção
+    if (opcoesFrete.length === 0) {
+      logger.warn('nenhuma_opcao_frete_calculada_retornando_padrao', {
+        cepVendedor,
+        cepCliente,
+        distanciaKm
+      });
+      return [{
+        id: 'padrao',
+        nome: 'Frete Padrão',
+        transportadora: 'Correios',
+        valor: FREIGHT_CONFIG.FRETE_BASE,
+        prazo: '3-5 dias úteis',
+        descricao: 'Entrega padrão',
+        ativo: true
+      }];
+    }
+
     return opcoesFrete;
   } catch (error) {
     logger.error('erro_calculo_frete', {

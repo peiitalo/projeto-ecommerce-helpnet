@@ -295,6 +295,10 @@ export const login = async (req, res) => {
     const onlyDigits = (s) => s.replace(/\D+/g, '');
     const idDigits = onlyDigits(identifierRaw);
 
+    // Debug logs
+    const searchType = identifierRaw.includes('@') ? 'email' : idDigits.length === 11 ? 'cpf_telefone' : idDigits.length === 14 ? 'cnpj' : idDigits.length === 10 ? 'telefone' : 'desconhecido';
+    logger.info('login_debug_identifier', { identifier: identifierRaw, searchType });
+
     const maskCPF = (d) => `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9,11)}`;
     const maskCNPJ = (d) => `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12,14)}`;
     const maskPhone10 = (d) => `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6,10)}`;
@@ -346,9 +350,11 @@ export const login = async (req, res) => {
       });
     }
 
+    logger.info('login_debug_cliente_encontrado', { encontrado: !!cliente, clienteId: cliente?.ClienteID });
     if (!cliente) return res.status(401).json({ success: false, errors: ["Credenciais inválidas"] });
 
     const senhaValida = await cryptoService.comparePassword(senha, cliente.SenhaHash);
+    logger.info('login_debug_senha_valida', { valida: senhaValida, clienteId: cliente.ClienteID });
     if (!senhaValida) return res.status(401).json({ success: false, errors: ["Email ou senha inválidos"] });
 
     // Determina role/tipo e informações de vendedor/empresa (se aplicável)
@@ -574,6 +580,48 @@ export const buscarPerfil = async (req, res) => {
     logControllerError('buscar_perfil_error', error, req);
     res.status(500).json({ success: false, errors: ["Erro interno do servidor"] });
   }
+};
+
+// Buscar avaliações do cliente
+export const buscarAvaliacoesCliente = async (req, res) => {
+ try {
+   const { user } = req;
+
+   const avaliacoes = await prisma.avaliacao.findMany({
+     where: { ClienteID: user.id },
+     orderBy: { CriadoEm: 'desc' },
+     include: {
+       produto: {
+         select: {
+           ProdutoID: true,
+           Nome: true,
+           Imagens: true
+         }
+       }
+     }
+   });
+
+   // Mapear para o formato esperado pelo frontend
+   const avaliacoesMapeadas = avaliacoes.map(avaliacao => ({
+     id: avaliacao.AvaliacaoID,
+     produto: {
+       id: avaliacao.produto?.ProdutoID || null,
+       nome: avaliacao.produto?.Nome || 'Produto não encontrado',
+       imagem: avaliacao.produto?.Imagens?.[0] || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?q=80&w=400&auto=format&fit=crop'
+     },
+     nota: avaliacao.Nota,
+     comentario: avaliacao.Comentario,
+     data: avaliacao.CriadoEm
+   }));
+
+   res.json({
+     success: true,
+     avaliacoes: avaliacoesMapeadas
+   });
+ } catch (error) {
+   logControllerError('buscar_avaliacoes_cliente_error', error, req);
+   res.status(500).json({ success: false, errors: ['Erro interno do servidor'] });
+ }
 };
 
 export const listarEnderecos = async (req, res) => {

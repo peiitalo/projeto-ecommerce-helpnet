@@ -239,11 +239,23 @@ export const atualizarStatusAvaliacao = async (req, res) => {
     const { id } = req.params;
     const { aprovado, exibirLanding } = req.body;
 
+    // First fetch the evaluation to get current data
+    const avaliacaoExistente = await prisma.sistemaAvaliacao.findUnique({
+      where: { AvaliacaoID: parseInt(id) }
+    });
+
+    if (!avaliacaoExistente) {
+      return res.status(404).json({
+        success: false,
+        errors: ["Avaliação não encontrada"]
+      });
+    }
+
     const avaliacao = await prisma.sistemaAvaliacao.update({
       where: { AvaliacaoID: parseInt(id) },
       data: {
         Aprovado: aprovado,
-        ExibirLanding: exibirLanding !== undefined ? exibirLanding : (aprovado && avaliacao.Estrelas >= 4)
+        ExibirLanding: exibirLanding !== undefined ? exibirLanding : (aprovado && avaliacaoExistente.Estrelas >= 4)
       }
     });
 

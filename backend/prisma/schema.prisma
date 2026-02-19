@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "postgres"
   url      = env("DATABASE_URL")
 }
 
@@ -19,6 +19,17 @@ enum PedidoStatusPagamento {
   EXPIRADO
 }
 
+enum TipoDesconto {
+  PERCENTUAL
+  VALOR_FIXO
+  FRETE_GRATIS
+}
+
+enum TipoDistribuicao {
+  PUBLICO
+  VENDEDOR_ESPECIFICO
+}
+
 model Administrador {
   AdminID     Int      @id @default(autoincrement())
   Nome        String
@@ -28,6 +39,8 @@ model Administrador {
   NivelAcesso Int      @default(1)
   Ativo       Boolean  @default(true)
   CriadoEm    DateTime @default(now())
+
+  mensagensSuporte MensagemSuporte[]
 
   @@map("Administrador")
 }
@@ -70,6 +83,9 @@ model Cliente {
   Notificacao        Notificacao[]
   clientesVendedor   ClienteVendedor[]
   resetTokens        PasswordResetToken[]
+  cuponsCliente      CupomCliente[]
+  mensagensSuporte   MensagemSuporte[]
+  avaliacoesPlataforma AvaliacaoPlataforma[]
 
   @@index([Email])
   @@index([DataCadastro])
@@ -167,16 +183,23 @@ model Pedido {
   TotalPago        Float                 @default(0)
   StatusPagamento  PedidoStatusPagamento @default(PENDENTE)
   ExpiraEm         DateTime?
+  // Campos para cupom
+  CupomID          Int?                  // ID do cupom aplicado
+  DescontoCupom    Float                 @default(0) // Valor do desconto aplicado
+  DescontoVista    Float                 @default(0) // Valor do desconto à vista
   itensPedido      ItensPedido[]
   pagamentosPedido PagamentosPedido[]
   distribuicoes    DistribuicaoPagamentoPedido[]
   cliente          Cliente               @relation(fields: [ClienteID], references: [ClienteID])
   Endereco         Endereco              @relation(fields: [EnderecoID], references: [EnderecoID])
   entregas         Entrega[]
+  cupom            Cupom?                @relation(fields: [CupomID], references: [CupomID])
+  cuponsCliente    CupomCliente[]        // Relação reversa para cupons usados neste pedido
 
   @@index([ClienteID])
   @@index([Status])
   @@index([StatusPagamento])
+  @@index([CupomID])
   @@map("Pedido")
 }
 
@@ -262,6 +285,10 @@ model Vendedor {
   notificacoes Notificacao[]
   clientesVendedor ClienteVendedor[]
   enderecosVendedor EnderecoVendedor[]
+  cupons       Cupom[]
+  // Parcerias
+  parceriasEnviadas   ParceriaVendedor[] @relation("ParceriaSolicitante")
+  parceriasRecebidas  ParceriaVendedor[] @relation("ParceriaConvidado")
 
   @@index([EmpresaID])
   @@index([Ativo])
@@ -407,4 +434,135 @@ model PasswordResetToken {
   @@index([Token])
   @@index([ExpiresAt])
   @@map("PasswordResetToken")
+}
+
+model Cupom {
+  CupomID           Int           @id @default(autoincrement())
+  // Campos básicos
+  Nome               String        // Nome do cupom (ex: "Desconto de Frete")
+  Codigo             String        @unique // Código único (ex: FRETE50)
+  Tipo               String        @default("publico") // "publico" ou "especifico"
+  DescontoTipo       String        // "porcentagem", "valor_fixo", "frete_gratis"
+  DescontoValor      Float         // Valor do desconto
+  DataInicio         DateTime      @default(now()) // Quando o cupom começa a valer
+  DataExpiracao      DateTime?     // Quando expira
+  LimiteUso          Int?          // Quantas vezes pode ser usado no total
+  UsoPorCliente      Int?          @default(1) // Quantas vezes cada cliente pode usar
+  Ativo              Boolean       @default(true) // Se está ativo
+  CriadoPor          Int           // ID do vendedor que criou
+  CriadoEm           DateTime      @default(now())
+
+  // Sistema de restrições (objeto JSON)
+  Restricoes         Json?         // Objeto com todas as restrições configuráveis
+
+  // Controle de uso
+  UsosAtuais         Int           @default(0) // Contador total de usos
+
+  // Relações
+  vendedor           Vendedor      @relation(fields: [CriadoPor], references: [VendedorID])
+  cuponsCliente      CupomCliente[]
+  pedidos            Pedido[]      // Pedidos que usaram este cupom
+
+  @@index([CriadoPor])
+  @@index([Ativo])
+  @@index([DataExpiracao])
+  @@index([Tipo])
+  @@map("Cupom")
+}
+
+model CupomCliente {
+  CupomClienteID Int      @id @default(autoincrement())
+  CupomID        Int
+  ClienteID      Int
+  // Controle de distribuição
+  RecebidoEm     DateTime @default(now()) // Quando o cliente recebeu o cupom
+  // Controle de resgate
+  Resgatado      Boolean  @default(false) // Se o cliente já resgatou o cupom
+  DataResgate    DateTime? // Quando o cliente resgatou
+  // Controle de uso
+  Usado          Boolean  @default(false) // Se já foi usado
+  DataUso        DateTime? // Quando foi usado
+  PedidoID       Int?     // Pedido onde foi usado
+  UsosCliente    Int      @default(0) // Contador de usos por cliente
+
+  cupom    Cupom   @relation(fields: [CupomID], references: [CupomID])
+  cliente  Cliente @relation(fields: [ClienteID], references: [ClienteID])
+  pedido   Pedido? @relation(fields: [PedidoID], references: [PedidoID])
+
+  @@unique([CupomID, ClienteID])
+  @@index([CupomID])
+  @@index([ClienteID])
+  @@index([PedidoID])
+  @@index([Resgatado])
+  @@index([Usado])
+  @@map("CupomCliente")
+}
+
+// Sistema de suporte e avaliações da plataforma
+model MensagemSuporte {
+  MensagemID    Int      @id @default(autoincrement())
+  ClienteID     Int
+  Tipo          String   // 'DUVIDA' ou 'COMENTARIO_PLATAFORMA'
+  Assunto       String
+  Mensagem      String
+  Status        String   @default("PENDENTE") // PENDENTE, RESPONDIDO, RESOLVIDO
+  Resposta      String?
+  RespondidoPor Int?     // AdminID que respondeu
+  RespondidoEm  DateTime?
+  CriadoEm      DateTime @default(now())
+
+  cliente       Cliente      @relation(fields: [ClienteID], references: [ClienteID])
+  admin         Administrador? @relation(fields: [RespondidoPor], references: [AdminID])
+
+  @@index([ClienteID])
+  @@index([Tipo])
+  @@index([Status])
+  @@index([CriadoEm])
+  @@map("MensagemSuporte")
+}
+
+model AvaliacaoPlataforma {
+  AvaliacaoID Int      @id @default(autoincrement())
+  ClienteID   Int
+  Nota        Int      // 1-5 estrelas
+  Comentario  String?
+  ExibirSite  Boolean  @default(false) // Se deve aparecer na landing page
+  CriadoEm    DateTime @default(now())
+
+  cliente     Cliente  @relation(fields: [ClienteID], references: [ClienteID])
+
+  @@index([ClienteID])
+  @@index([Nota])
+  @@index([ExibirSite])
+  @@index([CriadoEm])
+  @@map("AvaliacaoPlataforma")
+}
+
+enum StatusParceria {
+  PENDENTE
+  ATIVA
+  RECUSADA
+  ENCERRADA
+}
+
+model ParceriaVendedor {
+  ParceriaID         Int             @id @default(autoincrement())
+  SolicitanteID      Int             // Vendedor que enviou o convite
+  ConvidadoID        Int             // Vendedor que recebeu o convite
+  Status             StatusParceria  @default(PENDENTE)
+  PercentualSolicitante Float         // Percentual do solicitante (ex: 50.0 para 50%)
+  PercentualConvidado   Float         // Percentual do convidado (ex: 50.0 para 50%)
+  Mensagem           String?         // Mensagem opcional do convite
+  DataCriacao        DateTime        @default(now())
+  DataAceitacao      DateTime?
+  DataEncerramento   DateTime?
+
+  solicitante        Vendedor        @relation("ParceriaSolicitante", fields: [SolicitanteID], references: [VendedorID])
+  convidado          Vendedor        @relation("ParceriaConvidado", fields: [ConvidadoID], references: [VendedorID])
+
+  @@unique([SolicitanteID, ConvidadoID])
+  @@index([SolicitanteID])
+  @@index([ConvidadoID])
+  @@index([Status])
+  @@map("ParceriaVendedor")
 }

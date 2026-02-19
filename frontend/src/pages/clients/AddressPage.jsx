@@ -70,7 +70,6 @@ function AddressPage() {
     { label: 'Explore', to: '/explorer', icon: <FiSearch className="text-slate-500" /> },
     { label: 'Pedidos', to: '/meus-pedidos', icon: <FiPackage className="text-slate-500" /> },
     { label: 'Histórico', to: '/historico', icon: <FiClock className="text-slate-500" /> },
-    { label: 'Categorias', to: '/categorias', icon: <FiTag className="text-slate-500" /> },
     { label: 'Meus Cupons', to: '/cupons', icon: <FiCreditCard className="text-slate-500" /> },
     { label: 'Endereços', to: '/enderecos', icon: <FiMapPin className="text-slate-500" /> },
     { label: 'Suporte', to: '/suporte', icon: <FiHelpCircle className="text-slate-500" /> },
@@ -96,15 +95,11 @@ function AddressPage() {
   };
 
   const handleLogout = () => {
-    showWarning('Tem certeza que deseja sair da conta?', {
-      autoClose: false,
-      closeOnClick: false,
-      draggable: false,
-      onClose: () => {
-        logout();
-        window.location.href = '/login';
-      }
-    });
+    const confirmed = window.confirm('Tem certeza que deseja sair da conta?');
+    if (confirmed) {
+      logout();
+      window.location.href = '/login';
+    }
   };
 
   const handleAddAddress = () => {

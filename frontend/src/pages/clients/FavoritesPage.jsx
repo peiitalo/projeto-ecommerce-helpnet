@@ -34,7 +34,13 @@ function FavoritesPage() {
       log.info('favorites_fetch_success', { count: data.favoritos?.length || 0 });
     } catch (err) {
       log.error('favorites_fetch_error', { error: err?.message });
-      setError(err.message || 'Erro ao carregar favoritos');
+      // For unauthenticated users, show empty favorites instead of error
+      if (err.message?.includes('Sessão expirada') || err.message?.includes('401')) {
+        setFavorites([]);
+        log.info('favorites_fetch_unauthenticated', { showing_empty: true });
+      } else {
+        setError(err.message || 'Erro ao carregar favoritos');
+      }
     } finally {
       setLoading(false);
     }

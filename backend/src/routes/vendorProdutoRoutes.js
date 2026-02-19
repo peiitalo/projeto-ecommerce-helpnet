@@ -10,15 +10,38 @@ const router = express.Router();
 router.use(authMiddleware);
 router.use(vendorScope);
 
-// Listar produtos do vendedor logado
+// Listar produtos do vendedor logado (incluindo produtos de parceiros)
 router.get('/', async (req, res) => {
   try {
     console.log('Debug: vendorId:', req.vendorId, 'vendorEmpresaId:', req.vendorEmpresaId, 'query:', req.query);
+    console.log('Debug: prisma object:', typeof prisma, prisma ? 'defined' : 'undefined');
     const { status, busca, categoria, pagina = 1, limit = 10 } = req.query;
     const skip = (parseInt(pagina) - 1) * parseInt(limit);
 
-    // Escopo estrito por vendedor individual para isolamento de dados
-    const vendedorClause = { VendedorID: req.vendorId };
+    // Buscar parcerias ativas do vendedor logado (apenas ATIVA, não ENCERRADA)
+    const parcerias = await prisma.parceriaVendedor.findMany({
+      where: {
+        OR: [
+          { SolicitanteID: req.vendorId, Status: 'ATIVA' },
+          { ConvidadoID: req.vendorId, Status: 'ATIVA' }
+        ]
+      },
+      select: {
+        SolicitanteID: true,
+        ConvidadoID: true
+      }
+    });
+
+    // Extrair IDs dos parceiros (apenas se a parceria estiver ATIVA)
+    const parceiroIds = parcerias.flatMap(p =>
+      p.SolicitanteID === req.vendorId ? [p.ConvidadoID] : [p.SolicitanteID]
+    );
+
+    // Incluir o próprio vendedor
+    const vendedorIds = [req.vendorId, ...parceiroIds];
+
+    // Escopo por vendedor e seus parceiros
+    const vendedorClause = { VendedorID: { in: vendedorIds } };
     const andClauses = [vendedorClause];
 
     if (categoria) andClauses.push({ CategoriaID: parseInt(categoria) });
@@ -61,7 +84,14 @@ router.get('/', async (req, res) => {
       prisma.produto.count({ where }),
     ]);
 
-    res.json({ produtos, total });
+    // Adicionar flag para identificar produtos próprios vs de parceiros
+    const produtosComFlag = produtos.map(produto => ({
+      ...produto,
+      isProprio: produto.vendedor.VendedorID === req.vendorId,
+      isParceiro: produto.vendedor.VendedorID !== req.vendorId
+    }));
+
+    res.json({ produtos: produtosComFlag, total });
   } catch (error) {
     console.error('Erro ao listar produtos do vendedor:', error);
     console.error('Debug: Detailed error:', error.message, error.stack);
@@ -125,7 +155,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Atualizar produto do vendedor logado
+// Atualizar produto do vendedor logado (apenas produtos próprios)
 router.put('/:id', async (req, res) => {
   try {
     console.log('Debug PUT /:id vendorId:', req.vendorId, 'vendorEmpresaId:', req.vendorEmpresaId, 'id:', req.params.id, 'body keys:', Object.keys(req.body));
@@ -133,9 +163,9 @@ router.put('/:id', async (req, res) => {
     const data = req.body;
 
     const produtoExistente = await prisma.produto.findUnique({ where: { ProdutoID: id } });
-    // Verifica se o produto pertence ao vendedor logado para isolamento de dados
+    // Verifica se o produto pertence ao vendedor logado (apenas produtos próprios podem ser editados)
     if (!produtoExistente || produtoExistente.VendedorID !== req.vendorId) {
-      return res.status(404).json({ erro: 'Produto não encontrado' });
+      return res.status(403).json({ erro: 'Você só pode editar seus próprios produtos' });
     }
 
     if (data.sku && data.sku !== produtoExistente.SKU) {
@@ -192,7 +222,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Ação em lote para produtos do vendedor logado
+// Ação em lote para produtos do vendedor logado (apenas produtos próprios)
 router.post('/acao-em-lote', async (req, res) => {
   try {
     console.log('Debug POST /acao-em-lote: vendorId:', req.vendorId, 'vendorEmpresaId:', req.vendorEmpresaId, 'acao:', req.body.acao, 'produtoIds length:', req.body.produtoIds?.length);
@@ -203,7 +233,7 @@ router.post('/acao-em-lote', async (req, res) => {
 
     const ids = produtoIds.map(id => parseInt(id));
 
-    // Verificar se todos os produtos pertencem ao vendedor logado para isolamento de dados
+    // Verificar se todos os produtos pertencem ao vendedor logado (apenas produtos próprios podem ser modificados)
     const produtos = await prisma.produto.findMany({
       where: { ProdutoID: { in: ids } },
       select: { ProdutoID: true, VendedorID: true }
@@ -211,7 +241,7 @@ router.post('/acao-em-lote', async (req, res) => {
 
     const produtosInvalidos = produtos.filter(p => p.VendedorID !== req.vendorId);
     if (produtosInvalidos.length > 0) {
-      return res.status(403).json({ erro: 'Alguns produtos não pertencem ao seu usuário' });
+      return res.status(403).json({ erro: 'Você só pode modificar seus próprios produtos' });
     }
 
     switch (acao) {
@@ -261,16 +291,16 @@ router.post('/acao-em-lote', async (req, res) => {
   }
 });
 
-// Excluir/desativar produto do vendedor logado
+// Excluir/desativar produto do vendedor logado (apenas produtos próprios)
 router.delete('/:id', async (req, res) => {
   try {
     console.log('Debug DELETE /:id vendorId:', req.vendorId, 'vendorEmpresaId:', req.vendorEmpresaId, 'id:', req.params.id);
     const id = parseInt(req.params.id);
 
     const produto = await prisma.produto.findUnique({ where: { ProdutoID: id } });
-    // Verifica se o produto pertence ao vendedor logado para isolamento de dados
+    // Verifica se o produto pertence ao vendedor logado (apenas produtos próprios podem ser excluídos)
     if (!produto || produto.VendedorID !== req.vendorId) {
-      return res.status(404).json({ erro: 'Produto não encontrado' });
+      return res.status(403).json({ erro: 'Você só pode excluir seus próprios produtos' });
     }
 
     const temPedidos = await prisma.itensPedido.findFirst({ where: { ProdutoID: id } });

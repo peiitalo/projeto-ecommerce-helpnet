@@ -4,6 +4,8 @@ import { logControllerError, logger } from "../utils/logger.js";
 import paymentService from "../services/paymentService.js";
 import { calcularFrete } from "../services/freightService.js";
 import { sendOrderConfirmationEmail, sendDeliveryStatusEmail, sendVendorNewSaleEmail } from "../services/emailService.js";
+import { validateCouponState } from "../services/couponValidationService.js";
+import { calculateDiscount } from "../services/couponCalculator.js";
 
 export const criarPedido = async (req, res) => {
   try {
@@ -13,7 +15,10 @@ export const criarPedido = async (req, res) => {
       itens,
       metodosPagamento,
       frete = 0,
-      observacoes
+      descontoVista = 0,
+      valorDescontoVista = 0,
+      observacoes,
+      cupomCodigos
     } = req.body;
 
     logger.info('criar_pedido_iniciado', {
@@ -62,6 +67,90 @@ export const criarPedido = async (req, res) => {
     // Criar mapa de produtos para acesso rápido
     const produtosMap = new Map(produtos.map(p => [p.ProdutoID, p]));
 
+    // Validar cupons se fornecidos usando os novos serviços
+    let cuponsAplicadosArray = [];
+    let descontoCupom = 0;
+    let freteGratisCupom = false;
+    let cuponsDetalhes = []; // Para armazenar detalhes dos cupons aplicados
+
+    if (req.body.cuponsAplicados && Array.isArray(req.body.cuponsAplicados) && req.body.cuponsAplicados.length > 0) {
+      try {
+        // Preparar itens do carrinho para validação
+        const itensCarrinho = itens.map(item => {
+          const produto = produtosMap.get(parseInt(item.produtoId));
+          return {
+            ProdutoID: parseInt(item.produtoId),
+            Quantidade: item.quantidade,
+            PrecoUnitario: item.precoUnitario || produto.Preco,
+            CategoriaID: produto.CategoriaID,
+            Nome: produto.Nome
+          };
+        });
+
+        // Validar cada cupom com o estado atual do carrinho
+        for (const cupomAplicado of req.body.cuponsAplicados) {
+          const validacao = await validateCouponState(cupomAplicado.codigo, itensCarrinho, user.id);
+
+          if (validacao.state !== 'active') {
+            return res.status(400).json({
+              success: false,
+              errors: [`Cupom ${cupomAplicado.codigo}: ${validacao.reason}`]
+            });
+          }
+
+          const cupom = validacao.coupon;
+          const discountDetails = validacao.discountDetails;
+
+          // Aplicar desconto baseado no tipo
+          let descontoAplicado = 0;
+          if (cupom.DescontoTipo === 'frete_gratis') {
+            freteGratisCupom = true;
+          } else {
+            descontoAplicado = discountDetails.totalDiscount || 0;
+            descontoCupom += descontoAplicado;
+          }
+
+          // Registrar detalhes do cupom aplicado com informações item-specific
+          cuponsAplicadosArray.push(cupom);
+          cuponsDetalhes.push({
+            cupom: cupom,
+            descontoAplicado: descontoAplicado,
+            eligibleItems: discountDetails.eligibleItems,
+            ineligibleItems: discountDetails.ineligibleItems,
+            totalDiscount: discountDetails.totalDiscount,
+            itemDiscounts: discountDetails.itemDiscounts,
+            itensAplicados: cupomAplicado.itensAplicados || []
+          });
+
+          logger.info('cupom_validado_aplicado', {
+            clienteId: user.id,
+            cupomCodigo: cupomAplicado.codigo,
+            desconto: descontoAplicado,
+            freteGratis: cupom.DescontoTipo === 'frete_gratis',
+            eligibleItemsCount: discountDetails.eligibleItems?.length || 0,
+            totalDiscount: discountDetails.totalDiscount
+          });
+        }
+
+        logger.info('cupons_totais_validacao', {
+          clienteId: user.id,
+          cuponsCount: cuponsAplicadosArray.length,
+          descontoTotal: descontoCupom,
+          freteGratis: freteGratisCupom
+        });
+      } catch (cupomError) {
+        logger.warn('erro_validacao_cupons', {
+          clienteId: user.id,
+          cuponsAplicados: req.body.cuponsAplicados,
+          error: cupomError.message
+        });
+        return res.status(400).json({
+          success: false,
+          errors: ["Erro ao validar cupons"]
+        });
+      }
+    }
+
     // Calcular total e verificar estoque
     let totalItens = 0;
     const itensComPreco = [];
@@ -90,7 +179,8 @@ export const criarPedido = async (req, res) => {
         });
       }
 
-      const precoUnitario = produto.Preco;
+      // Use the discounted price sent from frontend
+      const precoUnitario = item.precoUnitario || produto.Preco;
       const subtotal = precoUnitario * item.quantidade;
       totalItens += subtotal;
 
@@ -99,13 +189,14 @@ export const criarPedido = async (req, res) => {
         nome: produto.Nome,
         quantidade: item.quantidade,
         precoUnitario,
-        subtotal
+        subtotal,
+        categoriaId: produto.CategoriaID
       });
     }
 
     // Usar o valor de frete enviado pelo frontend (já calculado)
-    // Para validação, podemos recalcular e comparar se necessário
-    let valorFrete = frete || 0;
+    // Aplicar frete grátis se cupom permitir
+    let valorFrete = freteGratisCupom ? 0 : (frete || 0);
 
     // Opcional: validar frete recalculando (comentado para evitar complexidade)
     // try {
@@ -135,9 +226,10 @@ export const criarPedido = async (req, res) => {
     //   });
     // }
 
+
     // Calcular total dos pagamentos
     const totalPagamentos = metodosPagamento.reduce((total, metodo) => total + parseFloat(metodo.valor), 0);
-    const totalPedido = totalItens + valorFrete;
+    const totalPedido = totalItens + valorFrete - descontoCupom - valorDescontoVista;
 
     logger.info('criar_pedido_calculos', {
       clienteId: user.id,
@@ -166,7 +258,9 @@ export const criarPedido = async (req, res) => {
       select: {
         NomeCompleto: true,
         Email: true,
-        CPF_CNPJ: true
+        CPF_CNPJ: true,
+        TelefoneCelular: true,
+        TelefoneFixo: true
       }
     });
 
@@ -242,7 +336,11 @@ export const criarPedido = async (req, res) => {
           Status: 'AguardandoPagamento',
           StatusPagamento: 'PENDENTE',
           ExpiraEm: expiraEm,
-          TotalPago: 0
+          TotalPago: 0,
+          // Adicionar campos do cupom se aplicável
+          CupomID: cuponsAplicadosArray.length > 0 ? cuponsAplicadosArray[0].CupomID : null, // Primeiro cupom para compatibilidade
+          DescontoCupom: descontoCupom,
+          DescontoVista: valorDescontoVista
         }
       });
 
@@ -258,10 +356,24 @@ export const criarPedido = async (req, res) => {
         });
 
         // Atualizar estoque
-        await tx.produto.update({
+        const produtoAtualizado = await tx.produto.update({
           where: { ProdutoID: item.produtoId },
-          data: { Estoque: { decrement: item.quantidade } }
+          data: { Estoque: { decrement: item.quantidade } },
+          select: { ProdutoID: true, Nome: true, Estoque: true, Ativo: true }
         });
+
+        // Se estoque chegou a zero, desativar produto automaticamente
+        if (produtoAtualizado.Estoque <= 0 && produtoAtualizado.Ativo) {
+          await tx.produto.update({
+            where: { ProdutoID: item.produtoId },
+            data: { Ativo: false }
+          });
+          logger.info('produto_desativado_estoque_esgotado', {
+            produtoId: item.produtoId,
+            nome: produtoAtualizado.Nome,
+            pedidoId: pedido.PedidoID
+          });
+        }
       }
 
       // Salvar distribuição de pagamento (usando métodos já validados)
@@ -327,9 +439,66 @@ export const criarPedido = async (req, res) => {
         }
       });
 
+      // Registrar uso dos cupons se aplicáveis
+      if (cuponsAplicadosArray.length > 0) {
+        try {
+          for (let i = 0; i < cuponsAplicadosArray.length; i++) {
+            const cupom = cuponsAplicadosArray[i];
+            const cupomDetalhes = cuponsDetalhes[i];
+            // Incrementar usos totais do cupom
+            await prisma.cupom.update({
+              where: { CupomID: cupom.CupomID },
+              data: { UsosAtuais: { increment: 1 } }
+            });
+
+            // Registrar uso por cliente
+            await prisma.cupomCliente.upsert({
+              where: {
+                CupomID_ClienteID: {
+                  CupomID: cupom.CupomID,
+                  ClienteID: user.id
+                }
+              },
+              update: {
+                Usado: true,
+                DataUso: new Date(),
+                PedidoID: resultado.PedidoID,
+                UsosCliente: { increment: 1 }
+              },
+              create: {
+                CupomID: cupom.CupomID,
+                ClienteID: user.id,
+                Usado: true,
+                DataUso: new Date(),
+                PedidoID: resultado.PedidoID,
+                UsosCliente: 1
+              }
+            });
+
+            logger.info('cupom_uso_registrado', {
+              pedidoId: resultado.PedidoID,
+              cupomId: cupom.CupomID,
+              clienteId: user.id,
+              desconto: cupomDetalhes.descontoAplicado,
+              itensAplicados: cupomDetalhes.itensAplicados
+            });
+          }
+        } catch (cupomUsoError) {
+          logger.error('erro_registro_uso_cupons', {
+            pedidoId: resultado.PedidoID,
+            cupomIds: cuponsAplicadosArray.map(c => c.CupomID),
+            error: cupomUsoError.message
+          });
+          // Não falhar o pedido por erro no registro do cupom
+        }
+      }
+
       // Notificar vendedor e criar entregas
       await notificarVendedorPedidoPago(resultado.PedidoID);
       await criarEntregasAutomaticas(resultado.PedidoID);
+
+      // Calcular e registrar divisão de lucros para parcerias
+      await calcularDivisaoLucrosParcerias(resultado.PedidoID, itensComPreco);
 
       logger.info('pagamento_mock_aprovado', {
         pedidoId: resultado.PedidoID,
@@ -399,6 +568,17 @@ export const criarPedido = async (req, res) => {
         total: totalPedido,
         frete: valorFrete,
         subtotal: totalItens,
+        descontoCupom: descontoCupom,
+        cuponsAplicados: cuponsDetalhes.map(detalhe => ({
+          codigo: detalhe.cupom.Codigo,
+          tipo: detalhe.cupom.DescontoTipo,
+          valor: detalhe.cupom.DescontoValor,
+          descontoAplicado: detalhe.descontoAplicado,
+          itensAplicados: detalhe.itensAplicados,
+          itensElegiveis: detalhe.eligibleItems?.length || 0,
+          itensInelegiveis: detalhe.ineligibleItems?.length || 0,
+          totalDiscount: detalhe.totalDiscount
+        })),
         status: 'Pago',
         // Pagamento simulado aprovado - redirecionar para página de sucesso
         paymentUrl: null, // Não há URL de pagamento externa
@@ -620,6 +800,20 @@ export const listarPedidosCliente = async (req, res) => {
       prisma.pedido.count({ where: { ClienteID: user.id } })
     ]);
 
+    // Log de diagnóstico para imagens
+    pedidos.forEach(pedido => {
+      pedido.itensPedido.forEach(item => {
+        logger.info('diagnostico_imagem_pedido', {
+          pedidoId: pedido.PedidoID,
+          produtoId: item.produto.ProdutoID,
+          produtoNome: item.produto.Nome,
+          imagensCount: item.produto.Imagens?.length || 0,
+          imagens: item.produto.Imagens || [],
+          primeiraImagem: item.produto.Imagens?.[0] || null
+        });
+      });
+    });
+
     logger.info('listar_pedidos_cliente_ok', { clienteId: user.id, total });
     res.json({ pedidos, total });
 
@@ -644,6 +838,8 @@ export const buscarPedidoPorId = async (req, res) => {
     }
     const pedidoId = parseInt(match[1]);
 
+    logger.info('buscar_pedido_iniciado', { pedidoId, clienteId: user.id });
+
     const pedido = await prisma.pedido.findFirst({
       where: {
         PedidoID: pedidoId,
@@ -658,6 +854,17 @@ export const buscarPedidoPorId = async (req, res) => {
         TotalPago: true,
         StatusPagamento: true,
         ExpiraEm: true,
+        EnderecoID: true, // Adicionar para debug
+        cliente: {
+          select: {
+            ClienteID: true,
+            NomeCompleto: true,
+            Email: true,
+            CPF_CNPJ: true,
+            TelefoneCelular: true,
+            TelefoneFixo: true
+          }
+        },
         itensPedido: {
           select: {
             Quantidade: true,
@@ -698,6 +905,7 @@ export const buscarPedidoPorId = async (req, res) => {
         },
         Endereco: {
           select: {
+            EnderecoID: true, // Adicionar para debug
             Nome: true,
             Complemento: true,
             CEP: true,
@@ -712,12 +920,33 @@ export const buscarPedidoPorId = async (req, res) => {
       }
     });
 
+    // Logs de debug para endereço
+    logger.info('pedido_encontrado_debug', {
+      pedidoId,
+      clienteId: user.id,
+      enderecoId: pedido?.EnderecoID,
+      enderecoEncontrado: !!pedido?.Endereco,
+      enderecoDados: pedido?.Endereco
+    });
+
     if (!pedido) {
       return res.status(404).json({
         success: false,
         errors: ["Pedido não encontrado"]
       });
     }
+
+    // Log de diagnóstico para imagens
+    pedido.itensPedido.forEach(item => {
+      logger.info('diagnostico_imagem_pedido_detalhado', {
+        pedidoId: pedido.PedidoID,
+        produtoId: item.produto.ProdutoID,
+        produtoNome: item.produto.Nome,
+        imagensCount: item.produto.Imagens?.length || 0,
+        imagens: item.produto.Imagens || [],
+        primeiraImagem: item.produto.Imagens?.[0] || null
+      });
+    });
 
     logger.info('buscar_pedido_ok', { pedidoId: pedidoId, clienteId: user.id });
     res.json({ success: true, pedido });
@@ -955,7 +1184,8 @@ export const listarPedidosVendedor = async (req, res) => {
             select: {
               NomeCompleto: true,
               Email: true,
-              TelefoneCelular: true
+              TelefoneCelular: true,
+              CPF_CNPJ: true
             }
           }
         },
@@ -989,7 +1219,7 @@ export const listarPedidosVendedor = async (req, res) => {
 export const listarPedidosAdmin = async (req, res) => {
   try {
     const { user } = req;
-    const { pagina = 1, limit = 10, status, cliente, dataInicio, dataFim } = req.query;
+    const { pagina = 1, limit = 10, status, cliente, dataInicio, dataFim, search } = req.query;
     const skip = (pagina - 1) * limit;
 
     // Verificar se o usuário é administrador
@@ -1019,6 +1249,30 @@ export const listarPedidosAdmin = async (req, res) => {
       if (dataFim) {
         whereClause.DataPedido.lte = new Date(dataFim);
       }
+    }
+
+    // Adicionar busca por ID do pedido ou nome do cliente
+    if (search && search.trim()) {
+      const searchTerm = search.trim();
+      whereClause.OR = [
+        { PedidoID: isNaN(parseInt(searchTerm)) ? undefined : parseInt(searchTerm) },
+        {
+          cliente: {
+            NomeCompleto: {
+              contains: searchTerm,
+              mode: 'insensitive'
+            }
+          }
+        },
+        {
+          cliente: {
+            Email: {
+              contains: searchTerm,
+              mode: 'insensitive'
+            }
+          }
+        }
+      ].filter(Boolean); // Remove undefined values
     }
 
     const [pedidos, total] = await prisma.$transaction([
@@ -1246,7 +1500,9 @@ export const buscarPedidoAdmin = async (req, res) => {
             ClienteID: true,
             NomeCompleto: true,
             Email: true,
-            CPF_CNPJ: true
+            CPF_CNPJ: true,
+            TelefoneCelular: true,
+            TelefoneFixo: true
           }
         },
         itensPedido: {
@@ -1335,4 +1591,135 @@ function getStatusDescription(status) {
     'Reembolsado': 'Reembolsado'
   };
   return descriptions[status] || status;
+}
+
+// Função para calcular divisão de lucros entre parceiros
+async function calcularDivisaoLucrosParcerias(pedidoId, itensComPreco) {
+  try {
+    logger.info('iniciando_calculo_divisao_lucros', { pedidoId });
+
+    // Buscar informações dos produtos e vendedores
+    const produtoIds = itensComPreco.map(item => item.produtoId);
+    const produtos = await prisma.produto.findMany({
+      where: {
+        ProdutoID: { in: produtoIds }
+      },
+      select: {
+        ProdutoID: true,
+        VendedorID: true,
+        Nome: true
+      }
+    });
+
+    // Criar mapa de produtos para acesso rápido
+    const produtosMap = new Map(produtos.map(p => [p.ProdutoID, p.VendedorID]));
+
+    // Agrupar vendas por vendedor
+    const vendasPorVendedor = new Map();
+
+    for (const item of itensComPreco) {
+      const vendedorId = produtosMap.get(item.produtoId);
+      if (!vendedorId) continue;
+
+      if (!vendasPorVendedor.has(vendedorId)) {
+        vendasPorVendedor.set(vendedorId, {
+          vendedorId,
+          valorTotal: 0,
+          produtos: []
+        });
+      }
+
+      const dadosVendedor = vendasPorVendedor.get(vendedorId);
+      dadosVendedor.valorTotal += item.subtotal;
+      dadosVendedor.produtos.push({
+        produtoId: item.produtoId,
+        nome: item.nome,
+        quantidade: item.quantidade,
+        precoUnitario: item.precoUnitario,
+        subtotal: item.subtotal
+      });
+    }
+
+    // Para cada vendedor, verificar se tem parcerias ativas e calcular divisão
+    for (const [vendedorId, dadosVendas] of vendasPorVendedor) {
+      // Buscar parcerias ativas deste vendedor
+      const parceriasAtivas = await prisma.parceriaVendedor.findMany({
+        where: {
+          OR: [
+            { SolicitanteID: vendedorId, Status: 'ATIVA' },
+            { ConvidadoID: vendedorId, Status: 'ATIVA' }
+          ]
+        },
+        select: {
+          ParceriaID: true,
+          SolicitanteID: true,
+          ConvidadoID: true,
+          PercentualSolicitante: true,
+          PercentualConvidado: true
+        }
+      });
+
+      if (parceriasAtivas.length === 0) continue;
+
+      // Para cada parceria, calcular a divisão dos lucros
+      for (const parceria of parceriasAtivas) {
+        const isSolicitante = parceria.SolicitanteID === vendedorId;
+        const parceiroId = isSolicitante ? parceria.ConvidadoID : parceria.SolicitanteID;
+        const percentualProprio = isSolicitante ? parceria.PercentualSolicitante : parceria.PercentualConvidado;
+        const percentualParceiro = isSolicitante ? parceria.PercentualConvidado : parceria.PercentualSolicitante;
+
+        // Calcular valores de divisão
+        const valorProprio = (dadosVendas.valorTotal * percentualProprio) / 100;
+        const valorParceiro = (dadosVendas.valorTotal * percentualParceiro) / 100;
+
+        logger.info('divisao_lucros_calculada', {
+          pedidoId,
+          parceriaId: parceria.ParceriaID,
+          vendedorId,
+          parceiroId,
+          valorTotal: dadosVendas.valorTotal,
+          percentualProprio,
+          percentualParceiro,
+          valorProprio,
+          valorParceiro
+        });
+
+        // Aqui seria implementada a lógica de transferência/repartição dos valores
+        // Por exemplo, criar registros em uma tabela de repasses ou integrar com sistema de pagamentos
+        // Para este exemplo, apenas registramos no log
+
+        // Criar notificações para ambos os parceiros sobre a divisão
+        const mensagemPropria = `Parceria #${parceria.ParceriaID}: Você recebeu R$ ${valorProprio.toFixed(2)} da venda de produtos (Pedido #${pedidoId})`;
+        const mensagemParceiro = `Parceria #${parceria.ParceriaID}: Você recebeu R$ ${valorParceiro.toFixed(2)} da venda de produtos (Pedido #${pedidoId})`;
+
+        await prisma.notificacao.create({
+          data: {
+            Titulo: 'Repasse de Lucros - Parceria',
+            Mensagem: mensagemPropria,
+            Tipo: 'success',
+            VendedorID: vendedorId
+          }
+        });
+
+        await prisma.notificacao.create({
+          data: {
+            Titulo: 'Repasse de Lucros - Parceria',
+            Mensagem: mensagemParceiro,
+            Tipo: 'success',
+            VendedorID: parceiroId
+          }
+        });
+      }
+    }
+
+    logger.info('calculo_divisao_lucros_concluido', { pedidoId });
+
+  } catch (error) {
+    logger.error('erro_calculo_divisao_lucros', {
+      pedidoId,
+      error: error.message,
+      stack: error.stack
+    });
+    // Não falhar o pedido por erro na divisão de lucros
+  }
 }

@@ -149,7 +149,7 @@ function ProductsManagement() {
   });
 
   const ProductCard = ({ product }) => (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200 hover:scale-105">
+    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-all duration-200 hover:scale-102">
       <div className="aspect-square bg-gray-100 relative">
         <LazyImage
           src={product.image}
@@ -158,36 +158,36 @@ function ProductsManagement() {
           fallback="/placeholder-image.svg"
         />
         {product.stock < 10 && (
-          <div className="absolute top-3 right-3 bg-red-500 text-white text-xs px-2 py-1 rounded-full shadow-sm">
-            Estoque Baixo
+          <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded shadow-sm">
+            Baixo
           </div>
         )}
       </div>
-      <div className="p-6">
-        <div className="text-center mb-4">
-          <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 min-h-[3rem]">{product.name}</h3>
-          <p className="text-sm text-gray-500 mb-2">SKU: {product.sku}</p>
-          <p className="text-2xl font-bold text-blue-600 mb-2">
+      <div className="p-3">
+        <div className="text-center mb-3">
+          <h3 className="font-medium text-gray-900 mb-1 line-clamp-2 min-h-[2.5rem] text-sm leading-tight">{product.name}</h3>
+          <p className="text-xs text-gray-500 mb-1">SKU: {product.sku}</p>
+          <p className="text-lg font-bold text-blue-600 mb-1">
             R$ {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </p>
-          <p className="text-sm text-gray-600">
-            Estoque: <span className={product.stock < 10 ? 'text-red-600 font-semibold' : 'text-green-600 font-semibold'}>{product.stock} unidades</span>
+          <p className="text-xs text-gray-600">
+            Estoque: <span className={product.stock < 10 ? 'text-red-600 font-medium' : 'text-green-600 font-medium'}>{product.stock}</span>
           </p>
         </div>
-        <div className="flex flex-col space-y-2">
+        <div className="flex flex-col space-y-1.5">
           <Link
             to={`/vendedor/produtos/${product.id}/editar`}
-            className="bg-blue-600 text-white text-sm px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors text-center font-medium"
+            className="bg-blue-600 text-white text-xs px-3 py-2 rounded hover:bg-blue-700 transition-colors text-center font-medium"
           >
-            Editar Produto
+            Editar
           </Link>
           <button
             onClick={() => handleViewProduct(product.id)}
-            className="flex items-center justify-center gap-2 text-gray-600 hover:text-blue-600 border border-gray-200 rounded-lg py-2 px-4 hover:bg-gray-50 transition-colors"
+            className="flex items-center justify-center gap-1 text-gray-600 hover:text-blue-600 border border-gray-200 rounded py-1.5 px-2 hover:bg-gray-50 transition-colors text-xs"
             title="Ver detalhes"
           >
-            <FaEye className="w-4 h-4" />
-            Ver Detalhes
+            <FaEye className="w-3 h-3" />
+            Ver
           </button>
         </div>
       </div>
@@ -338,7 +338,7 @@ function ProductsManagement() {
             </div>
 
             {viewMode === 'grid' ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                 {filteredProducts.map((product) => (
                   <ProductCard key={product.id} product={product} />
                 ))}

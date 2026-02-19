@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import VendorLayout from '../../components/VendorLayout.jsx';
-import { vendedorApi } from '../../services/api.js';
+import { vendedorApi, parceriaApi } from '../../services/api.js';
 import {
   FaSearch,
   FaUser,
@@ -13,21 +13,40 @@ import {
   FaEnvelope,
   FaPhone,
   FaMapMarkerAlt,
-  FaCalendarAlt
+  FaCalendarAlt,
+  FaHandshake,
+  FaClock,
+  FaCheck,
+  FaTimes,
+  FaUserFriends
 } from 'react-icons/fa';
 
 function VendorSellersPage() {
   const { user } = useAuth();
   const [sellers, setSellers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const sellersPerPage = 10;
+
+  // Estados para parcerias
+  const [parcerias, setParcerias] = useState({ ativas: [], pendentes: [] });
+  const [showPartnershipModal, setShowPartnershipModal] = useState(false);
+  const [showSellerModal, setShowSellerModal] = useState(false);
+  const [selectedSeller, setSelectedSeller] = useState(null);
+  const [partnershipForm, setPartnershipForm] = useState({
+    percentualMeu: 50,
+    percentualParceiro: 50,
+    mensagem: ''
+  });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResult, setSearchResult] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
 
 
   useEffect(() => {
     loadSellers();
-  }, [user, searchQuery, currentPage]);
+    loadParcerias();
+  }, [user, currentPage]);
 
   const loadSellers = async () => {
     try {
@@ -35,7 +54,7 @@ function VendorSellersPage() {
       const response = await vendedorApi.listarVendedores({
         page: currentPage,
         limit: sellersPerPage,
-        search: searchQuery
+        search: ''
       });
       setSellers(response.vendedores || []);
       setLoading(false);
@@ -43,6 +62,16 @@ function VendorSellersPage() {
       console.error('Erro ao carregar vendedores:', error);
       setSellers([]);
       setLoading(false);
+    }
+  };
+
+  const loadParcerias = async () => {
+    try {
+      const response = await parceriaApi.listar();
+      setParcerias(response.parcerias || { ativas: [], pendentes: [] });
+    } catch (error) {
+      console.error('Erro ao carregar parcerias:', error);
+      setParcerias({ ativas: [], pendentes: [] });
     }
   };
 
@@ -73,39 +102,300 @@ function VendorSellersPage() {
     return status === 'active' ? 'Ativo' : 'Inativo';
   };
 
+  // Funções para parcerias
+  const handleOpenSellerModal = (seller) => {
+    setSelectedSeller(seller);
+    setShowSellerModal(true);
+  };
+
+  const handleCloseSellerModal = () => {
+    setShowSellerModal(false);
+    setSelectedSeller(null);
+  };
+
+  const handleOpenPartnershipModal = (seller) => {
+    setSelectedSeller(seller);
+    setPartnershipForm({
+      percentualMeu: 50,
+      percentualParceiro: 50,
+      mensagem: ''
+    });
+    setShowPartnershipModal(true);
+  };
+
+  const handleClosePartnershipModal = () => {
+    setShowPartnershipModal(false);
+    setSelectedSeller(null);
+  };
+
+  const handleSendPartnershipRequest = async () => {
+    try {
+      await parceriaApi.enviarSolicitacao({
+        vendedorId: selectedSeller.id,
+        percentualMeu: partnershipForm.percentualMeu,
+        percentualParceiro: partnershipForm.percentualParceiro,
+        mensagem: partnershipForm.mensagem
+      });
+      handleClosePartnershipModal();
+      loadParcerias();
+      alert('Solicitação de parceria enviada com sucesso!');
+    } catch (error) {
+      console.error('Erro ao enviar solicitação:', error);
+      alert('Erro ao enviar solicitação de parceria');
+    }
+  };
+
+  const handleRespondPartnership = async (parceriaId, acao) => {
+    try {
+      await parceriaApi.responderSolicitacao(parceriaId, acao);
+      loadParcerias();
+      alert(`Solicitação ${acao === 'aceitar' ? 'aceita' : 'recusada'} com sucesso!`);
+    } catch (error) {
+      console.error('Erro ao responder solicitação:', error);
+      alert('Erro ao responder solicitação');
+    }
+  };
+
+  const handleEndPartnership = async (parceriaId) => {
+    if (!confirm('Tem certeza que deseja encerrar esta parceria?')) return;
+
+    try {
+      await parceriaApi.encerrar(parceriaId);
+      loadParcerias();
+      alert('Parceria encerrada com sucesso!');
+    } catch (error) {
+      console.error('Erro ao encerrar parceria:', error);
+      alert('Erro ao encerrar parceria');
+    }
+  };
+
+  // Função para buscar vendedor
+  const handleSearchSeller = async () => {
+    if (!searchTerm.trim() || searchTerm.length < 3) {
+      alert('Digite pelo menos 3 caracteres para buscar');
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const response = await vendedorApi.buscarPorCnpjEmail(searchTerm.trim());
+      setSearchResult(response.vendedor);
+    } catch (error) {
+      console.error('Erro ao buscar vendedor:', error);
+      setSearchResult(null);
+      if (error.message !== 'Vendedor não encontrado') {
+        alert('Erro ao buscar vendedor');
+      }
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSearchSeller();
+    }
+  };
+
   return (
     <VendorLayout>
-      <div className="space-y-6">
+      <div className="space-y-6 p-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Gerenciar Vendedores</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Vendedores Parceiros</h1>
             <p className="text-slate-600 mt-1">
-              {filteredSellers.length} vendedor{filteredSellers.length !== 1 ? 'es' : ''} encontrado{filteredSellers.length !== 1 ? 's' : ''}
+              Gerencie suas parcerias e convide novos vendedores
             </p>
           </div>
-          <Link
-            to="/vendedor/vendedores/novo"
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <FaPlus />
-            <span>Adicionar Vendedor</span>
-          </Link>
+        </div>
+
+        {/* Parcerias Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Parcerias Ativas */}
+          <div className="bg-white rounded-lg border border-slate-200 p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <FaHandshake className="text-green-600" />
+              <h2 className="text-lg font-semibold text-slate-900">Parcerias Ativas</h2>
+              <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                {parcerias.ativas.length}
+              </span>
+            </div>
+            {parcerias.ativas.length === 0 ? (
+              <p className="text-slate-500 text-sm">Nenhuma parceria ativa</p>
+            ) : (
+              <div className="space-y-3">
+                {parcerias.ativas.map((parceria) => (
+                  <div key={parceria.id} className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <FaUserFriends className="text-green-600" />
+                      <div>
+                        <p className="font-medium text-slate-900">{parceria.parceiro.nome}</p>
+                        <p className="text-sm text-slate-600">
+                          {parceria.percentual.meu}% / {parceria.percentual.parceiro}%
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleEndPartnership(parceria.id)}
+                      className="text-red-600 hover:text-red-800 p-1"
+                      title="Encerrar parceria"
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Solicitações Pendentes */}
+          <div className="bg-white rounded-lg border border-slate-200 p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <FaClock className="text-yellow-600" />
+              <h2 className="text-lg font-semibold text-slate-900">Solicitações Pendentes</h2>
+              <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full">
+                {parcerias.pendentes.length}
+              </span>
+            </div>
+            {parcerias.pendentes.length === 0 ? (
+              <p className="text-slate-500 text-sm">Nenhuma solicitação pendente</p>
+            ) : (
+              <div className="space-y-3">
+                {parcerias.pendentes.map((parceria) => (
+                  <div key={parceria.id} className="p-3 bg-yellow-50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <FaUserFriends className="text-yellow-600" />
+                        <div>
+                          <p className="font-medium text-slate-900">{parceria.parceiro.nome}</p>
+                          <p className="text-sm text-slate-600">
+                            {parceria.souSolicitante
+                              ? `Você ofereceu: ${parceria.percentual.meu}% / ${parceria.percentual.parceiro}%`
+                              : `Recebido: ${parceria.percentual.parceiro}% / ${parceria.percentual.meu}%`
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    {parceria.mensagem && (
+                      <p className="text-sm text-slate-600 mb-2 italic">"{parceria.mensagem}"</p>
+                    )}
+                    <div className="flex gap-2">
+                      {!parceria.souSolicitante ? (
+                        <>
+                          <button
+                            onClick={() => handleRespondPartnership(parceria.id, 'aceitar')}
+                            className="flex items-center gap-1 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+                          >
+                            <FaCheck />
+                            Aceitar
+                          </button>
+                          <button
+                            onClick={() => handleRespondPartnership(parceria.id, 'recusar')}
+                            className="flex items-center gap-1 px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+                          >
+                            <FaTimes />
+                            Recusar
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => handleRespondPartnership(parceria.id, 'recusar')}
+                          className="flex items-center gap-1 px-3 py-1 bg-gray-600 text-white text-sm rounded hover:bg-gray-700"
+                        >
+                          <FaTimes />
+                          Cancelar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Search */}
         <div className="bg-white rounded-lg border border-slate-200 p-4">
-          <div className="relative">
-            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Buscar por nome, e-mail ou ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-            />
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Buscar vendedor por CNPJ ou e-mail..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyPress={handleKeyPress}
+                className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+              />
+            </div>
+            <button
+              onClick={handleSearchSeller}
+              disabled={isSearching || !searchTerm.trim()}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {isSearching ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              ) : (
+                <FaSearch />
+              )}
+              <span className="hidden sm:inline">Procurar</span>
+            </button>
           </div>
         </div>
+
+        {/* Search Result */}
+        {searchResult && (
+          <div className="bg-white rounded-lg border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">Vendedor Encontrado</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Nome</label>
+                <p className="text-slate-900 bg-slate-50 px-3 py-2 rounded-lg">{searchResult.name}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
+                <p className="text-slate-900 bg-slate-50 px-3 py-2 rounded-lg">{searchResult.email}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">CNPJ</label>
+                <p className="text-slate-900 bg-slate-50 px-3 py-2 rounded-lg">{searchResult.cpfCnpj}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Razão Social</label>
+                <p className="text-slate-900 bg-slate-50 px-3 py-2 rounded-lg">{searchResult.razaoSocial}</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleOpenPartnershipModal(searchResult)}
+                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+              >
+                Solicitar Parceria
+              </button>
+              <button
+                onClick={() => setSearchResult(null)}
+                className="px-4 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* No Search Result */}
+        {searchTerm && !isSearching && !searchResult && (
+          <div className="bg-white rounded-lg border border-slate-200 p-8 text-center">
+            <FaUser className="text-6xl text-slate-300 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">
+              Nenhum vendedor encontrado
+            </h3>
+            <p className="text-slate-600">
+              Verifique se o CNPJ ou e-mail estão corretos e tente novamente.
+            </p>
+          </div>
+        )}
 
         {/* Sellers Table */}
         <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
@@ -116,25 +406,13 @@ function VendorSellersPage() {
             </div>
           ) : paginatedSellers.length === 0 ? (
             <div className="p-8 text-center">
-              <FaUser className="text-6xl text-slate-300 mx-auto mb-4" />
+              <FaUserFriends className="text-6xl text-slate-300 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-slate-900 mb-2">
-                {searchQuery ? 'Nenhum vendedor encontrado' : 'Nenhum vendedor cadastrado'}
+                Vendedores Parceiros
               </h3>
               <p className="text-slate-600 mb-4">
-                {searchQuery
-                  ? 'Tente ajustar os filtros'
-                  : 'Comece adicionando seu primeiro vendedor'
-                }
+                Use a busca acima para encontrar vendedores e estabelecer parcerias
               </p>
-              {!searchQuery && (
-                <Link
-                  to="/vendedor/vendedores/novo"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <FaPlus />
-                  <span>Adicionar Primeiro Vendedor</span>
-                </Link>
-              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -235,24 +513,19 @@ function VendorSellersPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center gap-2">
-                          <Link
-                            to={`/vendedor/vendedores/${seller.id}`}
+                          <button
+                            onClick={() => handleOpenSellerModal(seller)}
                             className="text-blue-600 hover:text-blue-900 p-1"
-                            title="Ver Detalhes"
+                            title="Ver Informações"
                           >
                             <FaEye />
-                          </Link>
-                          <button
-                            className="text-green-600 hover:text-green-900 p-1"
-                            title="Editar"
-                          >
-                            <FaEdit />
                           </button>
                           <button
-                            className="text-red-600 hover:text-red-900 p-1"
-                            title="Excluir"
+                            onClick={() => handleOpenPartnershipModal(seller)}
+                            className="text-purple-600 hover:text-purple-900 p-1"
+                            title="Solicitar Parceria"
                           >
-                            <FaTrash />
+                            <FaHandshake />
                           </button>
                         </div>
                       </td>
@@ -295,6 +568,227 @@ function VendorSellersPage() {
             </div>
           )}
         </div>
+
+        {/* Modal de Informações do Vendedor */}
+        {showSellerModal && selectedSeller && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-slate-900">
+                  Informações do Vendedor
+                </h3>
+                <button
+                  onClick={handleCloseSellerModal}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Informações Básicas */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Nome</label>
+                    <p className="text-slate-900 bg-slate-50 px-3 py-2 rounded-lg">{selectedSeller.name || 'Não informado'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
+                    <p className="text-slate-900 bg-slate-50 px-3 py-2 rounded-lg">{selectedSeller.email || 'Não informado'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">CNPJ</label>
+                    <p className="text-slate-900 bg-slate-50 px-3 py-2 rounded-lg">{selectedSeller.cpfCnpj || 'Não informado'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Razão Social</label>
+                    <p className="text-slate-900 bg-slate-50 px-3 py-2 rounded-lg">{selectedSeller.razaoSocial || 'Não informado'}</p>
+                  </div>
+                </div>
+
+                {/* Contato */}
+                <div>
+                  <h4 className="text-lg font-medium text-slate-900 mb-3">Contato</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
+                      <p className="text-slate-900 bg-slate-50 px-3 py-2 rounded-lg">{selectedSeller.phone || 'Não informado'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">WhatsApp</label>
+                      <p className="text-slate-900 bg-slate-50 px-3 py-2 rounded-lg">{selectedSeller.whatsapp || 'Não informado'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Localização */}
+                <div>
+                  <h4 className="text-lg font-medium text-slate-900 mb-3">Localização</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Endereço</label>
+                      <p className="text-slate-900 bg-slate-50 px-3 py-2 rounded-lg">{selectedSeller.address || 'Não informado'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Cidade/UF</label>
+                      <p className="text-slate-900 bg-slate-50 px-3 py-2 rounded-lg">
+                        {selectedSeller.city && selectedSeller.state ? `${selectedSeller.city} - ${selectedSeller.state}` : 'Não informado'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Estatísticas */}
+                <div>
+                  <h4 className="text-lg font-medium text-slate-900 mb-3">Estatísticas</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-blue-50 p-4 rounded-lg text-center">
+                      <div className="text-2xl font-bold text-blue-600">{selectedSeller.totalOrders || 0}</div>
+                      <div className="text-sm text-blue-700">Pedidos</div>
+                    </div>
+                    <div className="bg-green-50 p-4 rounded-lg text-center">
+                      <div className="text-2xl font-bold text-green-600">
+                        {selectedSeller.totalSales ? formatPrice(selectedSeller.totalSales) : 'R$ 0,00'}
+                      </div>
+                      <div className="text-sm text-green-700">Vendas</div>
+                    </div>
+                    <div className="bg-purple-50 p-4 rounded-lg text-center">
+                      <div className="text-2xl font-bold text-purple-600">
+                        {selectedSeller.joinDate ? formatDate(selectedSeller.joinDate) : 'N/A'}
+                      </div>
+                      <div className="text-sm text-purple-700">Desde</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-8">
+                <button
+                  onClick={handleCloseSellerModal}
+                  className="flex-1 px-4 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50"
+                >
+                  Fechar
+                </button>
+                <button
+                  onClick={() => {
+                    handleCloseSellerModal();
+                    handleOpenPartnershipModal(selectedSeller);
+                  }}
+                  className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                >
+                  Solicitar Parceria
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Parceria */}
+        {showPartnershipModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-slate-900">
+                  Convidar para Parceria
+                </h3>
+                <button
+                  onClick={handleClosePartnershipModal}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+
+              {selectedSeller && (
+                <div className="mb-4 p-3 bg-slate-50 rounded-lg">
+                  <p className="font-medium text-slate-900">{selectedSeller.name}</p>
+                  <p className="text-sm text-slate-600">{selectedSeller.email}</p>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Percentual de Lucro
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-slate-600 mb-1">Você</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={partnershipForm.percentualMeu}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value) || 0;
+                          setPartnershipForm({
+                            ...partnershipForm,
+                            percentualMeu: value,
+                            percentualParceiro: 100 - value
+                          });
+                        }}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-600 mb-1">Parceiro</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={partnershipForm.percentualParceiro}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value) || 0;
+                          setPartnershipForm({
+                            ...partnershipForm,
+                            percentualParceiro: value,
+                            percentualMeu: 100 - value
+                          });
+                        }}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    A soma deve ser 100%
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Mensagem (opcional)
+                  </label>
+                  <textarea
+                    value={partnershipForm.mensagem}
+                    onChange={(e) => setPartnershipForm({
+                      ...partnershipForm,
+                      mensagem: e.target.value
+                    })}
+                    placeholder="Digite uma mensagem para o convite..."
+                    rows={3}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={handleClosePartnershipModal}
+                  className="flex-1 px-4 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSendPartnershipRequest}
+                  disabled={partnershipForm.percentualMeu + partnershipForm.percentualParceiro !== 100}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Enviar Convite
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </VendorLayout>
   );

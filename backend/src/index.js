@@ -28,6 +28,10 @@ import vendorRoutes from './routes/vendorRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import publicRoutes from './routes/publicRoutes.js';
+import cupomRoutes, { publicRouter as cupomPublicRoutes } from './routes/cupomRoutes.js';
+import suporteRoutes from './routes/suporteRoutes.js';
+import adminSuporteRoutes from './routes/adminSuporteRoutes.js';
+import parceriaRoutes from './routes/parceriaRoutes.js';
 import { logger, requestLogger } from './utils/logger.js';
 // Middlewares de erro centralizados
 import { notFound, errorHandler } from './middleware/errorHandler.js';
@@ -108,10 +112,22 @@ app.use(cacheMiddleware); // Cache headers inteligentes
 app.use(requestLogger);
 
 // Segurança HTTP (helmet):
-// - Desabilita CSP padrão no dev para evitar conflitos com Vite/React; habilitar em produção com política definida
+// - Implementa CSP personalizado para prevenir XSS
 // - Libera CORP para servir uploads entre domínios quando necessário
 app.use(helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.jsdelivr.net"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:", "http:"],
+      connectSrc: ["'self'", "https://api.", "http://localhost:*", "http://127.0.0.1:*"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  },
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
@@ -153,12 +169,17 @@ app.use('/api/pagamentos', pagamentoRoutes);
 app.use('/api/vendedor/clientes', clienteVendedorRoutes);
 app.use('/api/vendedor/pedidos', vendorPedidoRoutes);
 app.use('/api/entregas', entregaRoutes);
-app.use('/api/vendedor/vendedores', vendedorRoutes);
+app.use('/api/vendedor', vendedorRoutes);
 app.use('/api/vendedor/relatorios', relatoriosRoutes);
 app.use('/api/vendedor', vendorRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/public', publicRoutes);
+// app.use('/api/cupons', cupomRoutes); // Moved to vendor scope
+app.use('/api/cupons', cupomPublicRoutes);
+app.use('/api/suporte', suporteRoutes);
+app.use('/api/admin/suporte', adminSuporteRoutes);
+app.use('/api/vendedor/parcerias', parceriaRoutes);
 
 // Helper: healthcheck simples
 app.get('/api/health', (req, res) => res.json({ ok: true }));

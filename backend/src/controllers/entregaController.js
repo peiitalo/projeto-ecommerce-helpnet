@@ -294,10 +294,10 @@ export const buscarEntregaCliente = async (req, res) => {
       success: true,
       entrega: {
         ...entrega,
-        rastreamentos: entrega.rastreamentos.map(r => ({
-          status: r.Status,
+        historico: entrega.rastreamentos.map(r => ({
+          descricao: r.Status,
+          data: r.DataHora,
           local: r.Local,
-          dataHora: r.DataHora,
           observacoes: r.Observacoes
         }))
       }
@@ -410,10 +410,10 @@ export const buscarEntregaVendedor = async (req, res) => {
       success: true,
       entrega: {
         ...entrega,
-        rastreamentos: entrega.rastreamentos.map(r => ({
-          status: r.Status,
+        historico: entrega.rastreamentos.map(r => ({
+          descricao: r.Status,
+          data: r.DataHora,
           local: r.Local,
-          dataHora: r.DataHora,
           observacoes: r.Observacoes
         }))
       }

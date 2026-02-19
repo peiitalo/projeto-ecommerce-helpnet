@@ -41,11 +41,11 @@ function AdminLayout({ children }) {
         id: u?.id || adminUser.id,
       };
     }
-  } catch (_e) {}
+    // eslint-disable-next-line no-empty
+  } catch {}
 
   const isVendor = location.pathname.startsWith('/vendedor');
   const basePath = isVendor ? '/vendedor' : '/admin';
-  const brandName = isVendor ? 'HelpNet Vendedor' : 'HelpNet Admin';
 
   const vendorMenu = [
     { label: 'Visão Geral', to: `${basePath}`, icon: <FiHome className="text-slate-500" /> },
@@ -64,7 +64,7 @@ function AdminLayout({ children }) {
 
   // Admin agora foca em controles macro (empresas, usuários, faturamento)
   const adminMenu = [
-    { label: 'Visão Geral', to: `${basePath}`, icon: <FiHome className="text-slate-500" /> },
+    { label: 'Visão Geral', to: `${basePath}/dashboard`, icon: <FiHome className="text-slate-500" /> },
     { label: 'Pedidos', to: `${basePath}/pedidos`, icon: <FiPackage className="text-slate-500" /> },
     { label: 'Empresas', to: `${basePath}/empresas`, icon: <FiBriefcase className="text-slate-500" /> },
     { label: 'Usuários', to: `${basePath}/usuarios`, icon: <FiUsers className="text-slate-500" /> },
@@ -88,11 +88,11 @@ function AdminLayout({ children }) {
     if (window.confirm('Tem certeza que deseja sair da conta?')) {
       try {
         await logout();
-        navigate('/login');
+        navigate('/admin/login');
       } catch (error) {
         console.error('Erro ao fazer logout:', error);
         // Mesmo com erro, redireciona para login
-        navigate('/login');
+        navigate('/admin/login');
       }
     }
   };
@@ -155,7 +155,7 @@ function AdminLayout({ children }) {
       </div>
 
       {/* Sidebar Desktop (sempre aberta) */}
-      <aside className="hidden md:flex md:w-72 bg-white border-r border-slate-200 flex-col">
+      <aside className="hidden md:flex md:w-72 bg-white border-r border-slate-200 flex-col fixed h-screen">
         <div className="h-16 px-6 border-b border-slate-200 flex items-center">
           <img
             src="/logo-vertical.png"
@@ -192,7 +192,7 @@ function AdminLayout({ children }) {
       </aside>
 
       {/* Conteúdo Principal */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col md:ml-72">
         {/* Header */}
         <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
           <div className="px-4 sm:px-6 lg:px-8">

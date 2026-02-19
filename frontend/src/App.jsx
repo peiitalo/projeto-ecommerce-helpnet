@@ -1,123 +1,226 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { Suspense, lazy } from 'react';
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-import LoadingSkeleton from './components/LoadingSkeleton';
-import { NotificationProvider } from './context/NotificationContext';
-import NotificationContainer from './components/NotificationContainer';
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { Suspense, lazy } from "react";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import LoadingSkeleton from "./components/LoadingSkeleton";
+import { NotificationProvider } from "./context/NotificationContext";
+import NotificationContainer from "./components/NotificationContainer";
+import { CountersProvider } from "./context/CountersContext";
+import { AuthProvider } from "./context/AuthContext";
 
-const LandingPage = lazy(() => import('./pages/landingPage'));
-const Login = lazy(() => import('./pages/login'));
-const Cadastro = lazy(() => import('./pages/cadastro'));
-const Dashboard = lazy(() => import('./pages/admin/dashboard'));
-const AdminOrdersPage = lazy(() => import('./pages/admin/orders'));
-const VendedoresPage = lazy(() => import('./pages/admin/VendedoresPage'));
-const FinanceiroPage = lazy(() => import('./pages/vendor/FinanceiroPage'));
-const ConfiguracoesPage = lazy(() => import('./pages/admin/ConfiguracoesPage'));
-const NotFound = lazy(() => import('./pages/errors/notFound'));
-const Home = lazy(() => import('./pages/clients/home'));
-const ProductPage = lazy(() => import('./pages/clients/ProductPage'));
-const CartPage = lazy(() => import('./pages/clients/CartPage'));
-const FavoritesPage = lazy(() => import('./pages/clients/FavoritesPage'));
-const NotificationsPage = lazy(() => import('./pages/clients/NotificationsPage'));
-const ProfilePage = lazy(() => import('./pages/clients/ProfilePage'));
-const ExplorePage = lazy(() => import('./pages/clients/ExplorePage'));
-const CheckoutPage = lazy(() => import('./pages/clients/CheckoutPage'));
-const AddressPage = lazy(() => import('./pages/clients/AddressPage'));
-const OrdersPage = lazy(() => import('./pages/clients/OrdersPage'));
-const HistoryPage = lazy(() => import('./pages/clients/HistoryPage'));
-const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
-const PaymentSimulator = lazy(() => import('./pages/clients/PaymentSimulator'));
-const PaymentCheckout = lazy(() => import('./pages/clients/PaymentCheckout'));
-const SuportePage = lazy(() => import('./pages/clients/SuportePage'));
-const MeusCuponsPage = lazy(() => import('./pages/clients/MeusCuponsPage'));
-const ClientConfiguracoesPage = lazy(() => import('./pages/clients/ConfiguracoesPage'));
-const ProductsManagement = lazy(() => import('./pages/vendor/ProductsManagement'));
-const ProductForm = lazy(() => import('./pages/vendor/ProductForm'));
-const VendorDashboard = lazy(() => import('./pages/vendor/VendorDashboard'));
-const VendorOrdersPage = lazy(() => import('./pages/vendor/VendorOrdersPage'));
-const VendorClientsPage = lazy(() => import('./pages/vendor/VendorClientsPage'));
-const VendorProfilePage = lazy(() => import('./pages/vendor/VendorProfilePage'));
-const VendorDeliveriesPage = lazy(() => import('./pages/vendor/VendorDeliveriesPage'));
-const VendorDeliveryDetailPage = lazy(() => import('./pages/vendor/VendorDeliveryDetailPage'));
-const RelatorioPage = lazy(() => import('./pages/vendor/RelatorioPage'));
-const VendorCuponsPage = lazy(() => import('./pages/vendor/VendorCuponsPage'));
-
-import AdminLogin from './pages/admin/AdminLogin.jsx';
-import ProtectedRoute from './components/ProtectedRoute.jsx';
+const LandingPage = lazy(() => import("./pages/landingPage"));
+const Login = lazy(() => import("./pages/login"));
+const Cadastro = lazy(() => import("./pages/cadastro"));
+const Dashboard = lazy(() => import("./pages/admin/dashboard"));
+const AdminOrdersPage = lazy(() => import("./pages/admin/orders"));
+const VendedoresPage = lazy(() => import("./pages/admin/VendedoresPage"));
+const EmpresasPage = lazy(() => import("./pages/admin/EmpresasPage"));
+const UsuariosPage = lazy(() => import("./pages/admin/UsuariosPage"));
+const FinanceiroPage = lazy(() => import("./pages/vendor/FinanceiroPage"));
+const ConfiguracoesPage = lazy(() => import("./pages/admin/ConfiguracoesPage"));
+const NotFound = lazy(() => import("./pages/errors/notFound"));
+const Home = lazy(() => import("./pages/clients/home"));
+import ProductPage from "./pages/clients/ProductPage";
+const CartPage = lazy(() => import("./pages/clients/CartPage"));
+const FavoritesPage = lazy(() => import("./pages/clients/FavoritesPage"));
+const NotificationsPage = lazy(() =>
+  import("./pages/clients/NotificationsPage")
+);
+const ProfilePage = lazy(() => import("./pages/clients/ProfilePage"));
+const ExplorePage = lazy(() => import("./pages/clients/ExplorePage"));
+const CheckoutPage = lazy(() => import("./pages/clients/CheckoutPage"));
+const AddressPage = lazy(() => import("./pages/clients/AddressPage"));
+const OrdersPage = lazy(() => import("./pages/clients/OrdersPage"));
+const TrackingPage = lazy(() => import("./pages/clients/TrackingPage"));
+const HistoryPage = lazy(() => import("./pages/clients/HistoryPage"));
+const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
+const PaymentSimulator = lazy(() => import("./pages/clients/PaymentSimulator"));
+const PaymentCheckout = lazy(() => import("./pages/clients/PaymentCheckout"));
+const SuportePage = lazy(() => import("./pages/clients/SuportePage"));
+const MeusCuponsPage = lazy(() => import("./pages/clients/MeusCuponsPage"));
+const ClientConfiguracoesPage = lazy(() =>
+  import("./pages/clients/ConfiguracoesPage")
+);
+const ProductsManagement = lazy(() =>
+  import("./pages/vendor/ProductsManagement")
+);
+const ProductForm = lazy(() => import("./pages/vendor/ProductForm"));
+const VendorDashboard = lazy(() => import("./pages/vendor/VendorDashboard"));
+const VendorOrdersPage = lazy(() => import("./pages/vendor/VendorOrdersPage"));
+const VendorClientsPage = lazy(() =>
+  import("./pages/vendor/VendorClientsPage")
+);
+const VendorProfilePage = lazy(() =>
+  import("./pages/vendor/VendorProfilePage")
+);
+const VendorDeliveriesPage = lazy(() =>
+  import("./pages/vendor/VendorDeliveriesPage")
+);
+const VendorDeliveryDetailPage = lazy(() =>
+  import("./pages/vendor/VendorDeliveryDetailPage")
+);
+const RelatorioPage = lazy(() => import("./pages/vendor/RelatorioPage"));
+const VendorCuponsPage = lazy(() => import("./pages/vendor/VendorCuponsPage"));
+const VendorSellersPage = lazy(() => import("./pages/vendor/VendorSellersPage"));
+const SuporteAdminPage = lazy(() => import('./pages/admin/SuporteAdminPage'));
+import AdminLogin from "./pages/admin/AdminLogin.jsx";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 function App() {
   return (
-    <NotificationProvider>
-      <Router>
-        <Suspense fallback={<LoadingSkeleton type="page" message="Carregando página..." />}>
+    <AuthProvider>
+      <CountersProvider>
+        <NotificationProvider>
+          <Router>
+        <Suspense
+          fallback={
+            <LoadingSkeleton type="page" message="Carregando página..." />
+          }
+        >
           <Routes>
-          {/* Público */}
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/home" element={<Home />} />
-          <Route path="/suporte" element={<SuportePage />} />
-          <Route path="/carrinho" element={<CartPage />} />
-          <Route path="/produto/:id" element={<ProductPage />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/cadastro" element={<Cadastro />} />
-          <Route path="/esqueci-senha" element={<ForgotPasswordPage />} />
-
-          {/* Cliente autenticado */}
-          <Route element={<ProtectedRoute allowedRoles={["cliente", "vendedor"]} />}>
+            {/* Público */}
+            <Route path="/" element={<Home />} />
+            <Route path="/home" element={<Home />} />
+            <Route path="/suporte" element={<SuportePage />} />
+            <Route path="/vendedor/suporte" element={<SuportePage />} />
+            <Route path="/carrinho" element={<CartPage />} />
             <Route path="/favoritos" element={<FavoritesPage />} />
             <Route path="/notificacoes" element={<NotificationsPage />} />
-            <Route path="/perfil" element={<ProfilePage />} />
-            <Route path="/explorer/:category?" element={<ExplorePage />} />
-            <Route path="/enderecos" element={<AddressPage />} />
-            <Route path="/checkout" element={<CheckoutPage />} />
-            <Route path="/checkout/pagamento/:id" element={<PaymentCheckout />} />
-            <Route path="/meus-pedidos" element={<OrdersPage />} />
-            <Route path="/historico" element={<HistoryPage />} />
-            <Route path="/cupons" element={<MeusCuponsPage />} />
-            <Route path="/configuracoes" element={<ClientConfiguracoesPage />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            {/* demais rotas do cliente */}
-          </Route>
+            <Route path="/produto/:id" element={<ProductPage />} />
+            <Route path="/products" element={<ExplorePage />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/cadastro" element={<Cadastro />} />
+            <Route path="/esqueci-senha" element={<ForgotPasswordPage />} />
 
-          {/* Admin */}
-          <Route>
-            <Route path="/admin" element={<Dashboard />} />
-            <Route path="/admin/login" element={<AdminLogin />} />
-            <Route path="/admin/pedidos" element={<AdminOrdersPage />} />
-            <Route path="/admin/vendedores" element={<VendedoresPage />} />
-            <Route path="/admin/configuracoes" element={<ConfiguracoesPage />} />
-          </Route>
+            {/* Cliente autenticado */}
+            <Route
+              element={
+                <ProtectedRoute allowedRoles={["cliente", "vendedor"]} />
+              }
+            >
+              <Route path="/perfil" element={<ProfilePage />} />
+              <Route path="/explorer/:category?" element={<ExplorePage />} />
+              <Route path="/enderecos" element={<AddressPage />} />
+              <Route path="/checkout" element={<CheckoutPage />} />
+              <Route
+                path="/checkout/pagamento/:id"
+                element={<PaymentCheckout />}
+              />
+              <Route path="/meus-pedidos" element={<OrdersPage />} />
+              <Route path="/tracking/:pedidoId" element={<TrackingPage />} />
+              <Route path="/historico" element={<HistoryPage />} />
+              <Route path="/cupons" element={<MeusCuponsPage />} />
+              <Route
+                path="/configuracoes"
+                element={<ClientConfiguracoesPage />}
+              />
+              <Route path="/dashboard" element={<Dashboard />} />
+              {/* demais rotas do cliente */}
+            </Route>
 
-          {/* Vendedor */}
-          <Route element={<ProtectedRoute allowedRoles={["vendedor", "juridico"]} />}>
-            <Route path="/vendedor" element={<VendorDashboard />} />
-            <Route path="/vendedor/perfil" element={<VendorProfilePage />} />
-            <Route path="/vendedor/produtos" element={<ProductsManagement />} />
-            <Route path="/vendedor/produtos/novo" element={<ProductForm />} />
-            <Route path="/vendedor/produtos/:id/editar" element={<ProductForm />} />
-            <Route path="/vendedor/pedidos" element={<VendorOrdersPage />} />
-            <Route path="/vendedor/clientes" element={<VendorClientsPage />} />
-            <Route path="/vendedor/entregas" element={<VendorDeliveriesPage />} />
-            <Route path="/vendedor/entregas/:pedidoId" element={<VendorDeliveryDetailPage />} />
-            <Route path="/vendedor/cupons" element={<VendorCuponsPage />} />
-            <Route path="/vendedor/relatorios" element={<RelatorioPage />} />
-            <Route path="/vendedor/financeiro" element={<FinanceiroPage />} />
-          </Route>
+            {/* Admin */}
+            <Route>
+              <Route path="/admin/login" element={<AdminLogin />} />
+            </Route>
 
-          {/* Demais páginas placeholder */}
-          <Route path="/pedidos" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">Pedidos - Em desenvolvimento</h1></div>} />
+            {/* Admin Protected */}
+            <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+              <Route path="/admin/dashboard" element={<Dashboard />} />
+              <Route path="/admin/pedidos" element={<AdminOrdersPage />} />
+              <Route path="/admin/empresas" element={<EmpresasPage />} />
+              <Route path="/admin/usuarios" element={<UsuariosPage />} />
+              <Route path="/admin/vendedores" element={<VendedoresPage />} />
+              <Route path="/admin/suporte" element={<SuporteAdminPage />} />
+              <Route path="/admin/configuracoes" element={<ConfiguracoesPage />} />
+            </Route>
 
-          {/* Simulador de Pagamento (dev/sandbox) */}
-          <Route path="/pedido/simulado/:id" element={<PaymentSimulator />} />
+            {/* Vendedor */}
+            <Route
+              element={
+                <ProtectedRoute allowedRoles={["vendedor", "juridico"]} />
+              }
+            >
+              <Route path="/vendedor" element={<VendorDashboard />} />
+              <Route path="/vendedor/perfil" element={<VendorProfilePage />} />
+              <Route
+                path="/vendedor/produtos"
+                element={<ProductsManagement />}
+              />
+              <Route path="/vendedor/produtos/novo" element={<ProductForm />} />
+              <Route
+                path="/vendedor/produtos/:id/editar"
+                element={<ProductForm />}
+              />
+              <Route path="/vendedor/pedidos" element={<VendorOrdersPage />} />
+              <Route
+                path="/vendedor/clientes"
+                element={<VendorClientsPage />}
+              />
+              <Route
+                path="/vendedor/entregas"
+                element={<VendorDeliveriesPage />}
+              />
+              <Route
+                path="/vendedor/entregas/:pedidoId"
+                element={<VendorDeliveryDetailPage />}
+              />
+              <Route path="/vendedor/cupons" element={<VendorCuponsPage />} />
+              <Route path="/vendedor/vendedores" element={<VendorSellersPage />} />
+              <Route path="/vendedor/relatorios" element={<RelatorioPage />} />
+              <Route path="/vendedor/financeiro" element={<FinanceiroPage />} />
+            </Route>
 
-          <Route path="/contato" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">Contato - Em desenvolvimento</h1></div>} />
-          <Route path="/ajuda" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">Ajuda - Em desenvolvimento</h1></div>} />
-          <Route path="/faq" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">FAQ - Em desenvolvimento</h1></div>} />
-          <Route path="/esqueci-senha" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">Esqueci Senha - Em desenvolvimento</h1></div>} />
+            {/* Demais páginas placeholder */}
+            <Route
+              path="/pedidos"
+              element={
+                <div className="min-h-screen flex items-center justify-center">
+                  <h1 className="text-2xl">Pedidos - Em desenvolvimento</h1>
+                </div>
+              }
+            />
 
-          {/* 404 */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+            {/* Simulador de Pagamento (dev/sandbox) */}
+            <Route path="/pedido/simulado/:id" element={<PaymentSimulator />} />
+
+            <Route
+              path="/contato"
+              element={
+                <div className="min-h-screen flex items-center justify-center">
+                  <h1 className="text-2xl">Contato - Em desenvolvimento</h1>
+                </div>
+              }
+            />
+            <Route
+              path="/ajuda"
+              element={
+                <div className="min-h-screen flex items-center justify-center">
+                  <h1 className="text-2xl">Ajuda - Em desenvolvimento</h1>
+                </div>
+              }
+            />
+            <Route
+              path="/faq"
+              element={
+                <div className="min-h-screen flex items-center justify-center">
+                  <h1 className="text-2xl">FAQ - Em desenvolvimento</h1>
+                </div>
+              }
+            />
+            <Route
+              path="/esqueci-senha"
+              element={
+                <div className="min-h-screen flex items-center justify-center">
+                  <h1 className="text-2xl">
+                    Esqueci Senha - Em desenvolvimento
+                  </h1>
+                </div>
+              }
+            />
+
+            {/* 404 */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
         </Suspense>
         <NotificationContainer />
         <ToastContainer
@@ -132,8 +235,10 @@ function App() {
           pauseOnHover
           theme="light"
         />
-      </Router>
-    </NotificationProvider>
+          </Router>
+        </NotificationProvider>
+      </CountersProvider>
+    </AuthProvider>
   );
 }
 

@@ -12,12 +12,18 @@ import { sendVendorLowStockEmail } from "../services/emailService.js";
  * @returns {Object} JSON com produtos e total
  */
 export const listarProdutos = async (req, res) => {
-  try {
-    console.log('Debug listarProdutos: query:', req.query);
-    const { categoria, status, busca, pagina = 1, limit = 10, precoMin, precoMax, estoqueMin, estoqueMax } = req.query;
-    const skip = (pagina - 1) * limit;
+   try {
+     console.log('Debug listarProdutos: query:', req.query);
+     const { categoria, status, busca, pagina = 1, limit = 10, precoMin, precoMax, estoqueMin, estoqueMax } = req.query;
+     const skip = (pagina - 1) * limit;
 
-    const where = {};
+     const where = {};
+
+     // Default filter: only show active products for clients (unless explicitly filtering for inactive)
+     // Products with zero stock are automatically deactivated, so they won't appear unless explicitly requested
+     if (status !== "inativo" && status !== "sem-estoque") {
+         where.Ativo = true;
+       }
 
     // Handle category filtering - support both ID and name
     if (categoria) {
@@ -43,7 +49,13 @@ export const listarProdutos = async (req, res) => {
 
     if (status === "ativo") where.Ativo = true;
     else if (status === "inativo") where.Ativo = false;
-    else if (status === "sem-estoque") where.Estoque = 0;
+    else if (status === "sem-estoque") {
+      where.Estoque = 0;
+      // For out of stock filter, we still want to show only active products unless explicitly asking for inactive
+      if (status !== "inativo") {
+        where.Ativo = true;
+      }
+    }
 
     if (busca) {
       // Uso correto de OR no Prisma para busca por nome/SKU (case-insensitive)
@@ -357,12 +369,15 @@ export const criarProduto = async (req, res) => {
     if (!categoria)
       return res.status(400).json({ erro: "Categoria não encontrada" });
 
+    let empresaId = null;
     if (vendedorId) {
       const vendedor = await prisma.vendedor.findUnique({
         where: { VendedorID: parseInt(vendedorId) },
+        select: { VendedorID: true, EmpresaID: true }
       });
       if (!vendedor)
         return res.status(400).json({ erro: "Vendedor não encontrado" });
+      empresaId = vendedor.EmpresaID;
     }
 
     const estoqueValue = parseInt(estoque) || 0;
@@ -375,6 +390,7 @@ export const criarProduto = async (req, res) => {
         PrecoOriginal: precoOriginal ? parseFloat(precoOriginal) : null,
         Estoque: estoqueValue,
         CategoriaID: parseInt(categoriaId),
+        EmpresaID: empresaId,
         VendedorID: vendedorId ? parseInt(vendedorId) : null,
         CodBarras:
           codBarras || `${Date.now()}${Math.floor(Math.random() * 1000)}`,
@@ -391,7 +407,7 @@ export const criarProduto = async (req, res) => {
         Desconto: parseInt(desconto) || 0,
         PrazoEntrega: prazoEntrega,
         Imagens: imagens || [],
-        Ativo: ativo !== undefined ? ativo : (estoqueValue > 0), // Set to false if out of stock
+        Ativo: ativo !== undefined ? ativo : true, // Default to active, will be deactivated if stock is 0 after creation
       },
       include: { categoria: true, vendedor: { select: { VendedorID: true, Nome: true } } },
     });
@@ -443,13 +459,18 @@ export const atualizarProduto = async (req, res) => {
         return res.status(400).json({ erro: "Categoria não encontrada" });
     }
 
+    let empresaId = produtoExistente.EmpresaID; // Keep existing EmpresaID by default
     if (data.vendedorId !== undefined) {
       if (data.vendedorId) {
         const vendedor = await prisma.vendedor.findUnique({
           where: { VendedorID: parseInt(data.vendedorId) },
+          select: { VendedorID: true, EmpresaID: true }
         });
         if (!vendedor)
           return res.status(400).json({ erro: "Vendedor não encontrado" });
+        empresaId = vendedor.EmpresaID;
+      } else {
+        empresaId = null; // If removing vendedor, also remove empresa
       }
     }
 
@@ -468,6 +489,7 @@ export const atualizarProduto = async (req, res) => {
         ...(data.estoque !== undefined && { Estoque: parseInt(data.estoque) }),
         ...(data.categoriaId && { CategoriaID: parseInt(data.categoriaId) }),
         ...(data.vendedorId !== undefined && { VendedorID: data.vendedorId ? parseInt(data.vendedorId) : null }),
+        EmpresaID: empresaId, // Always update EmpresaID based on VendedorID changes
         ...(data.codBarras && { CodBarras: data.codBarras }),
         ...(data.sku && { SKU: data.sku }),
         ...(data.peso !== undefined && { Peso: data.peso }),
@@ -502,30 +524,39 @@ export const atualizarProduto = async (req, res) => {
       },
     });
 
-    // Handle out of stock logic: if estoque <= 0, set status to inativo and notify vendor
-    if (produto.Estoque <= 0 && produto.Ativo) {
-      await prisma.produto.update({
-        where: { ProdutoID: parseInt(id) },
-        data: { Ativo: false },
-      });
-      produto.Ativo = false; // Update local object for consistency
+    // Handle stock changes: if estoque becomes > 0 and product was inactive, reactivate it
+     if (produto.Estoque > 0 && !produto.Ativo && produtoExistente.Estoque <= 0) {
+       await prisma.produto.update({
+         where: { ProdutoID: parseInt(id) },
+         data: { Ativo: true },
+       });
+       produto.Ativo = true; // Update local object for consistency
+       logger.info('produto_reativado_estoque_reposto', { produtoId: produto.ProdutoID });
+     }
+     // Handle out of stock logic: if estoque <= 0, set status to inativo and notify vendor
+     else if (produto.Estoque <= 0 && produto.Ativo) {
+       await prisma.produto.update({
+         where: { ProdutoID: parseInt(id) },
+         data: { Ativo: false },
+       });
+       produto.Ativo = false; // Update local object for consistency
 
-      // Send email notification to vendor
-      if (produto.vendedor) {
-        try {
-          await sendVendorLowStockEmail({
-            vendedorNome: produto.vendedor.Nome,
-            email: produto.vendedor.Email,
-            produtoNome: produto.Nome,
-            estoqueAtual: produto.Estoque,
-            vendasRecentes: 0 // For out of stock, we can set to 0 or calculate if needed
-          });
-          logger.info('email_estoque_esgotado_enviado', { produtoId: produto.ProdutoID, vendedorId: produto.vendedor.VendedorID });
-        } catch (emailError) {
-          logger.warn('erro_email_estoque_esgotado', { produtoId: produto.ProdutoID, error: emailError.message });
-        }
-      }
-    }
+       // Send email notification to vendor
+       if (produto.vendedor) {
+         try {
+           await sendVendorLowStockEmail({
+             vendedorNome: produto.vendedor.Nome,
+             email: produto.vendedor.Email,
+             produtoNome: produto.Nome,
+             estoqueAtual: produto.Estoque,
+             vendasRecentes: 0 // For out of stock, we can set to 0 or calculate if needed
+           });
+           logger.info('email_estoque_esgotado_enviado', { produtoId: produto.ProdutoID, vendedorId: produto.vendedor.VendedorID });
+         } catch (emailError) {
+           logger.warn('erro_email_estoque_esgotado', { produtoId: produto.ProdutoID, error: emailError.message });
+         }
+       }
+     }
 
 
     logger.info('atualizar_produto_ok', { id: produto.ProdutoID });

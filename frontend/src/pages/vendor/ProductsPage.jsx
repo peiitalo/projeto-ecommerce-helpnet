@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { produtoService } from '../../services/api';
+import { produtoService, parceriaApi } from '../../services/api';
 import VendorLayout from '../../components/VendorLayout.jsx';
 import { useNotifications } from '../../hooks/useNotifications';
 import {
@@ -13,31 +13,37 @@ import {
   FaBox,
   FaShoppingCart,
   FaExclamationTriangle,
-  FaTimes
+  FaTimes,
+  FaHandshake,
+  FaUserFriends
 } from 'react-icons/fa';
 
 function VendorProductsPage() {
   const { user } = useAuth();
   const { showSuccess, showError } = useNotifications();
   const [products, setProducts] = useState([]);
+  const [sharedProducts, setSharedProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const productsPerPage = 10;
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showProductModal, setShowProductModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('meus'); // 'meus' ou 'compartilhados'
 
   // Statistics
   const stats = useMemo(() => {
-    const total = products.length;
-    const active = products.filter(p => p.status === 'ativo').length;
-    const outOfStock = products.filter(p => p.estoque <= 0).length;
+    const currentProducts = activeTab === 'meus' ? products : sharedProducts;
+    const total = currentProducts.length;
+    const active = currentProducts.filter(p => p.ativo).length;
+    const outOfStock = currentProducts.filter(p => p.estoque <= 0).length;
 
     return { total, active, outOfStock };
-  }, [products]);
+  }, [products, sharedProducts, activeTab]);
 
   useEffect(() => {
     loadProducts();
+    loadSharedProducts();
   }, [user]);
 
   const loadProducts = async () => {
@@ -55,16 +61,28 @@ function VendorProductsPage() {
     }
   };
 
+  const loadSharedProducts = async () => {
+    try {
+      const response = await parceriaApi.listarProdutosCompartilhados();
+      setSharedProducts(response.produtos || []);
+    } catch (error) {
+      console.error('Erro ao carregar produtos compartilhados:', error);
+      setSharedProducts([]);
+    }
+  };
+
   const filteredProducts = useMemo(() => {
-    if (!searchQuery.trim()) return products;
+    const currentProducts = activeTab === 'meus' ? products : sharedProducts;
+
+    if (!searchQuery.trim()) return currentProducts;
 
     const query = searchQuery.toLowerCase();
-    return products.filter(product =>
-      product.Nome?.toLowerCase().includes(query) ||
+    return currentProducts.filter(product =>
+      product.nome?.toLowerCase().includes(query) ||
       product.SKU?.toLowerCase().includes(query) ||
-      product.categoria?.Nome?.toLowerCase().includes(query)
+      product.categoria?.toLowerCase().includes(query)
     );
-  }, [products, searchQuery]);
+  }, [products, sharedProducts, searchQuery, activeTab]);
 
   const paginatedProducts = useMemo(() => {
     const startIndex = (currentPage - 1) * productsPerPage;
@@ -111,13 +129,46 @@ function VendorProductsPage() {
                 {stats.total} produto{stats.total !== 1 ? 's' : ''} encontrado{stats.total !== 1 ? 's' : ''}
               </p>
             </div>
-            <Link
-              to="/vendedor/produtos/novo"
-              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
+            {activeTab === 'meus' && (
+              <Link
+                to="/vendedor/produtos/novo"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
+              >
+                <FaPlus className="text-sm" />
+                Novo produto
+              </Link>
+            )}
+          </div>
+
+          {/* Tabs */}
+          <div className="flex gap-1 bg-slate-100 p-1 rounded-lg w-fit">
+            <button
+              onClick={() => setActiveTab('meus')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'meus'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
             >
-              <FaPlus className="text-sm" />
-              Novo produto
-            </Link>
+              <FaBox className="inline mr-2" />
+              Meus Produtos
+            </button>
+            <button
+              onClick={() => setActiveTab('compartilhados')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'compartilhados'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <FaHandshake className="inline mr-2" />
+              Produtos Compartilhados
+              {sharedProducts.length > 0 && (
+                <span className="ml-2 bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full">
+                  {sharedProducts.length}
+                </span>
+              )}
+            </button>
           </div>
         </div>
 
@@ -271,16 +322,27 @@ function VendorProductsPage() {
                           {product.SKU || '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                          {product.categoria?.Nome || 'Sem categoria'}
+                          {product.categoria || 'Sem categoria'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            product.status === 'ativo'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            {product.status === 'ativo' ? 'Ativo' : 'Inativo'}
-                          </span>
+                          {activeTab === 'meus' ? (
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              product.status === 'ativo'
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {product.status === 'ativo' ? 'Ativo' : 'Inativo'}
+                            </span>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                                Compartilhado
+                              </span>
+                              <span className="text-xs text-slate-500">
+                                por {product.vendedor?.nome}
+                              </span>
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex items-center gap-2">
@@ -291,20 +353,28 @@ function VendorProductsPage() {
                             >
                               <FaEye />
                             </button>
-                            <Link
-                              to={`/vendedor/produtos/${product.ProdutoID}/editar`}
-                              className="text-green-600 hover:text-green-900 p-1"
-                              title="Editar"
-                            >
-                              <FaEdit />
-                            </Link>
-                            <button
-                              onClick={() => handleDelete(product.ProdutoID)}
-                              className="text-red-600 hover:text-red-900 p-1"
-                              title="Excluir"
-                            >
-                              <FaTrash />
-                            </button>
+                            {activeTab === 'meus' ? (
+                              <>
+                                <Link
+                                  to={`/vendedor/produtos/${product.ProdutoID}/editar`}
+                                  className="text-green-600 hover:text-green-900 p-1"
+                                  title="Editar"
+                                >
+                                  <FaEdit />
+                                </Link>
+                                <button
+                                  onClick={() => handleDelete(product.ProdutoID)}
+                                  className="text-red-600 hover:text-red-900 p-1"
+                                  title="Excluir"
+                                >
+                                  <FaTrash />
+                                </button>
+                              </>
+                            ) : (
+                              <span className="text-slate-400 text-xs">
+                                Visualização apenas
+                              </span>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -330,19 +400,30 @@ function VendorProductsPage() {
                         <div className="flex items-start justify-between">
                           <div className="flex-1 min-w-0">
                             <h3 className="text-sm font-medium text-slate-900 truncate">
-                              {product.Nome}
+                              {product.nome || product.Nome}
                             </h3>
                             <p className="text-sm text-slate-500 mt-1">
-                              {product.SKU || 'Sem SKU'} • {product.categoria?.Nome || 'Sem categoria'}
+                              {product.SKU || 'Sem SKU'} • {product.categoria || product.categoria?.Nome || 'Sem categoria'}
                             </p>
                           </div>
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ml-2 flex-shrink-0 ${
-                            product.status === 'ativo'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            {product.status === 'ativo' ? 'Ativo' : 'Inativo'}
-                          </span>
+                          {activeTab === 'meus' ? (
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ml-2 flex-shrink-0 ${
+                              product.status === 'ativo'
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {product.status === 'ativo' ? 'Ativo' : 'Inativo'}
+                            </span>
+                          ) : (
+                            <div className="flex flex-col items-end gap-1 ml-2">
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 flex-shrink-0">
+                                Compartilhado
+                              </span>
+                              <span className="text-xs text-slate-500">
+                                por {product.vendedor?.nome}
+                              </span>
+                            </div>
+                          )}
                         </div>
 
                         <div className="mt-2 grid grid-cols-2 gap-4 text-sm">
@@ -369,20 +450,28 @@ function VendorProductsPage() {
                             >
                               <FaEye className="text-sm" />
                             </button>
-                            <Link
-                              to={`/vendedor/produtos/${product.ProdutoID}/editar`}
-                              className="text-green-600 hover:text-green-900 p-2"
-                              title="Editar"
-                            >
-                              <FaEdit className="text-sm" />
-                            </Link>
-                            <button
-                              onClick={() => handleDelete(product.ProdutoID)}
-                              className="text-red-600 hover:text-red-900 p-2"
-                              title="Excluir"
-                            >
-                              <FaTrash className="text-sm" />
-                            </button>
+                            {activeTab === 'meus' ? (
+                              <>
+                                <Link
+                                  to={`/vendedor/produtos/${product.ProdutoID}/editar`}
+                                  className="text-green-600 hover:text-green-900 p-2"
+                                  title="Editar"
+                                >
+                                  <FaEdit className="text-sm" />
+                                </Link>
+                                <button
+                                  onClick={() => handleDelete(product.ProdutoID)}
+                                  className="text-red-600 hover:text-red-900 p-2"
+                                  title="Excluir"
+                                >
+                                  <FaTrash className="text-sm" />
+                                </button>
+                              </>
+                            ) : (
+                              <span className="text-slate-400 text-xs">
+                                Visualização apenas
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -455,18 +544,22 @@ function VendorProductsPage() {
                 {/* Details */}
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-xl font-semibold text-gray-900">{selectedProduct.Nome}</h3>
-                    <p className="text-sm text-gray-600">SKU: {selectedProduct.SKU || 'N/A'}</p>
-                  </div>
-
-                  <div>
-                    <p className="text-2xl font-bold text-blue-600">
-                      {formatPrice(selectedProduct.Preco)}
-                    </p>
-                    <p className="text-sm text-gray-600">Estoque: {selectedProduct.Estoque} unidades</p>
-                    <p className="text-sm text-gray-600">Categoria: {selectedProduct.categoria?.Nome || 'Sem categoria'}</p>
-                    <p className="text-sm text-gray-600">Status: {selectedProduct.status === 'ativo' ? 'Ativo' : 'Inativo'}</p>
-                  </div>
+                    <h3 className="text-xl font-semibold text-gray-900">{selectedProduct.nome || selectedProduct.Nome}</h3>
+                      <p className="text-sm text-gray-600">SKU: {selectedProduct.SKU || 'N/A'}</p>
+                    </div>
+ 
+                    <div>
+                      <p className="text-2xl font-bold text-blue-600">
+                        {formatPrice(selectedProduct.preco || selectedProduct.Preco)}
+                      </p>
+                      <p className="text-sm text-gray-600">Estoque: {selectedProduct.estoque || selectedProduct.Estoque} unidades</p>
+                      <p className="text-sm text-gray-600">Categoria: {selectedProduct.categoria || selectedProduct.categoria?.Nome || 'Sem categoria'}</p>
+                      {activeTab === 'meus' ? (
+                        <p className="text-sm text-gray-600">Status: {selectedProduct.status === 'ativo' ? 'Ativo' : 'Inativo'}</p>
+                      ) : (
+                        <p className="text-sm text-gray-600">Compartilhado por: {selectedProduct.vendedor?.nome}</p>
+                      )}
+                    </div>
 
                   {selectedProduct.BreveDescricao && (
                     <div>
@@ -478,13 +571,19 @@ function VendorProductsPage() {
                   <div className="pt-4 border-t border-gray-200">
                     <h4 className="font-semibold text-gray-900 mb-2">Ações</h4>
                     <div className="flex gap-2">
-                      <Link
-                        to={`/vendedor/produtos/${selectedProduct.ProdutoID}/editar`}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        onClick={() => setShowProductModal(false)}
-                      >
-                        Editar Produto
-                      </Link>
+                      {activeTab === 'meus' ? (
+                        <Link
+                          to={`/vendedor/produtos/${selectedProduct.ProdutoID}/editar`}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                          onClick={() => setShowProductModal(false)}
+                        >
+                          Editar Produto
+                        </Link>
+                      ) : (
+                        <span className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg">
+                          Produto compartilhado - Visualização apenas
+                        </span>
+                      )}
                       <button
                         onClick={() => setShowProductModal(false)}
                         className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"

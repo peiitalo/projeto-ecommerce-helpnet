@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCounters } from '../../context/CountersContext';
-import { clienteService, produtoService } from '../../services/api';
+import { clienteService, suporteService } from '../../services/api';
 import { useNotifications } from '../../hooks/useNotifications';
 import { buildImageUrl } from '../../utils/imageUtils';
 import {
@@ -30,6 +30,9 @@ function ConfiguracoesPage() {
   const { showSuccess, showError } = useNotifications();
   const { favoritesCount, notificationsCount, cartCount } = useCounters();
   const navigate = useNavigate();
+
+  // Always show sidebar for client settings
+  const VendorLayout = ({ children }) => children;
   
   const [activeTab, setActiveTab] = useState('conta');
   const [loading, setLoading] = useState(false);
@@ -178,12 +181,18 @@ function ConfiguracoesPage() {
     { id: 'conta', label: 'Conta', icon: <FiUser /> },
     { id: 'notificacoes', label: 'Notificações', icon: <FiBell /> },
     { id: 'avaliacoes', label: 'Avaliações', icon: <FiStar /> },
+    { id: 'suporte', label: 'Suporte', icon: <FiHelpCircle /> },
     { id: 'privacidade', label: 'Privacidade', icon: <FiShield /> }
   ];
 
   // Estados para avaliações
   const [avaliacoes, setAvaliacoes] = useState([]);
   const [loadingAvaliacoes, setLoadingAvaliacoes] = useState(false);
+
+  // Estados para suporte
+  const [mensagensSuporte, setMensagensSuporte] = useState([]);
+  const [avaliacaoPlataforma, setAvaliacaoPlataforma] = useState(null);
+  const [loadingSuporte, setLoadingSuporte] = useState(false);
 
 
   // Carregar avaliações do cliente
@@ -193,7 +202,7 @@ function ConfiguracoesPage() {
       // Buscar avaliações reais do cliente logado
       const response = await clienteService.buscarAvaliacoes();
       const avaliacoesData = response.avaliacoes || [];
-      
+
       // Mapear avaliações para o formato esperado
       const avaliacoesMapeadas = avaliacoesData.map(avaliacao => ({
         id: avaliacao.AvaliacaoID || avaliacao.id,
@@ -204,9 +213,9 @@ function ConfiguracoesPage() {
         },
         nota: avaliacao.Nota || avaliacao.nota,
         comentario: avaliacao.Comentario || avaliacao.comentario,
-        data: avaliacao.DataCriacao || avaliacao.data
+        data: avaliacao.CriadoEm || avaliacao.DataCriacao || avaliacao.data
       }));
-      
+
       setAvaliacoes(avaliacoesMapeadas);
     } catch (error) {
       console.error('Erro ao carregar avaliações:', error);
@@ -216,9 +225,38 @@ function ConfiguracoesPage() {
     }
   };
 
+  // Carregar mensagens de suporte do cliente
+  const carregarMensagensSuporte = async () => {
+    try {
+      setLoadingSuporte(true);
+      const response = await suporteService.buscarMinhasMensagens();
+      const mensagensData = response.mensagens || [];
+      setMensagensSuporte(mensagensData);
+    } catch (error) {
+      console.error('Erro ao carregar mensagens de suporte:', error);
+      setMensagensSuporte([]);
+    } finally {
+      setLoadingSuporte(false);
+    }
+  };
+
+  // Carregar avaliação da plataforma do cliente
+  const carregarAvaliacaoPlataforma = async () => {
+    try {
+      const response = await suporteService.buscarMinhaAvaliacao();
+      setAvaliacaoPlataforma(response.avaliacao || null);
+    } catch (error) {
+      console.error('Erro ao carregar avaliação da plataforma:', error);
+      setAvaliacaoPlataforma(null);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'avaliacoes') {
       carregarAvaliacoes();
+    } else if (activeTab === 'suporte') {
+      carregarMensagensSuporte();
+      carregarAvaliacaoPlataforma();
     }
   }, [activeTab]);
 
@@ -236,7 +274,7 @@ function ConfiguracoesPage() {
   };
 
   const handleLogout = () => {
-    if (window.confirm('Deseja realmente sair?')) {
+    if (window.confirm('Tem certeza que deseja sair da conta?')) {
       logout();
       navigate('/login');
     }
@@ -288,7 +326,7 @@ function ConfiguracoesPage() {
             className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 border border-red-200"
           >
             <FaSignOutAlt />
-            <span className="text-sm font-medium">Excluir Conta</span>
+            <span className="text-sm font-medium">Sair da conta</span>
           </button>
         </div>
       </div>
@@ -323,7 +361,7 @@ function ConfiguracoesPage() {
             className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 border border-red-200"
           >
             <FaSignOutAlt />
-            <span className="text-sm font-medium">Excluir Conta</span>
+            <span className="text-sm font-medium">Sair da conta</span>
           </button>
         </div>
       </aside>
@@ -505,8 +543,8 @@ function ConfiguracoesPage() {
               {/* Tab: Avaliações */}
               {activeTab === 'avaliacoes' && (
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-900 mb-6">Minhas Avaliações</h2>
-                  
+                  <h2 className="text-lg font-semibold text-slate-900 mb-6">Minhas Avaliações de Produtos</h2>
+
                   {loadingAvaliacoes ? (
                     <div className="text-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -516,34 +554,31 @@ function ConfiguracoesPage() {
                     <div className="space-y-6">
                       {avaliacoes.map((avaliacao) => (
                         <div key={avaliacao.id} className="bg-slate-50 border border-slate-200 rounded-lg p-6">
-                          <div className="flex gap-4 mb-4">
-                            <Link to={`/produto/${avaliacao.produto.id}`} className="flex-shrink-0">
-                              <img
-                                src={avaliacao.produto.imagem}
-                                alt={avaliacao.produto.nome}
-                                className="w-20 h-20 object-cover rounded-lg hover:opacity-80 transition-opacity"
-                              />
-                            </Link>
-                            <div className="flex-1 min-w-0">
-                              <Link 
-                                to={`/produto/${avaliacao.produto.id}`}
-                                className="font-medium text-slate-900 hover:text-blue-700 transition-colors block mb-2"
-                              >
-                                {avaliacao.produto.nome}
-                              </Link>
-                              <div className="flex items-center gap-2 mb-3">
-                                <div className="flex">
-                                  {renderStars(avaliacao.nota)}
-                                </div>
-                                <span className="text-sm font-medium text-slate-700">({avaliacao.nota}/5)</span>
-                                <span className="text-sm text-slate-500">•</span>
-                                <span className="text-sm text-slate-500">{new Date(avaliacao.data).toLocaleDateString('pt-BR')}</span>
-                              </div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="flex">
+                              {renderStars(avaliacao.nota)}
                             </div>
+                            <span className="text-sm font-medium text-slate-700">({avaliacao.nota}/5)</span>
+                            <span className="text-sm text-slate-500">•</span>
+                            <span className="text-sm text-slate-500">{new Date(avaliacao.data).toLocaleDateString('pt-BR')}</span>
                           </div>
                           <div className="bg-white rounded-lg p-4 border-l-4 border-blue-500">
                             <p className="text-slate-800 leading-relaxed">{avaliacao.comentario}</p>
                           </div>
+                          {avaliacao.produto && (
+                            <div className="mt-4 flex items-center gap-3">
+                              <Link to={`/produto/${avaliacao.produto.id}`} className="flex items-center gap-3 group">
+                                <img
+                                  src={avaliacao.produto.imagem}
+                                  alt={avaliacao.produto.nome}
+                                  className="w-12 h-12 object-cover rounded-lg group-hover:opacity-80 transition-opacity"
+                                />
+                                <span className="text-sm font-medium text-slate-900 group-hover:text-blue-700 transition-colors">
+                                  {avaliacao.produto.nome || 'Produto'}
+                                </span>
+                              </Link>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -562,6 +597,132 @@ function ConfiguracoesPage() {
                       </Link>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Tab: Suporte */}
+              {activeTab === 'suporte' && (
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900 mb-6">Histórico de Suporte</h2>
+
+                  {/* Avaliação da Plataforma */}
+                  <div className="mb-8">
+                    <h3 className="text-base font-semibold text-slate-900 mb-4">Avaliação da Plataforma</h3>
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-6">
+                      {avaliacaoPlataforma ? (
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-4">
+                            <div className="flex">
+                              {renderStars(avaliacaoPlataforma.Nota)}
+                            </div>
+                            <span className="text-sm font-medium text-slate-700">({avaliacaoPlataforma.Nota}/5)</span>
+                            <span className="text-sm text-slate-500">•</span>
+                            <span className="text-sm text-slate-500">
+                              Avaliado em {new Date(avaliacaoPlataforma.CriadoEm).toLocaleDateString('pt-BR')}
+                            </span>
+                          </div>
+                          {avaliacaoPlataforma.Comentario && (
+                            <div className="bg-white rounded-lg p-4 border-l-4 border-blue-500">
+                              <p className="text-slate-800 leading-relaxed">{avaliacaoPlataforma.Comentario}</p>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-center py-6">
+                          <div className="text-slate-400 mb-2">
+                            <FiStar className="w-8 h-8 mx-auto" />
+                          </div>
+                          <p className="text-slate-600 text-sm">Você ainda não avaliou nossa plataforma.</p>
+                          <Link
+                            to="/suporte"
+                            className="inline-flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 text-sm mt-2"
+                          >
+                            Avaliar Plataforma
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Mensagens de Feedback/Suporte */}
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-900 mb-4">Mensagens de Feedback</h3>
+
+                    {loadingSuporte ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                        <p className="text-slate-600 mt-2">Carregando mensagens...</p>
+                      </div>
+                    ) : mensagensSuporte.length > 0 ? (
+                      <div className="space-y-6">
+                        {mensagensSuporte.map((mensagem) => (
+                          <div key={mensagem.MensagemID} className="bg-slate-50 border border-slate-200 rounded-lg p-6">
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                    mensagem.Tipo === 'DUVIDA'
+                                      ? 'bg-blue-100 text-blue-800'
+                                      : 'bg-green-100 text-green-800'
+                                  }`}>
+                                    {mensagem.Tipo === 'DUVIDA' ? 'Dúvida' : 'Comentário'}
+                                  </span>
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                    mensagem.Status === 'PENDENTE'
+                                      ? 'bg-yellow-100 text-yellow-800'
+                                      : mensagem.Status === 'RESPONDIDO'
+                                      ? 'bg-blue-100 text-blue-800'
+                                      : 'bg-green-100 text-green-800'
+                                  }`}>
+                                    {mensagem.Status === 'PENDENTE' ? 'Pendente' : mensagem.Status === 'RESPONDIDO' ? 'Respondido' : 'Resolvido'}
+                                  </span>
+                                </div>
+                                <h3 className="font-medium text-slate-900 mb-1">{mensagem.Assunto}</h3>
+                                <p className="text-sm text-slate-500">
+                                  Enviado em {new Date(mensagem.CriadoEm).toLocaleDateString('pt-BR')} às {new Date(mensagem.CriadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="bg-white rounded-lg p-4 border-l-4 border-blue-500 mb-4">
+                              <p className="text-slate-800 leading-relaxed">{mensagem.Mensagem}</p>
+                            </div>
+
+                            {mensagem.Resposta && (
+                              <div className="bg-green-50 rounded-lg p-4 border-l-4 border-green-500">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="text-sm font-medium text-green-800">
+                                    Resposta do suporte
+                                    {mensagem.admin && ` - ${mensagem.admin.Nome}`}
+                                  </span>
+                                  {mensagem.RespondidoEm && (
+                                    <span className="text-xs text-green-600">
+                                      {new Date(mensagem.RespondidoEm).toLocaleDateString('pt-BR')} às {new Date(mensagem.RespondidoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-green-800 leading-relaxed">{mensagem.Resposta}</p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12">
+                        <div className="text-slate-400 mb-4">
+                          <FiHelpCircle className="w-12 h-12 mx-auto" />
+                        </div>
+                        <h3 className="text-lg font-medium text-slate-900 mb-2">Nenhuma mensagem de feedback</h3>
+                        <p className="text-slate-600 mb-4">Você ainda não enviou nenhuma mensagem de feedback.</p>
+                        <Link
+                          to="/suporte"
+                          className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                        >
+                          Enviar Feedback
+                        </Link>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 

@@ -47,6 +47,14 @@ router.post('/images', authMiddleware, (req, res) => {
         });
       }
 
+      // Tratar erro de API key inválida do Cloudinary
+      if (err.message && err.message.includes('Invalid api_key')) {
+        logger.error('uploadRoutes: Cloudinary API key inválida');
+        return res.status(400).json({
+          error: 'Configuração de upload não está completa. Configure as credenciais do Cloudinary.'
+        });
+      }
+
       // Outros erros do multer
       logger.error('uploadRoutes: Erro genérico do multer', {
         error: err.message,

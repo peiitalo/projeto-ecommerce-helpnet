@@ -1,66 +1,18 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../../context/CartContext.jsx';
-import { useAuth } from '../../context/AuthContext.jsx';
-import { freteService, clienteService } from '../../services/api.js';
 import { buildImageUrl } from '../../utils/imageUtils.js';
-import { FaTrash, FaArrowLeft, FaTruck, FaMapMarkerAlt, FaShoppingCart } from 'react-icons/fa';
+import { FaTrash, FaArrowLeft, FaShoppingCart } from 'react-icons/fa';
 
 export default function CartPage() {
-  const { items, updateQuantity, removeItem } = useCart();
-  const { user } = useAuth();
+  const { items, updateQuantity, removeItem, appliedCoupons, couponDiscount } = useCart();
   const navigate = useNavigate();
 
   const [selectedItems, setSelectedItems] = useState([]);
-  const [coupon, setCoupon] = useState('');
-  const [selectedCoupons, setSelectedCoupons] = useState([]);
-  const [availableCoupons, setAvailableCoupons] = useState([]);
 
-  // Estados para cálculo de frete
-  const [shippingInfo, setShippingInfo] = useState(null);
-  const [calculatingShipping, setCalculatingShipping] = useState(false);
-  const [shippingError, setShippingError] = useState('');
-  const [selectedAddressId, setSelectedAddressId] = useState(1); // ID do endereço padrão
   const [isFinalizing, setIsFinalizing] = useState(false); // Estado de carregamento para finalização
 
-  // Estados para endereços
-  const [addresses, setAddresses] = useState([]);
-  const [loadingAddresses, setLoadingAddresses] = useState(false);
 
-  // Buscar endereços do cliente
-  useEffect(() => {
-    const fetchAddresses = async () => {
-      if (!user) return;
-
-      setLoadingAddresses(true);
-      try {
-        const data = await clienteService.listarEnderecos();
-        setAddresses(data.enderecos || []);
-        if (data.enderecos && data.enderecos.length > 0) {
-          setSelectedAddressId(data.enderecos[0].EnderecoID);
-        }
-      } catch (error) {
-        console.error('Erro ao buscar endereços:', error);
-        setAddresses([]);
-      } finally {
-        setLoadingAddresses(false);
-      }
-    };
-
-    fetchAddresses();
-    loadAvailableCoupons();
-  }, [user]);
-
-  // Carregar cupons disponíveis
-  const loadAvailableCoupons = () => {
-    // Simular cupons disponíveis - em produção viria da API
-    const mockCoupons = [
-      { code: 'DESCONTO10', discount: 10, type: 'percentage', minValue: 50 },
-      { code: 'FRETEGRATIS', discount: 0, type: 'free_shipping', minValue: 100 },
-      { code: 'PRIMEIRA15', discount: 15, type: 'percentage', minValue: 0 }
-    ];
-    setAvailableCoupons(mockCoupons);
-  };
 
   const formatPrice = (n) =>
     n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -77,97 +29,37 @@ export default function CartPage() {
     updateQuantity(id, Math.max(1, (item.quantity || 1) + delta));
   };
 
-  const handleRemoveSelected = () => {
-    if (
-      window.confirm(
-        `Tem certeza que deseja remover ${selectedItems.length} item(s) selecionado(s)?`
-      )
-    ) {
-      selectedItems.forEach((id) => removeItem(id));
-      setSelectedItems([]);
-    }
-  };
-
-  const toggleCoupon = (code) => {
-    setSelectedCoupons((prev) =>
-      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
-    );
-  };
-
-  // Função para calcular frete
-  const calculateShipping = async () => {
-    if (!user || selectedItems.length === 0) return;
-
-    setCalculatingShipping(true);
-    setShippingError('');
-
-    try {
-      const produtoIds = selectedItems;
-      const result = await freteService.calcular(user.id, selectedAddressId, produtoIds);
-      setShippingInfo(result);
-    } catch (error) {
-      console.error('Erro ao calcular frete:', error);
-      setShippingError(error.message || 'Erro ao calcular frete');
-      setShippingInfo(null);
-    } finally {
-      setCalculatingShipping(false);
-    }
-  };
 
   // Subtotal baseado em itens selecionados
   const subtotal = useMemo(() => {
+    // Filtrar apenas itens selecionados e calcular subtotal com desconto
     return selectedItems.reduce((acc, id) => {
       const item = items.find((i) => i.id === id);
       if (!item) return acc;
-      return acc + item.price * item.quantity;
+      const basePrice = item.originalPrice || item.price || 0;
+      const discount = item.discount || 0;
+      const discountedPrice = basePrice * (1 - discount / 100);
+      return acc + (discountedPrice * (item.quantity || 1));
     }, 0);
   }, [selectedItems, items]);
 
-  // Aplicar desconto dos cupons selecionados
-  const discountAmount = useMemo(() => {
-    return selectedCoupons.reduce((acc, code) => {
-      const coupon = availableCoupons.find(c => c.code === code);
-      if (!coupon || subtotal < coupon.minValue) return acc;
-      
-      if (coupon.type === 'percentage') {
-        return acc + (subtotal * coupon.discount / 100);
-      } else if (coupon.type === 'fixed') {
-        return acc + Math.min(coupon.discount, subtotal);
-      }
-      return acc;
-    }, 0);
-  }, [selectedCoupons, subtotal, availableCoupons]);
 
-  // Verificar se tem frete grátis por cupom
-  const hasFreeShippingCoupon = useMemo(() => {
-    return selectedCoupons.some(code => {
-      const coupon = availableCoupons.find(c => c.code === code);
-      return coupon && coupon.type === 'free_shipping' && subtotal >= coupon.minValue;
-    });
-  }, [selectedCoupons, subtotal, availableCoupons]);
-
-  // Total incluindo frete e desconto
+  // Total com desconto do cupom
   const total = useMemo(() => {
-    let totalValue = subtotal - discountAmount;
-    if (shippingInfo && shippingInfo.frete > 0) {
-      totalValue += shippingInfo.frete;
-    }
-    return Math.max(0, totalValue);
-  }, [subtotal, discountAmount, shippingInfo]);
+    return Math.max(0, subtotal - couponDiscount);
+  }, [subtotal, couponDiscount]);
 
   const handleFinalizePurchase = () => {
     if (selectedItems.length === 0) return;
-    
+
     setIsFinalizing(true);
     try {
       // Persistir dados do checkout
       const checkoutData = {
         selectedItems,
         subtotal,
-        discountAmount,
-        selectedCoupons,
-        shippingInfo,
-        selectedAddressId
+        couponDiscount,
+        appliedCoupons
       };
       sessionStorage.setItem('helpnet_checkout_data', JSON.stringify(checkoutData));
       navigate('/checkout');
@@ -259,9 +151,30 @@ export default function CartPage() {
                     <p className="text-xs text-slate-500">SKU: {item.sku}</p>
                   )}
                   <div className="mt-2 flex items-center gap-3">
-                    <span className="text-blue-700 font-semibold">
-                      {formatPrice(item.price)}
-                    </span>
+                    {(() => {
+                      const discountValue = Number(item.discount) || 0;
+                      const basePrice = item.originalPrice || item.price || 0;
+
+                      if (discountValue > 0) {
+                        const discountedPrice = basePrice * (1 - discountValue / 100);
+                        return (
+                          <div className="flex flex-col">
+                            <span className="text-green-700 font-semibold">
+                              {formatPrice(discountedPrice)}
+                            </span>
+                            <span className="text-xs text-slate-400 line-through">
+                              {formatPrice(basePrice)}
+                            </span>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <span className="text-blue-700 font-semibold">
+                            {formatPrice(basePrice)}
+                          </span>
+                        );
+                      }
+                    })()}
                     {typeof item.estoque === 'number' && (
                       <span className="text-xs text-slate-500">
                         Estoque: {item.estoque}
@@ -296,104 +209,30 @@ export default function CartPage() {
         <aside className="lg:col-span-1 sticky top-20 self-start space-y-4">
           <div className="p-4 border border-slate-200 rounded-xl bg-white space-y-3 shadow-sm">
 
-            {/* Input para cupom */}
-            <div className="mt-3 space-y-2">
-              <input
-                type="text"
-                placeholder="Código do cupom"
-                value={coupon}
-                onChange={(e) => setCoupon(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-              />
-              <button
-                onClick={() => {
-                  if (coupon.trim()) {
-                    toggleCoupon(coupon);
-                    setCoupon('');
-                  }
-                }}
-                disabled={!coupon.trim()}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                Aplicar cupom
-              </button>
-            </div>
-
-            {/* Cupons */}
-            <div className="mt-4">
-              <h3 className="font-semibold text-gray-700 mb-2">Seus cupons</h3>
-              {availableCoupons.length === 0 ? (
-                <div className="p-3 border border-slate-200 rounded-lg text-center text-slate-500 text-sm">
-                  Você não tem cupons
-                  <button
-                    onClick={() => navigate('/cupons')}
-                    className="ml-2 text-blue-600 hover:text-blue-700 font-medium"
-                  >
-                    Mais detalhes
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {availableCoupons.map((c) => (
-                    <label
-                      key={c.code}
-                      className="flex justify-between items-center border px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-50"
-                    >
-                      <div>
-                        <span className="text-slate-900 font-medium">
-                          {c.code}
-                        </span>
-                        <div className="text-xs text-slate-500">
-                          {c.type === 'percentage' ? `${c.discount}% OFF` : 
-                           c.type === 'free_shipping' ? 'Frete grátis' : 
-                           `R$ ${c.discount} OFF`}
-                          {c.minValue > 0 && ` - Mín. R$ ${c.minValue}`}
-                        </div>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={selectedCoupons.includes(c.code)}
-                        onChange={() => toggleCoupon(c.code)}
-                        className="h-5 w-5 text-blue-600"
-                      />
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-
 
             {/* Método de Pagamento removido: a seleção e distribuição ocorrerá no checkout */}
 
             {/* Resumo */}
-            <div className="mt-4 pt-4 border-t border-slate-200 space-y-2">
-              <div className="flex justify-between">
-                <span className="text-slate-600">Subtotal</span>
-                <span>{formatPrice(subtotal)}</span>
+            <div className="space-y-2">
+              <h3 className="font-semibold text-slate-900">Itens selecionados ({selectedItems.length})</h3>
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-slate-900">Subtotal</span>
+                <span className="font-semibold text-blue-700">
+                  {formatPrice(subtotal)}
+                </span>
               </div>
-              {discountAmount > 0 && (
-                <div className="flex justify-between text-green-600">
+              {couponDiscount > 0 && (
+                <div className="flex justify-between text-green-600 font-semibold">
                   <span>Desconto</span>
-                  <span>-{formatPrice(discountAmount)}</span>
-                </div>
-              )}
-              {shippingInfo && shippingInfo.frete > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-slate-600">Frete</span>
-                  <span className={hasFreeShippingCoupon ? 'line-through text-slate-400' : ''}>
-                    {formatPrice(shippingInfo.frete)}
+                  <span>
+                    {`-${formatPrice(couponDiscount)}`}
                   </span>
                 </div>
               )}
-              {hasFreeShippingCoupon && (
-                <div className="flex justify-between text-green-600">
-                  <span>Frete (cupom)</span>
-                  <span>Grátis</span>
-                </div>
-              )}
-              <div className="flex justify-between items-center pt-2 border-t">
-                <span className="text-lg font-semibold text-slate-900">Total</span>
-                <span className="text-lg font-bold text-blue-700">
+              <hr className="border-slate-200 my-2" />
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-slate-900">Total</span>
+                <span className="font-semibold text-blue-700">
                   {formatPrice(total)}
                 </span>
               </div>
@@ -414,4 +253,5 @@ export default function CartPage() {
     </div>
   );
 }
+
 

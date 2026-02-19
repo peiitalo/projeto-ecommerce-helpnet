@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCounters } from '../../context/CountersContext';
-import { useCart } from '../../context/CartContext';
 import { useNotifications } from '../../hooks/useNotifications';
+import CouponDetailsModal from '../../components/CouponDetailsModal';
 import {
   FaUser,
   FaShoppingCart,
@@ -16,7 +16,8 @@ import {
   FaCheck,
   FaTimes,
   FaCalendarAlt,
-  FaPercent
+  FaPercent,
+  FaEye
 } from 'react-icons/fa';
 import {
   FiSearch,
@@ -37,13 +38,11 @@ function MeusCuponsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showGenerateModal, setShowGenerateModal] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const { user, logout } = useAuth();
+  const [selectedCoupon, setSelectedCoupon] = useState(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const { logout } = useAuth();
   const { favoritesCount, notificationsCount, cartCount } = useCounters();
-  const { applyCoupon } = useCart();
-  const { showSuccess, showError } = useNotifications();
-  const navigate = useNavigate();
+  const { showSuccess } = useNotifications();
 
   // Logo configuration
   const logoConfig = {
@@ -64,44 +63,79 @@ function MeusCuponsPage() {
     { label: 'Configurações', to: '/configuracoes', icon: <FiSettings className="text-slate-500" /> },
   ];
 
-  // Mock coupons data
+  // Carregar cupons recebidos
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setCoupons([
-        {
-          id: 1,
-          code: 'DESCONTO10',
-          discount: 10,
-          type: 'percentage',
-          description: '10% de desconto em produtos selecionados',
-          validUntil: '2024-12-31',
-          used: false,
-          minValue: 50
-        },
-        {
-          id: 2,
-          code: 'FRETEGRATIS',
-          discount: 0,
-          type: 'free_shipping',
-          description: 'Frete grátis em compras acima de R$ 100',
-          validUntil: '2024-12-15',
-          used: false,
-          minValue: 100
-        },
-        {
-          id: 3,
-          code: 'PRIMEIRA15',
-          discount: 15,
-          type: 'percentage',
-          description: '15% OFF na primeira compra',
-          validUntil: '2024-11-30',
-          used: true,
-          minValue: 0
+    const loadCoupons = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        console.log('Frontend Debug - Token:', token ? 'present' : 'missing');
+
+        // Buscar cupons disponíveis do cliente
+        const meusCuponsResponse = await fetch('/api/cupons/meus', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        let availableCoupons = [];
+        if (meusCuponsResponse.ok) {
+          const data = await meusCuponsResponse.json();
+          console.log('Frontend Debug - Meus cupons response:', data);
+          if (data.success && data.data.length > 0) {
+            availableCoupons = data.data.map(cupomCliente => ({
+              id: cupomCliente.id,
+              code: cupomCliente.code,
+              discount: cupomCliente.discount,
+              type: cupomCliente.type,
+              description: cupomCliente.description,
+              validUntil: cupomCliente.validUntil,
+              used: false, // Sempre false pois backend filtra apenas disponíveis
+              minValue: cupomCliente.minValue,
+              status: 'available', // Sempre available pois backend filtra apenas disponíveis
+              redeemedAt: cupomCliente.redeemedAt,
+              usedAt: null, // Sempre null pois backend filtra apenas disponíveis
+              canRedeem: true, // Sempre true pois são disponíveis
+              vendedor: cupomCliente.vendedor,
+              restricoes: cupomCliente.restricoes,
+              // Add new state-based properties
+              state: cupomCliente.state || 'active', // Default to active if not provided
+              reason: cupomCliente.reason || null
+            }));
+          }
+        } else {
+          console.log('Frontend Debug - Meus cupons failed:', meusCuponsResponse.status, await meusCuponsResponse.text());
         }
-      ]);
-      setLoading(false);
-    }, 1000);
+
+        // Ordenar cupons por data de validade (todos são disponíveis)
+        const sortedCoupons = availableCoupons.sort((a, b) => {
+          return new Date(a.validUntil) - new Date(b.validUntil);
+        });
+
+        console.log('Frontend Debug - Final coupons array:', sortedCoupons);
+        setCoupons(sortedCoupons);
+      } catch (error) {
+        console.error('Erro ao carregar cupons:', error);
+        // Fallback para dados mock se a API falhar
+        setCoupons([
+          {
+            id: 1,
+            code: 'DESCONTO10',
+            discount: 10,
+            type: 'percentage',
+            description: '10% de desconto em produtos selecionados',
+            validUntil: '2024-12-31',
+            used: false,
+            minValue: 50,
+            status: 'available'
+          }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCoupons();
   }, []);
 
   const handleLogout = () => {
@@ -116,36 +150,75 @@ function MeusCuponsPage() {
     showSuccess('Código copiado para a área de transferência!');
   };
 
-  const generateCoupon = async () => {
-    setGenerating(true);
-    // Simulate API call
-    setTimeout(() => {
-      const newCoupon = {
-        id: Date.now(),
-        code: 'NOVO' + Math.random().toString(36).substr(2, 6).toUpperCase(),
-        discount: 5,
-        type: 'percentage',
-        description: '5% de desconto especial',
-        validUntil: '2024-12-31',
-        used: false,
-        minValue: 25
-      };
-      setCoupons(prev => [newCoupon, ...prev]);
-      setShowGenerateModal(false);
-      setGenerating(false);
-      showSuccess('Cupom gerado com sucesso!');
-    }, 1500);
-  };
 
   const formatDiscount = (coupon) => {
     if (coupon.type === 'free_shipping') {
       return 'Frete Grátis';
     }
-    return `${coupon.discount}% OFF`;
+    if (coupon.type === 'fixed') {
+      return `R$ ${coupon.discount}`;
+    }
+    return `${coupon.discount}%`;
   };
 
   const isExpired = (validUntil) => {
     return new Date(validUntil) < new Date();
+  };
+
+  const getCouponStateDisplay = (coupon) => {
+    // Handle new state-based system
+    if (coupon.state) {
+      switch (coupon.state) {
+        case 'active':
+          return {
+            color: 'bg-green-100 text-green-700',
+            text: 'Ativo',
+            canApply: true,
+            icon: ''
+          };
+        case 'grayed_out':
+          return {
+            color: 'bg-gray-100 text-gray-700',
+            text: 'Aplicável com restrições',
+            canApply: false,
+            icon: '⚠️',
+            reason: coupon.reason
+          };
+        case 'inactive':
+          return {
+            color: 'bg-red-100 text-red-700',
+            text: 'Não aplicável',
+            canApply: false,
+            icon: '❌',
+            reason: coupon.reason
+          };
+        default:
+          return {
+            color: 'bg-slate-100 text-slate-700',
+            text: coupon.state,
+            canApply: false,
+            icon: '❓'
+          };
+      }
+    }
+
+    // Fallback to old status system
+    const expired = isExpired(coupon.validUntil);
+    if (expired) {
+      return {
+        color: 'bg-red-100 text-red-700',
+        text: 'Expirado',
+        canApply: false,
+        icon: '⏰'
+      };
+    }
+
+    return {
+      color: 'bg-green-100 text-green-700',
+      text: 'Disponível',
+      canApply: true,
+      icon: '✅'
+    };
   };
 
   return (
@@ -318,13 +391,7 @@ function MeusCuponsPage() {
                   <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Meus Cupons</h1>
                   <p className="text-slate-600">Gerencie seus cupons de desconto</p>
                 </div>
-                <button
-                  onClick={() => setShowGenerateModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <FaPlus />
-                  <span>Gerar Cupom</span>
-                </button>
+                {/* Removido: Botão de gerar cupom - agora cupons são distribuídos pelos vendedores */}
               </div>
             </div>
 
@@ -348,85 +415,71 @@ function MeusCuponsPage() {
                 {coupons.map((coupon) => (
                   <div
                     key={coupon.id}
-                    className={`bg-white border rounded-lg p-6 transition-all ${
-                      coupon.used || isExpired(coupon.validUntil)
-                        ? 'border-slate-200 opacity-60'
-                        : 'border-slate-200 hover:border-blue-300 hover:shadow-sm'
-                    }`}
+                    className="bg-white border border-slate-200 rounded-lg p-6 hover:border-blue-300 hover:shadow-sm transition-all"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <FaTicketAlt className={`text-lg ${
-                            coupon.used || isExpired(coupon.validUntil) ? 'text-slate-400' : 'text-blue-600'
-                          }`} />
-                          <h3 className={`font-semibold text-lg ${
-                            coupon.used || isExpired(coupon.validUntil) ? 'text-slate-500' : 'text-slate-900'
-                          }`}>
+                          <FaTicketAlt className="text-lg text-blue-600" />
+                          <h3 className="font-semibold text-lg text-slate-900">
                             {formatDiscount(coupon)}
                           </h3>
-                          {coupon.used && (
-                            <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full">
-                              Utilizado
+                        <div className="flex flex-col gap-2">
+                          <div className="flex gap-2 items-center">
+                            <span className="text-sm">{getCouponStateDisplay(coupon).icon}</span>
+                            <span className={`px-2 py-1 text-xs rounded-full ${getCouponStateDisplay(coupon).color}`}>
+                              {getCouponStateDisplay(coupon).text}
                             </span>
-                          )}
-                          {isExpired(coupon.validUntil) && !coupon.used && (
-                            <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded-full">
-                              Expirado
-                            </span>
+                          </div>
+                          {getCouponStateDisplay(coupon).reason && (
+                            <div className="text-xs text-slate-600 bg-slate-50 px-2 py-1 rounded">
+                              {getCouponStateDisplay(coupon).reason}
+                            </div>
                           )}
                         </div>
-                        <p className={`text-sm mb-2 ${
-                          coupon.used || isExpired(coupon.validUntil) ? 'text-slate-400' : 'text-slate-600'
-                        }`}>
+                        </div>
+                        <p className="text-sm mb-2 text-slate-600">
                           {coupon.description}
                         </p>
-                        <div className="flex items-center gap-4 text-sm text-slate-500">
-                          <span className="flex items-center gap-1">
+                        <div className="flex flex-col gap-1 text-sm text-slate-500">
+                          <div className="flex items-center gap-1">
                             <FaCalendarAlt />
                             Válido até {new Date(coupon.validUntil).toLocaleDateString('pt-BR')}
-                          </span>
+                          </div>
                           {coupon.minValue > 0 && (
-                            <span>Compra mínima: R$ {coupon.minValue}</span>
+                            <div>Compra mínima: R$ {coupon.minValue}</div>
+                          )}
+                          {coupon.restricoes?.quantidade_minima_itens && (
+                            <div>Mínimo {coupon.restricoes.quantidade_minima_itens} itens</div>
+                          )}
+                          {coupon.restricoes?.frete_gratis_acima && (
+                            <div>Frete grátis acima de R$ {coupon.restricoes.frete_gratis_acima}</div>
                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 ml-4">
-                        <span className={`font-mono text-lg font-bold px-3 py-2 rounded border ${
-                          coupon.used || isExpired(coupon.validUntil)
-                            ? 'border-slate-200 text-slate-400 bg-slate-50'
-                            : 'border-blue-200 text-blue-700 bg-blue-50'
-                        }`}>
+                        <span className="font-mono text-lg font-bold px-3 py-2 rounded border border-blue-200 text-blue-700 bg-blue-50">
                           {coupon.code}
                         </span>
-                        {!coupon.used && !isExpired(coupon.validUntil) && (
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => copyToClipboard(coupon.code)}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                              title="Copiar código"
-                            >
-                              <FaCopy />
-                            </button>
-                            <button
-                              onClick={() => {
-                                const couponData = {
-                                  code: coupon.code,
-                                  discount: coupon.discount,
-                                  type: coupon.type,
-                                  minValue: coupon.minValue || 0
-                                };
-                                applyCoupon(couponData);
-                                showSuccess('Cupom aplicado! Redirecionando para o carrinho...');
-                                setTimeout(() => navigate('/carrinho'), 1500);
-                              }}
-                              className="px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
-                              title="Usar no carrinho"
-                            >
-                              Usar
-                            </button>
-                          </div>
-                        )}
+                      {getCouponStateDisplay(coupon).canApply && (
+                        <button
+                          onClick={() => copyToClipboard(coupon.code)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Copiar código"
+                        >
+                          <FaCopy />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          setSelectedCoupon(coupon);
+                          setIsDetailsModalOpen(true);
+                        }}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Ver detalhes"
+                      >
+                        <FaEye />
+                      </button>
                       </div>
                     </div>
                   </div>
@@ -436,14 +489,7 @@ function MeusCuponsPage() {
               <div className="text-center py-16">
                 <FaTicketAlt className="mx-auto h-16 w-16 text-slate-300 mb-4" />
                 <h3 className="text-xl font-medium text-slate-900 mb-2">Nenhum cupom disponível</h3>
-                <p className="text-slate-600 mb-6">Você ainda não possui cupons de desconto</p>
-                <button
-                  onClick={() => setShowGenerateModal(true)}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <FaPlus />
-                  <span>Gerar Primeiro Cupom</span>
-                </button>
+                <p className="text-slate-600 mb-6">Você ainda não possui cupons de desconto. Aguarde os vendedores distribuírem cupons para você!</p>
               </div>
             )}
           </div>
@@ -464,45 +510,12 @@ function MeusCuponsPage() {
         </footer>
       </div>
 
-      {/* Modal de Geração de Cupom */}
-      {showGenerateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
-            <div className="p-6 border-b border-slate-200">
-              <h2 className="text-xl font-semibold text-slate-900">Gerar Novo Cupom</h2>
-              <p className="text-sm text-slate-600 mt-1">Crie um cupom de desconto personalizado</p>
-            </div>
-            <div className="p-6">
-              <div className="text-center">
-                <FaTicketAlt className="mx-auto h-12 w-12 text-blue-600 mb-4" />
-                <p className="text-slate-600 mb-6">
-                  Um novo cupom de desconto será gerado automaticamente com condições especiais.
-                </p>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                  <p className="text-sm text-blue-800">
-                    <strong>Benefício:</strong> 5% de desconto em qualquer compra acima de R$ 25
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
-              <button
-                onClick={() => setShowGenerateModal(false)}
-                className="px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={generateCoupon}
-                disabled={generating}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {generating ? 'Gerando...' : 'Gerar Cupom'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal de detalhes do cupom */}
+      <CouponDetailsModal
+        isOpen={isDetailsModalOpen}
+        onClose={() => setIsDetailsModalOpen(false)}
+        coupon={selectedCoupon}
+      />
     </div>
   );
 }

@@ -57,7 +57,6 @@ function HistoryPage() {
     { label: 'Explore', to: '/explorer', icon: <FiSearch className="text-slate-500" /> },
     { label: 'Pedidos', to: '/meus-pedidos', icon: <FiPackage className="text-slate-500" /> },
     { label: 'Histórico', to: '/historico', icon: <FiClockIcon className="text-slate-500" /> },
-    { label: 'Categorias', to: '/categorias', icon: <FiTag className="text-slate-500" /> },
     { label: 'Meus Cupons', to: '/cupons', icon: <FiCreditCard className="text-slate-500" /> },
     { label: 'Endereços', to: '/enderecos', icon: <FiMapPin className="text-slate-500" /> },
     { label: 'Suporte', to: '/suporte', icon: <FiHelpCircle className="text-slate-500" /> },
@@ -118,8 +117,11 @@ function HistoryPage() {
   };
 
   const handleLogout = () => {
-    logout();
-    window.location.href = '/login';
+    const confirmed = window.confirm('Tem certeza que deseja sair da conta?');
+    if (confirmed) {
+      logout();
+      window.location.href = '/login';
+    }
   };
 
   const getStatusIcon = (status) => {
@@ -490,23 +492,13 @@ function HistoryPage() {
                     {/* Ações */}
                     <div className="border-t border-slate-200 pt-4 mt-4">
                       <div className="flex gap-3">
-                        <button
-                          onClick={() => {
-                            setOrderModalId(order.id);
-                            setShowOrderModal(true);
-                          }}
-                          className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200"
-                          title="Ver detalhes do pedido"
-                        >
-                          <FaEye />
-                          <span>Ver Detalhes</span>
-                        </button>
+                       
                         <button
                           onClick={() => setSelectedOrder(order)}
                           className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200"
                         >
                           <FaReceipt />
-                          <span>Ver Comprovante</span>
+                          <span>Ver Detalhes</span>
                         </button>
                         {order.status === 'Entregue' && (
                           <button className="flex items-center gap-2 px-4 py-2 text-green-600 hover:bg-green-50 rounded-lg border border-green-200">

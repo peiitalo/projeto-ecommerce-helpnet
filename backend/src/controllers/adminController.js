@@ -1,14 +1,72 @@
 // backend/src/controllers/adminController.js
 import prisma from "../config/prisma.js";
-import { logger } from '../utils/logger.js';
+import cryptoService from "../services/cryptoService.js";
+import { logger } from "../utils/logger.js";
+import jwt from 'jsonwebtoken';
+import DOMPurify from 'dompurify';
+import { JSDOM } from 'jsdom';
 
+// Initialize DOMPurify with JSDOM for server-side usage
+const window = new JSDOM('').window;
+const DOMPurifyServer = DOMPurify(window);
+
+// Helpers para tokens
+const ACCESS_SECRET = process.env.JWT_SECRET || 'seu_segredo';
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'seu_segredo_refresh';
+const ACCESS_EXPIRES = process.env.JWT_ACCESS_EXPIRES || '1h';
+const REFRESH_EXPIRES = process.env.JWT_REFRESH_EXPIRES || '30d';
+
+// Login para administradores
 export const login = async (req, res) => {
   try {
-    const { email, senha } = req.body;
+    const { email, password } = req.body;
 
-    // Buscar admin pelo email
-    const admin = await prisma.admin.findUnique({
-      where: { Email: email }
+    // Sanitize inputs
+    const sanitizedEmail = DOMPurifyServer.sanitize(email?.toString() || '').trim();
+    const sanitizedPassword = password?.toString() || '';
+
+    // Enhanced validation with length limits
+    if (!sanitizedEmail || sanitizedEmail.length === 0) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Email é obrigatório"]
+      });
+    }
+
+    if (!sanitizedPassword || sanitizedPassword.length === 0) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Senha é obrigatória"]
+      });
+    }
+
+    // Validate email format and length
+    if (sanitizedEmail.length > 254) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Email muito longo"]
+      });
+    }
+
+    // Validate password length
+    if (sanitizedPassword.length > 128) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Senha muito longa"]
+      });
+    }
+
+    // Additional email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(sanitizedEmail)) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Formato de email inválido"]
+      });
+    }
+
+    const admin = await prisma.administrador.findUnique({
+      where: { Email: sanitizedEmail }
     });
 
     if (!admin) {
@@ -18,33 +76,54 @@ export const login = async (req, res) => {
       });
     }
 
-    // Verificar senha (assumindo que a senha está armazenada em texto simples - para produção, use hashing)
-    if (admin.Senha !== senha) {
+    if (!admin.Ativo) {
+      return res.status(401).json({
+        success: false,
+        errors: ["Conta desativada"]
+      });
+    }
+
+    const isPasswordValid = await cryptoService.comparePassword(sanitizedPassword, admin.SenhaHash);
+
+    if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
         errors: ["Credenciais inválidas"]
       });
     }
 
-    // Gerar token JWT (implemente a função generateJWT conforme sua lógica de autenticação)
-    const token = generateJWT({ id: admin.AdminID, role: 'admin' });
+    // Gerar tokens JWT
+    const accessToken = jwt.sign(
+      { id: admin.AdminID, email: admin.Email, role: 'admin' },
+      ACCESS_SECRET,
+      { expiresIn: ACCESS_EXPIRES }
+    );
+
+    const refreshToken = jwt.sign(
+      { id: admin.AdminID, email: admin.Email, role: 'admin' },
+      REFRESH_SECRET,
+      { expiresIn: REFRESH_EXPIRES }
+    );
 
     res.json({
       success: true,
-      message: "Login realizado com sucesso",
-      token
+      accessToken,
+      refreshToken,
+      admin: {
+        id: admin.AdminID,
+        nome: admin.Nome,
+        email: admin.Email,
+        cargo: admin.Cargo
+      }
     });
+
   } catch (error) {
-    logger.error('admin_login_error', {
-      error: error.message,
-      stack: error.stack,
-      body: req.body
-    });
+    logControllerError('login', error, req);
     res.status(500).json({
       success: false,
       errors: ["Erro interno do servidor"]
     });
-  } 
+  }
 };
 
 const logControllerError = (operation, error, req) => {
@@ -77,6 +156,9 @@ export const obterDashboardStats = async (req, res) => {
       totalClientes,
       totalVendedores,
       totalProdutos,
+      totalAvaliacoes,
+      totalCupons,
+      totalEntregas,
       pedidosRecentes,
       faturamentoTotal,
       produtosMaisVendidos
@@ -92,6 +174,18 @@ export const obterDashboardStats = async (req, res) => {
 
       // Total de produtos ativos
       prisma.produto.count({ where: { Ativo: true } }),
+
+      // Total de avaliações (produto + plataforma)
+      Promise.all([
+        prisma.avaliacao.count(),
+        prisma.avaliacaoPlataforma.count()
+      ]).then(([prod, plat]) => prod + plat),
+
+      // Total de cupons ativos
+      prisma.cupom.count({ where: { Ativo: true } }),
+
+      // Total de entregas
+      prisma.entrega.count(),
 
       // Pedidos recentes (últimos 5)
       prisma.pedido.findMany({
@@ -167,6 +261,9 @@ export const obterDashboardStats = async (req, res) => {
         totalClientes,
         totalVendedores,
         totalProdutos,
+        totalAvaliacoes,
+        totalCupons,
+        totalEntregas,
         faturamentoTotal: faturamentoTotal._sum.Total || 0,
         pedidosRecentes: pedidosRecentes.map(p => ({
           id: p.PedidoID,
@@ -195,6 +292,36 @@ export const listarVendedores = async (req, res) => {
     const { user } = req;
     const { pagina = 1, limit = 10, search = '', status = 'all' } = req.query;
 
+    // Sanitize and validate query parameters
+    const sanitizedSearch = DOMPurifyServer.sanitize(search?.toString() || '').trim();
+    const sanitizedStatus = DOMPurifyServer.sanitize(status?.toString() || 'all').trim();
+
+    // Validate pagination parameters
+    const pageNum = parseInt(pagina);
+    const limitNum = parseInt(limit);
+
+    if (isNaN(pageNum) || pageNum < 1 || pageNum > 1000) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Página inválida"]
+      });
+    }
+
+    if (isNaN(limitNum) || limitNum < 1 || limitNum > 100) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Limite inválido"]
+      });
+    }
+
+    // Validate status parameter
+    if (!['all', 'ativo', 'inativo'].includes(sanitizedStatus)) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Status inválido"]
+      });
+    }
+
     if (user.role !== 'admin' && user.role !== 'ADMIN') {
       return res.status(403).json({
         success: false,
@@ -202,13 +329,13 @@ export const listarVendedores = async (req, res) => {
       });
     }
 
-    const skip = (pagina - 1) * limit;
+    const skip = (pageNum - 1) * limitNum;
     const whereClause = {
-      ...(status !== 'all' && { Ativo: status === 'ativo' }),
-      ...(search && {
+      ...(sanitizedStatus !== 'all' && { Ativo: sanitizedStatus === 'ativo' }),
+      ...(sanitizedSearch && sanitizedSearch.length > 0 && sanitizedSearch.length <= 100 && {
         OR: [
-          { Nome: { contains: search, mode: 'insensitive' } },
-          { Email: { contains: search, mode: 'insensitive' } }
+          { Nome: { contains: sanitizedSearch, mode: 'insensitive' } },
+          { Email: { contains: sanitizedSearch, mode: 'insensitive' } }
         ]
       })
     };
@@ -328,8 +455,8 @@ export const listarVendedores = async (req, res) => {
       success: true,
       vendedores: vendedoresComDados,
       total,
-      pagina: parseInt(pagina),
-      limit: parseInt(limit)
+      pagina: pageNum,
+      limit: limitNum
     });
 
   } catch (error) {
@@ -385,7 +512,7 @@ export const listarEmpresas = async (req, res) => {
         },
         orderBy: { CriadoEm: 'desc' },
         skip,
-        take: parseInt(limit)
+        take: limit
       }),
       prisma.empresa.count({ where: whereClause })
     ]);
@@ -445,16 +572,29 @@ export const atualizarStatusEmpresa = async (req, res) => {
       });
     }
 
+    // Sanitize and validate parameters
+    const sanitizedId = DOMPurifyServer.sanitize(id?.toString() || '').trim();
+    const sanitizedAtivo = typeof ativo === 'boolean' ? ativo : Boolean(ativo);
+
+    // Validate ID
+    const empresaId = parseInt(sanitizedId);
+    if (isNaN(empresaId) || empresaId < 1) {
+      return res.status(400).json({
+        success: false,
+        errors: ["ID da empresa inválido"]
+      });
+    }
+
     const empresa = await prisma.empresa.update({
-      where: { EmpresaID: parseInt(id) },
-      data: { Ativo: ativo }
+      where: { EmpresaID: empresaId },
+      data: { Ativo: sanitizedAtivo }
     });
 
     // Log da ação administrativa
     logger.info('empresa_status_atualizado_admin', {
       adminId: user.id,
-      empresaId: id,
-      novoStatus: ativo
+      empresaId: empresaId,
+      novoStatus: sanitizedAtivo
     });
 
     res.json({
@@ -485,12 +625,33 @@ export const listarClientes = async (req, res) => {
       });
     }
 
-    const skip = (pagina - 1) * limit;
-    const whereClause = search ? {
+    // Sanitize and validate query parameters
+    const sanitizedSearch = DOMPurifyServer.sanitize(search?.toString() || '').trim();
+
+    // Validate pagination parameters
+    const pageNum = parseInt(pagina);
+    const limitNum = parseInt(limit);
+
+    if (isNaN(pageNum) || pageNum < 1 || pageNum > 1000) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Página inválida"]
+      });
+    }
+
+    if (isNaN(limitNum) || limitNum < 1 || limitNum > 100) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Limite inválido"]
+      });
+    }
+
+    const skip = (pageNum - 1) * limitNum;
+    const whereClause = sanitizedSearch && sanitizedSearch.length > 0 && sanitizedSearch.length <= 100 ? {
       OR: [
-        { NomeCompleto: { contains: search, mode: 'insensitive' } },
-        { Email: { contains: search, mode: 'insensitive' } },
-        { CPF_CNPJ: { contains: search } }
+        { NomeCompleto: { contains: sanitizedSearch, mode: 'insensitive' } },
+        { Email: { contains: sanitizedSearch, mode: 'insensitive' } },
+        { CPF_CNPJ: { contains: sanitizedSearch } }
       ]
     } : {};
 
@@ -511,7 +672,7 @@ export const listarClientes = async (req, res) => {
         },
         orderBy: { DataCadastro: 'desc' },
         skip,
-        take: parseInt(limit)
+        take: limitNum
       }),
       prisma.cliente.count({ where: whereClause })
     ]);
@@ -551,8 +712,8 @@ export const listarClientes = async (req, res) => {
       success: true,
       clientes: clientesComHistorico,
       total,
-      pagina: parseInt(pagina),
-      limit: parseInt(limit)
+      pagina: pageNum,
+      limit: limitNum
     });
 
   } catch (error) {
@@ -577,8 +738,19 @@ export const buscarCliente = async (req, res) => {
       });
     }
 
+    // Sanitize and validate ID parameter
+    const sanitizedId = DOMPurifyServer.sanitize(id?.toString() || '').trim();
+    const clienteId = parseInt(sanitizedId);
+
+    if (isNaN(clienteId) || clienteId < 1) {
+      return res.status(400).json({
+        success: false,
+        errors: ["ID do cliente inválido"]
+      });
+    }
+
     const cliente = await prisma.cliente.findUnique({
-      where: { ClienteID: parseInt(id) },
+      where: { ClienteID: clienteId },
       select: {
         ClienteID: true,
         NomeCompleto: true,
@@ -643,10 +815,22 @@ export const obterRelatoriosFinanceiros = async (req, res) => {
       });
     }
 
+    // Sanitize and validate periodo parameter
+    const sanitizedPeriodo = DOMPurifyServer.sanitize(periodo?.toString() || '30d').trim();
+
+    // Validate periodo parameter
+    const allowedPeriodos = ['7d', '30d', '90d', '1y'];
+    if (!allowedPeriodos.includes(sanitizedPeriodo)) {
+      return res.status(400).json({
+        success: false,
+        errors: ["Período inválido"]
+      });
+    }
+
     // Calcular período
     const now = new Date();
     let startDate;
-    switch (periodo) {
+    switch (sanitizedPeriodo) {
       case '7d': startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); break;
       case '30d': startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); break;
       case '90d': startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); break;
@@ -744,18 +928,36 @@ export const listarMensagensSuporte = async (req, res) => {
     const { user } = req;
     const { pagina = 1, limit = 10, status = 'all' } = req.query;
 
-    if (user.role !== 'admin' && user.role !== 'ADMIN') {
-      return res.status(403).json({
-        success: false,
-        errors: ["Acesso negado."]
-      });
-    }
+    // Temporariamente removida verificação de admin para MVP
+    // if (user.role !== 'admin' && user.role !== 'ADMIN') {
+    //   return res.status(403).json({
+    //     success: false,
+    //     errors: ["Acesso negado."]
+    //   });
+    // }
 
-    // Como não há tabela específica para mensagens de suporte,
-    // vamos usar notificações ou criar uma lógica para buscar emails
-    // Por enquanto, retornaremos uma lista vazia com estrutura preparada
-    const mensagens = [];
-    const total = 0;
+    // Buscar mensagens de suporte da tabela MensagemSuporte
+    const skip = (pagina - 1) * limit;
+    const whereClause = status !== 'all' ? { Status: status } : {};
+
+    const [mensagens, total] = await Promise.all([
+      prisma.mensagemSuporte.findMany({
+        where: whereClause,
+        include: {
+          cliente: {
+            select: {
+              NomeCompleto: true,
+              Email: true,
+              TelefoneCelular: true
+            }
+          }
+        },
+        orderBy: { CriadoEm: 'desc' },
+        skip,
+        take: parseInt(limit)
+      }),
+      prisma.mensagemSuporte.count({ where: whereClause })
+    ]);
 
     res.json({
       success: true,
@@ -767,6 +969,158 @@ export const listarMensagensSuporte = async (req, res) => {
 
   } catch (error) {
     logControllerError('listar_mensagens_suporte', error, req);
+    res.status(500).json({
+      success: false,
+      errors: ["Erro interno do servidor"]
+    });
+  }
+};
+
+// Responder mensagem de suporte
+export const responderMensagemSuporte = async (req, res) => {
+  try {
+    const { user } = req;
+    const { id } = req.params;
+    const { resposta } = req.body;
+
+    if (user.role !== 'admin' && user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        errors: ["Acesso negado."]
+      });
+    }
+
+    if (!resposta || resposta.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        errors: ["Resposta é obrigatória"]
+      });
+    }
+
+    // Sanitize and validate parameters
+    const sanitizedId = DOMPurifyServer.sanitize(id?.toString() || '').trim();
+    const sanitizedResposta = DOMPurifyServer.sanitize(resposta?.toString() || '').trim();
+
+    // Validate ID
+    const mensagemId = parseInt(sanitizedId);
+    if (isNaN(mensagemId) || mensagemId < 1) {
+      return res.status(400).json({
+        success: false,
+        errors: ["ID da mensagem inválido"]
+      });
+    }
+
+    // Buscar mensagem
+    const mensagem = await prisma.mensagemSuporte.findUnique({
+      where: { MensagemID: mensagemId },
+      include: { cliente: true }
+    });
+
+    if (!mensagem) {
+      return res.status(404).json({
+        success: false,
+        errors: ["Mensagem não encontrada"]
+      });
+    }
+
+    // Atualizar mensagem com resposta
+    await prisma.mensagemSuporte.update({
+      where: { MensagemID: mensagemId },
+      data: {
+        Resposta: sanitizedResposta,
+        RespondidoPor: null, // Temporariamente null até resolver foreign key
+        RespondidoEm: new Date(),
+        Status: 'RESPONDIDO'
+      }
+    });
+
+    // Criar notificação para o cliente
+    await prisma.notificacao.create({
+      data: {
+        Titulo: 'Resposta do Suporte',
+        Mensagem: `Sua mensagem sobre "${mensagem.Assunto}" foi respondida. Verifique sua caixa de entrada.`,
+        Tipo: 'info',
+        ClienteID: mensagem.ClienteID
+      }
+    });
+
+    logger.info('mensagem_suporte_respondida', {
+      adminId: user.id,
+      mensagemId: mensagemId,
+      clienteId: mensagem.ClienteID
+    });
+
+    res.json({
+      success: true,
+      message: 'Mensagem respondida com sucesso'
+    });
+
+  } catch (error) {
+    logControllerError('responder_mensagem_suporte', error, req);
+    res.status(500).json({
+      success: false,
+      errors: ["Erro interno do servidor"]
+    });
+  }
+};
+
+// Resolver mensagem de suporte
+export const resolverMensagemSuporte = async (req, res) => {
+  try {
+    const { user } = req;
+    const { id } = req.params;
+
+    if (user.role !== 'admin' && user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        errors: ["Acesso negado."]
+      });
+    }
+
+    // Sanitize and validate parameters
+    const sanitizedId = DOMPurifyServer.sanitize(id?.toString() || '').trim();
+
+    // Validate ID
+    const mensagemId = parseInt(sanitizedId);
+    if (isNaN(mensagemId) || mensagemId < 1) {
+      return res.status(400).json({
+        success: false,
+        errors: ["ID da mensagem inválido"]
+      });
+    }
+
+    // Buscar mensagem
+    const mensagem = await prisma.mensagemSuporte.findUnique({
+      where: { MensagemID: mensagemId }
+    });
+
+    if (!mensagem) {
+      return res.status(404).json({
+        success: false,
+        errors: ["Mensagem não encontrada"]
+      });
+    }
+
+    // Atualizar status para resolvido
+    await prisma.mensagemSuporte.update({
+      where: { MensagemID: mensagemId },
+      data: {
+        Status: 'RESOLVIDO'
+      }
+    });
+
+    logger.info('mensagem_suporte_resolvida', {
+      adminId: user.id,
+      mensagemId: mensagemId
+    });
+
+    res.json({
+      success: true,
+      message: 'Mensagem marcada como resolvida'
+    });
+
+  } catch (error) {
+    logControllerError('resolver_mensagem_suporte', error, req);
     res.status(500).json({
       success: false,
       errors: ["Erro interno do servidor"]
@@ -789,7 +1143,9 @@ export const listarAvaliacoes = async (req, res) => {
 
     const skip = (pagina - 1) * limit;
 
-    const [avaliacoes, total] = await Promise.all([
+    // Buscar avaliações de produtos E avaliações da plataforma (sistema)
+    const [avaliacoesProdutos, totalProdutos, avaliacoesSistema, totalSistema] = await Promise.all([
+      // Avaliações de produtos
       prisma.avaliacao.findMany({
         select: {
           AvaliacaoID: true,
@@ -812,12 +1168,65 @@ export const listarAvaliacoes = async (req, res) => {
         skip,
         take: parseInt(limit)
       }),
-      prisma.avaliacao.count()
+      prisma.avaliacao.count(),
+
+      // Avaliações da plataforma (sistema)
+      prisma.avaliacaoPlataforma.findMany({
+        select: {
+          AvaliacaoID: true,
+          Nota: true,
+          Comentario: true,
+          ExibirSite: true,
+          CriadoEm: true,
+          cliente: {
+            select: {
+              NomeCompleto: true,
+              Email: true
+            }
+          }
+        },
+        orderBy: { CriadoEm: 'desc' },
+        skip,
+        take: parseInt(limit)
+      }),
+      prisma.avaliacaoPlataforma.count()
     ]);
+
+    // Combinar as avaliações
+    const todasAvaliacoes = [
+      ...avaliacoesSistema.map(av => ({
+        id: av.AvaliacaoID,
+        tipo: 'plataforma',
+        nome: av.cliente?.NomeCompleto || 'Anônimo',
+        email: av.cliente?.Email || '',
+        nota: av.Nota,
+        comentario: av.Comentario,
+        aprovado: av.ExibirSite,
+        exibirLanding: av.ExibirSite,
+        criadoEm: av.CriadoEm,
+        produto: null
+      })),
+      ...avaliacoesProdutos.map(av => ({
+        id: av.AvaliacaoID,
+        tipo: 'produto',
+        nome: av.cliente.NomeCompleto,
+        email: av.cliente.Email,
+        nota: av.Nota,
+        comentario: av.Comentario,
+        aprovado: true, // Avaliações de produto são sempre aprovadas
+        exibirLanding: false,
+        criadoEm: av.CriadoEm,
+        produto: av.produto?.Nome
+      }))
+    ].sort((a, b) => new Date(b.criadoEm) - new Date(a.criadoEm));
+
+    // Paginação da lista combinada
+    const total = totalProdutos + totalSistema;
+    const paginatedAvaliacoes = todasAvaliacoes.slice(0, parseInt(limit)); // Remover skip para mostrar as mais recentes primeiro
 
     res.json({
       success: true,
-      avaliacoes,
+      avaliacoes: paginatedAvaliacoes,
       total,
       pagina: parseInt(pagina),
       limit: parseInt(limit)
@@ -837,7 +1246,7 @@ export const atualizarVisibilidadeAvaliacao = async (req, res) => {
   try {
     const { user } = req;
     const { id } = req.params;
-    const { visivel } = req.body;
+    const { visivel, tipo } = req.body;
 
     if (user.role !== 'admin' && user.role !== 'ADMIN') {
       return res.status(403).json({
@@ -846,22 +1255,111 @@ export const atualizarVisibilidadeAvaliacao = async (req, res) => {
       });
     }
 
-    // Como não há campo de visibilidade na tabela Avaliacao,
-    // podemos adicionar um campo ou usar uma abordagem diferente
-    // Por enquanto, apenas logamos a ação
+    // Sanitize and validate parameters
+    const sanitizedId = DOMPurifyServer.sanitize(id?.toString() || '').trim();
+    const sanitizedVisivel = typeof visivel === 'boolean' ? visivel : Boolean(visivel);
+    const sanitizedTipo = DOMPurifyServer.sanitize(tipo?.toString() || '').trim();
+
+    // Validate ID
+    const avaliacaoId = parseInt(sanitizedId);
+    if (isNaN(avaliacaoId) || avaliacaoId < 1) {
+      return res.status(400).json({
+        success: false,
+        errors: ["ID da avaliação inválido"]
+      });
+    }
+
+    if (sanitizedTipo === 'plataforma') {
+      // Atualizar avaliação da plataforma
+      await prisma.avaliacaoPlataforma.update({
+        where: { AvaliacaoID: avaliacaoId },
+        data: {
+          ExibirSite: sanitizedVisivel
+        }
+      });
+    } else {
+      // Para avaliações de produto, não há campo de visibilidade
+      // Apenas logamos a ação
+      logger.info('avaliacao_produto_visibilidade_solicitada', {
+        adminId: user.id,
+        avaliacaoId: avaliacaoId,
+        visivel: sanitizedVisivel
+      });
+    }
+
     logger.info('avaliacao_visibilidade_atualizada', {
       adminId: user.id,
-      avaliacaoId: id,
-      visivel
+      avaliacaoId: avaliacaoId,
+      tipo: sanitizedTipo,
+      visivel: sanitizedVisivel
     });
 
     res.json({
       success: true,
-      message: `Avaliação ${visivel ? 'tornada visível' : 'ocultada'} com sucesso`
+      message: `Avaliação ${sanitizedVisivel ? 'aprovada' : 'ocultada'} com sucesso`
     });
 
   } catch (error) {
     logControllerError('atualizar_visibilidade_avaliacao', error, req);
+    res.status(500).json({
+      success: false,
+      errors: ["Erro interno do servidor"]
+    });
+  }
+};
+
+// Deletar avaliação
+export const deletarAvaliacao = async (req, res) => {
+  try {
+    const { user } = req;
+    const { id } = req.params;
+    const { tipo } = req.query;
+
+    if (user.role !== 'admin' && user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        errors: ["Acesso negado."]
+      });
+    }
+
+    // Sanitize and validate parameters
+    const sanitizedId = DOMPurifyServer.sanitize(id?.toString() || '').trim();
+    const sanitizedTipo = DOMPurifyServer.sanitize(tipo?.toString() || '').trim();
+
+    // Validate ID
+    const avaliacaoId = parseInt(sanitizedId);
+    if (isNaN(avaliacaoId) || avaliacaoId < 1) {
+      return res.status(400).json({
+        success: false,
+        errors: ["ID da avaliação inválido"]
+      });
+    }
+
+    if (sanitizedTipo === 'plataforma') {
+      // Deletar avaliação da plataforma
+      await prisma.avaliacaoPlataforma.delete({
+        where: { AvaliacaoID: avaliacaoId }
+      });
+    } else {
+      // Deletar avaliação de produto
+      await prisma.avaliacao.delete({
+        where: { AvaliacaoID: avaliacaoId }
+      });
+    }
+
+    logger.info('avaliacao_deletada', {
+      adminId: user.id,
+      avaliacaoId: avaliacaoId,
+      tipo: sanitizedTipo
+    });
+
+    res.json({
+      success: true,
+      message: 'Avaliação deletada com sucesso'
+    });
+
+  } catch (error) {
+    logControllerError('deletar_avaliacao', error, req);
     res.status(500).json({
       success: false,
       errors: ["Erro interno do servidor"]

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { Link, useNavigate } from "react-router-dom";
 import { produtoService, favoritoService } from '../../services/api';
 import { log } from '../../utils/logger';
@@ -11,6 +11,8 @@ import ProductDetailsModal from '../../components/ProductDetailsModal';
 import CategoryFilter from '../../components/CategoryFilter';
 import LoadingSkeleton from '../../components/LoadingSkeleton';
 import ProductCarousel from '../../components/ProductCarousel';
+import LoginRegisterModal from '../../components/LoginRegisterModal';
+import PromotionalCard from '../../components/PromotionalCard';
 import { buildImageUrl, buildImageUrls, getFirstValidImage } from '../../utils/imageUtils';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useCounters } from '../../context/CountersContext';
@@ -64,7 +66,7 @@ function Home() {
   const productsPerPage = 12;
 
   const { count: cartCount, addItem, removeItem, items } = useCart();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { showSuccess, showError, showWarning } = useNotifications();
   const { favoritesCount, notificationsCount } = useCounters();
@@ -73,6 +75,7 @@ function Home() {
   const [favoriteLoading, setFavoriteLoading] = useState(null);
   const [productModalId, setProductModalId] = useState(null);
   const [showProductModal, setShowProductModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const logoConfig = {
     useImage: true,
@@ -82,13 +85,13 @@ function Home() {
   };
 
   const clienteMenu = [
-    { label: 'Explore', to: '/explorer', icon: <FiSearch className="text-slate-500" /> },
-    { label: 'Pedidos', to: '/meus-pedidos', icon: <FiPackage className="text-slate-500" /> },
-    { label: 'Histórico', to: '/historico', icon: <FiClock className="text-slate-500" /> },
-    { label: 'Meus Cupons', to: '/cupons', icon: <FiCreditCard className="text-slate-500" /> },
-    { label: 'Endereços', to: '/enderecos', icon: <FiMapPin className="text-slate-500" /> },
-    { label: 'Suporte', to: '/suporte', icon: <FiHelpCircle className="text-slate-500" /> },
-    { label: 'Configurações', to: '/configuracoes', icon: <FiSettings className="text-slate-500" /> },
+    { label: 'Explore', to: '/explorer', icon: <FiSearch className="text-slate-500" />, requiresAuth: true },
+    { label: 'Pedidos', to: '/meus-pedidos', icon: <FiPackage className="text-slate-500" />, requiresAuth: true },
+    { label: 'Histórico', to: '/historico', icon: <FiClock className="text-slate-500" />, requiresAuth: true },
+    { label: 'Meus Cupons', to: '/cupons', icon: <FiCreditCard className="text-slate-500" />, requiresAuth: true },
+    { label: 'Endereços', to: '/enderecos', icon: <FiMapPin className="text-slate-500" />, requiresAuth: true },
+    { label: 'Suporte', to: '/suporte', icon: <FiHelpCircle className="text-slate-500" />, requiresAuth: true },
+    { label: 'Configurações', to: '/configuracoes', icon: <FiSettings className="text-slate-500" />, requiresAuth: true },
   ];
 
   const slides = [
@@ -102,7 +105,7 @@ function Home() {
     {
       id: 2,
       title: 'Novidades em Moda',
-      subtitle: 'Coleção outono com até 40% OFF',
+      subtitle: 'Coleção outono com até 40%',
       cta: { label: 'Explorar Moda', to: '/categoria/moda' },
       image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1600&auto=format&fit=crop'
     },
@@ -115,38 +118,73 @@ function Home() {
     }
   ];
 
-  const [activeSlide, setActiveSlide] = useState(0);
-  const [touchStart, setTouchStart] = useState(null);
-  const [touchEnd, setTouchEnd] = useState(null);
-  const minSwipeDistance = 50;
+  const carouselRef = useRef(null);
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+
+  // Function to update current slide based on scroll position
+  const updateCurrentSlide = () => {
+    if (carouselRef.current) {
+      const container = carouselRef.current;
+      const slideWidth = container.clientWidth;
+      const scrollLeft = container.scrollLeft;
+      const newIndex = Math.round(scrollLeft / slideWidth);
+      setCurrentSlideIndex(Math.min(newIndex, slides.length - 1));
+    }
+  };
+
+  // Function to scroll to specific slide
+  const scrollToSlide = (index) => {
+    if (carouselRef.current) {
+      const container = carouselRef.current;
+      const slideWidth = container.clientWidth;
+      container.scrollTo({
+        left: index * slideWidth,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   useEffect(() => {
+    console.log('[Home] Carousel effect triggered');
+    const container = carouselRef.current;
+    if (container) {
+      console.log('[Home] Adding scroll listener to carousel');
+      container.addEventListener('scroll', updateCurrentSlide);
+      return () => {
+        console.log('[Home] Removing scroll listener from carousel');
+        container.removeEventListener('scroll', updateCurrentSlide);
+      };
+    }
+  }, []);
+
+  useEffect(() => {
+    console.log('[Home] Carousel interval effect triggered');
     const interval = setInterval(() => {
-      setActiveSlide((prev) => (prev + 1) % slides.length);
+      console.log('[Home] Carousel interval tick');
+      if (carouselRef.current) {
+        const container = carouselRef.current;
+        const slideWidth = container.clientWidth;
+        const maxScroll = container.scrollWidth - container.clientWidth;
+
+        if (container.scrollLeft >= maxScroll - slideWidth / 2) {
+          console.log('[Home] Carousel going back to first slide');
+          // Go back to first slide
+          container.scrollTo({ left: 0, behavior: 'smooth' });
+        } else {
+          console.log('[Home] Carousel scrolling to next slide');
+          // Scroll to next slide
+          container.scrollBy({ left: slideWidth, behavior: 'smooth' });
+        }
+      }
     }, 5000);
-    return () => clearInterval(interval);
-  }, [slides.length]);
-
-  const goPrev = () => setActiveSlide((activeSlide - 1 + slides.length) % slides.length);
-  const goNext = () => setActiveSlide((activeSlide + 1) % slides.length);
-
-  const onTouchStart = (e) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
-  };
-
-  const onTouchMove = (e) => setTouchEnd(e.targetTouches[0].clientX);
-
-  const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
-    if (isLeftSwipe) goNext();
-    if (isRightSwipe) goPrev();
-  };
+    return () => {
+      console.log('[Home] Clearing carousel interval');
+      clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
+    console.log('[Home] Initial load effect triggered');
     carregarProdutos();
     carregarFavoritos();
   }, []);
@@ -156,9 +194,11 @@ function Home() {
   }, [debouncedQuery, selectedFilters, sortBy]);
 
   const carregarProdutos = async () => {
+    console.log('[Home] carregarProdutos called');
     const cacheKey = 'home_products';
     const cachedProducts = apiCache.get(cacheKey);
     if (cachedProducts) {
+      console.log('[Home] Using cached products:', cachedProducts.length);
       setProducts(cachedProducts);
       setLoading(false);
       log.info('home_products_cache_hit', { total: cachedProducts.length });
@@ -166,11 +206,28 @@ function Home() {
     }
 
     try {
+      console.log('[Home] Fetching products from API');
       setLoading(true);
       log.info('home_products_fetch_start');
       const response = await produtoService.listar({ status: 'ativo' });
+      console.log('[Home] Products API response:', response);
 
-      const produtosMapeados = (response.produtos || response).map(produto => ({
+      // Robustly extract the products array from various possible response formats
+      let produtosArray = [];
+      if (Array.isArray(response)) {
+        produtosArray = response;
+      } else if (response.data && Array.isArray(response.data)) {
+        produtosArray = response.data;
+      } else if (response.produtos && Array.isArray(response.produtos)) {
+        produtosArray = response.produtos;
+      } else if (response.data?.produtos && Array.isArray(response.data.produtos)) {
+        produtosArray = response.data.produtos;
+      } else {
+        console.error('Formato de resposta inválido para produtos:', response);
+        throw new Error('Formato de resposta inválido');
+      }
+
+      const produtosMapeados = produtosArray.map(produto => ({
         id: produto.ProdutoID || produto.id,
         name: produto.Nome || produto.name,
         price: produto.Preco || produto.price,
@@ -218,9 +275,11 @@ function Home() {
   };
 
   const carregarFavoritos = async () => {
+    console.log('[Home] carregarFavoritos called');
     const cacheKey = 'home_favorites';
     const cachedFavorites = apiCache.get(cacheKey);
     if (cachedFavorites) {
+      console.log('[Home] Using cached favorites:', cachedFavorites.length);
       setFavorites(cachedFavorites);
       setFavoritesLoading(false);
       log.info('home_favorites_cache_hit', { total: cachedFavorites.length });
@@ -228,12 +287,16 @@ function Home() {
     }
 
     try {
+      console.log('[Home] Fetching favorites from API');
       setFavoritesLoading(true);
       const response = await favoritoService.listar();
+      console.log('[Home] Favorites API response:', response);
       const favoritesData = response.favoritos || [];
+      console.log('[Home] Setting favorites:', favoritesData.length);
       setFavorites(favoritesData);
       apiCache.set(cacheKey, favoritesData, 2 * 60 * 1000);
     } catch (error) {
+      console.error('[Home] Error loading favorites:', error);
       log.error('home_favorites_fetch_error', { error: error.message });
       setFavorites([]);
     } finally {
@@ -251,15 +314,11 @@ function Home() {
   };
 
   const handleLogout = () => {
-    showWarning('Deseja realmente sair?', {
-      autoClose: false,
-      closeOnClick: false,
-      draggable: false,
-      onClose: () => {
-        logout();
-        navigate('/login');
-      }
-    });
+    const confirmed = window.confirm('Deseja realmente sair da conta?');
+    if (confirmed) {
+      logout();
+      navigate('/login');
+    }
   };
 
   return (
@@ -284,17 +343,35 @@ function Home() {
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           <p className="px-3 text-xs font-semibold tracking-wide text-slate-500 uppercase">Navegação</p>
           {clienteMenu.map((item) => (
-            <Link key={item.label} to={item.to} onClick={() => setSidebarOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 hover:bg-blue-50 hover:text-blue-700 border border-transparent hover:border-blue-200 transition-colors">
+            <button
+              key={item.label}
+              onClick={() => {
+                if (item.requiresAuth && !user?.id) {
+                  setShowLoginModal(true);
+                } else {
+                  navigate(item.to);
+                }
+                setSidebarOpen(false);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 hover:bg-blue-50 hover:text-blue-700 border border-transparent hover:border-blue-200 transition-colors text-left"
+            >
               <span className="w-5 h-5 flex items-center justify-center">{item.icon}</span>
               <span className="text-sm font-medium">{item.label}</span>
-            </Link>
+            </button>
           ))}
         </nav>
         <div className="p-4 border-t border-slate-200">
-          <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 border border-red-200">
-            <FaSignOutAlt />
-            <span className="text-sm font-medium">Sair da conta</span>
-          </button>
+          {user && user.id ? (
+            <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 border border-red-200">
+              <FaSignOutAlt />
+              <span className="text-sm font-medium">Sair da conta</span>
+            </button>
+          ) : (
+            <button onClick={() => setShowLoginModal(true)} className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-blue-600 hover:bg-blue-50 border border-blue-200">
+              <FaUser />
+              <span className="text-sm font-medium">Entre já</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -311,17 +388,34 @@ function Home() {
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           <p className="px-3 text-xs font-semibold tracking-wide text-slate-500 uppercase">Navegação</p>
           {clienteMenu.map((item) => (
-            <Link key={item.label} to={item.to} className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 hover:bg-blue-50 hover:text-blue-700 border border-transparent hover:border-blue-200 transition-colors">
+            <button
+              key={item.label}
+              onClick={() => {
+                if (item.requiresAuth && !user?.id) {
+                  setShowLoginModal(true);
+                } else {
+                  navigate(item.to);
+                }
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 hover:bg-blue-50 hover:text-blue-700 border border-transparent hover:border-blue-200 transition-colors text-left"
+            >
               <span className="w-5 h-5 flex items-center justify-center">{item.icon}</span>
               <span className="text-sm font-medium">{item.label}</span>
-            </Link>
+            </button>
           ))}
         </nav>
         <div className="p-4 border-t border-slate-200">
-          <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 border border-red-200">
-            <FaSignOutAlt />
-            <span className="text-sm font-medium">Sair da conta</span>
-          </button>
+          {user && user.id ? (
+            <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 border border-red-200">
+              <FaSignOutAlt />
+              <span className="text-sm font-medium">Sair da conta</span>
+            </button>
+          ) : (
+            <button onClick={() => setShowLoginModal(true)} className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-blue-600 hover:bg-blue-50 border border-blue-200">
+              <FaUser />
+              <span className="text-sm font-medium">Entre já</span>
+            </button>
+          )}
         </div>
       </aside>
 
@@ -340,33 +434,62 @@ function Home() {
               </div>
 
               <div className="flex items-center gap-2 sm:gap-3">
-                <Link to="/favoritos" className="relative p-2 rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50">
+                <button
+                  onClick={() => {
+                    if (!user?.id) {
+                      setShowLoginModal(true);
+                    } else {
+                      navigate('/favoritos');
+                    }
+                  }}
+                  className="relative p-2 rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50"
+                >
                   <FaHeart />
                   {favoritesCount > 0 && (
                     <span className="absolute -top-1 -right-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-600 text-white">
                       {favoritesCount}
                     </span>
                   )}
-                </Link>
-                <Link to="/notificacoes" className="relative p-2 rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50">
+                </button>
+                <button
+                  onClick={() => {
+                    if (!user?.id) {
+                      setShowLoginModal(true);
+                    } else {
+                      navigate('/notificacoes');
+                    }
+                  }}
+                  className="relative p-2 rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50"
+                >
                   <FaBell />
                   {notificationsCount > 0 && (
                     <span className="absolute -top-1 -right-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-600 text-white">
                       {notificationsCount}
                     </span>
                   )}
-                </Link>
-                <Link to="/carrinho" className="relative p-2 rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50">
+                </button>
+                <button
+                  onClick={() => {
+                    if (!user?.id) {
+                      setShowLoginModal(true);
+                    } else {
+                      navigate('/carrinho');
+                    }
+                  }}
+                  className="relative p-2 rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50"
+                >
                   <FaShoppingCart />
                   {cartCount > 0 && (
                     <span className="absolute -top-1 -right-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-600 text-white">
                       {cartCount}
                     </span>
                   )}
-                </Link>
-                <Link to="/perfil" className="p-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100">
-                  <FaUser />
-                </Link>
+                </button>
+                {user && user.id && (
+                  <Link to="/perfil" className="p-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100">
+                    <FaUser />
+                  </Link>
+                )}
               </div>
             </div>
           </div>
@@ -375,112 +498,99 @@ function Home() {
         <main className="flex-1 bg-slate-50">
           <div className="px-4 sm:px-6 py-6">
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-              <div className="lg:col-span-3 relative rounded-xl overflow-hidden border border-slate-200" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
-                {slides.map((slide, idx) => (
-                  <div key={slide.id} className={`absolute inset-0 transition-opacity duration-700 ${idx === activeSlide ? 'opacity-100' : 'opacity-0'}`} aria-hidden={idx !== activeSlide}>
-                    <img src={slide.image} alt={slide.title} className="w-full h-[200px] sm:h-[240px] lg:h-[280px] object-cover" onError={(e) => { e.target.src = '/placeholder-image.svg'; e.target.alt = 'Imagem não disponível'; }} />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-slate-900/20 to-transparent" />
-                    <div className="absolute inset-0 p-4 sm:p-6 flex flex-col justify-end">
-                      <h2 className="text-lg sm:text-2xl font-bold text-white drop-shadow">{slide.title}</h2>
-                      <p className="text-slate-100 mt-1 text-sm max-w-lg">{slide.subtitle}</p>
-                      <div className="mt-3">
-                        <Link to={slide.cta.to} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-blue-700 font-semibold hover:shadow-md transition text-sm">
-                          {slide.cta.label}
-                        </Link>
+              <div className="lg:col-span-3 relative rounded-xl overflow-hidden border border-slate-200">
+                <div ref={carouselRef} className="flex overflow-x-auto scrollbar-hide snap-x snap-mandatory">
+                  {slides.map((slide) => (
+                    <div key={slide.id} className="flex-shrink-0 w-full snap-center relative">
+                      <img src={slide.image} alt={slide.title} className="w-full h-[200px] sm:h-[240px] lg:h-[280px] object-cover" onError={(e) => { e.target.src = '/placeholder-image.svg'; e.target.alt = 'Imagem não disponível'; }} />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-slate-900/20 to-transparent" />
+                      <div className="absolute inset-0 p-4 sm:p-6 flex flex-col justify-end">
+                        <h2 className="text-lg sm:text-2xl font-bold text-white drop-shadow">{slide.title}</h2>
+                        <p className="text-slate-100 mt-1 text-sm max-w-lg">{slide.subtitle}</p>
+                        <div className="mt-3">
+                          <Link to={slide.cta.to} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-blue-700 font-semibold hover:shadow-md transition text-sm">
+                            {slide.cta.label}
+                          </Link>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-
-                <button onClick={goPrev} aria-label="Anterior" className="absolute left-2 top-1/2 -translate-y-1/2 z-10 inline-flex items-center justify-center w-8 h-8 rounded-full bg-white/90 text-slate-700 hover:bg-white shadow">
-                  <FiChevronLeft className="text-sm" />
-                </button>
-                <button onClick={goNext} aria-label="Próximo" className="absolute right-2 top-1/2 -translate-y-1/2 z-10 inline-flex items-center justify-center w-8 h-8 rounded-full bg-white/90 text-slate-700 hover:bg-white shadow">
-                  <FiChevronRight className="text-sm" />
-                </button>
-
-                <div className="absolute bottom-2 left-0 right-0 flex items-center justify-center gap-1 z-10">
-                  {slides.map((_, i) => (
-                    <button key={i} onClick={() => setActiveSlide(i)} className={`h-1.5 rounded-full transition-all ${i === activeSlide ? 'w-4 bg-white' : 'w-1.5 bg-white/70 hover:bg-white'}`} aria-label={`Ir para slide ${i + 1}`} />
                   ))}
                 </div>
 
-                <div className="invisible">
-                  <img src={slides[0].image} alt="placeholder" className="w-full h-[200px] sm:h-[240px] lg:h-[280px] object-cover" onError={(e) => { e.target.src = '/placeholder-image.svg'; e.target.alt = 'Imagem não disponível'; }} />
+                {/* Progress indicators */}
+                <div className="absolute bottom-4 left-0 right-0 flex items-center justify-center gap-2 z-10">
+                  {slides.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => scrollToSlide(index)}
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        index === currentSlideIndex
+                          ? 'w-6 bg-white'
+                          : 'w-2 bg-white/50 hover:bg-white/70'
+                      }`}
+                      aria-label={`Ir para slide ${index + 1}`}
+                    />
+                  ))}
                 </div>
               </div>
 
               <div className="hidden lg:flex lg:col-span-1 flex-col gap-3 h-[200px] sm:h-[240px] lg:h-[280px]">
-                <div className="relative rounded-lg overflow-hidden border border-slate-200 bg-gradient-to-br from-orange-300 to-orange-400 text-white flex-1">
-                  <div className="p-3 h-full flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center gap-1 mb-1">
-                        <FaPercent className="text-orange-100 text-xs" />
-                        <span className="text-xs font-bold">OFERTA</span>
-                      </div>
-                      <h3 className="text-sm font-bold mb-1">Até 70% OFF</h3>
-                      <p className="text-xs opacity-90 mb-2">Produtos selecionados</p>
-                    </div>
-                    <Link to="/ofertas" className="inline-block px-3 py-1 bg-white text-orange-600 text-xs font-semibold rounded hover:bg-orange-50 transition-colors self-start">
-                      Ver Ofertas
-                    </Link>
-                  </div>
+                <div onClick={() => navigate('/products?discount=true')} className="cursor-pointer hover:opacity-80 transition-opacity">
+                  <PromotionalCard
+                    type="offers"
+                    onRequireAuth={() => setShowLoginModal(true)}
+                  />
                 </div>
-
-                <div className="relative rounded-lg overflow-hidden border border-slate-200 bg-gradient-to-br from-emerald-300 to-emerald-400 text-white flex-1">
-                  <div className="p-3 h-full flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center gap-1 mb-1">
-                        <FaTruck className="text-emerald-100 text-xs" />
-                        <span className="text-xs font-bold">FRETE GRÁTIS</span>
-                      </div>
-                      <h3 className="text-sm font-bold mb-1">Entrega Grátis</h3>
-                      <p className="text-xs opacity-90 mb-2">Acima de R$ 99</p>
-                    </div>
-                    <Link to="/frete-gratis" className="inline-block px-3 py-1 bg-white text-emerald-600 text-xs font-semibold rounded hover:bg-emerald-50 transition-colors self-start">
-                      Aproveitar
-                    </Link>
-                  </div>
+                <div onClick={() => navigate('/products?freeShipping=true')} className="cursor-pointer hover:opacity-80 transition-opacity">
+                  <PromotionalCard
+                    type="free_shipping"
+                    onRequireAuth={() => setShowLoginModal(true)}
+                  />
                 </div>
               </div>
             </div>
 
             <div className="mt-8 space-y-8">
-              <ProductCarousel 
-                title="Mais Vendidos" 
-                products={products.sort((a, b) => b.sales - a.sales).slice(0, 10)} 
+              <ProductCarousel
+                title="Mais Vendidos"
+                products={products.sort((a, b) => b.sales - a.sales).slice(0, 10)}
                 loading={loading}
                 favorites={favorites}
                 favoriteLoading={favoriteLoading}
                 onToggleFavorite={() => {}}
                 setProductModalId={setProductModalId}
                 setShowProductModal={setShowProductModal}
+                onRequireAuth={() => setShowLoginModal(true)}
               />
-              <ProductCarousel 
-                title="Bem Avaliados" 
-                products={products.filter(p => p.rating >= 4).sort((a, b) => b.rating - a.rating).slice(0, 10)} 
+              <ProductCarousel
+                title="Bem Avaliados"
+                products={products.filter(p => p.rating >= 4).sort((a, b) => b.rating - a.rating).slice(0, 10)}
                 loading={loading}
                 favorites={favorites}
                 favoriteLoading={favoriteLoading}
                 onToggleFavorite={() => {}}
                 setProductModalId={setProductModalId}
                 setShowProductModal={setShowProductModal}
+                onRequireAuth={() => setShowLoginModal(true)}
               />
-              <ProductCarousel 
-                title="Produtos Recentes" 
-                products={products.slice().reverse().slice(0, 10)} 
+              <ProductCarousel
+                title="Produtos Recentes"
+                products={products.slice().reverse().slice(0, 10)}
                 loading={loading}
                 favorites={favorites}
                 favoriteLoading={favoriteLoading}
                 onToggleFavorite={() => {}}
                 setProductModalId={setProductModalId}
                 setShowProductModal={setShowProductModal}
+                onRequireAuth={() => setShowLoginModal(true)}
               />
             </div>
           </div>
         </main>
 
         <ProductDetailsModal productId={productModalId} isOpen={showProductModal} onClose={() => { setShowProductModal(false); setProductModalId(null); }} />
+
+        <LoginRegisterModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
 
         <footer className="bg-slate-900 text-slate-300">
           <div className="px-4 sm:px-6 py-6">

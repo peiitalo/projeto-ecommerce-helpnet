@@ -1,71 +1,16 @@
-<div style="text-align: center; margin-bottom: 30px;">
-  <div style="font-size: 48px; margin-bottom: 15px;">⭐</div>
-</div>
+Subject: Obrigado pela sua avaliação - HelpNet
 
-<h1>Obrigado pela sua avaliação!</h1>
+Olá {{nome}},
 
-<p>Olá, <strong>{{nome}}</strong>!</p>
+Obrigado por avaliar nossa plataforma!
 
-<p>Muito obrigado por avaliar nossa plataforma! Sua opinião é extremamente valiosa para nós. 💙</p>
+Sua avaliação de {{estrelas}} estrela(s) foi recebida com sucesso.
 
-<div class="order-details">
-  <h3>⭐ Sua Avaliação</h3>
-  <p><strong>Classificação:</strong> 
-    <span style="color: #ffc107; font-size: 18px;">
-      {{#each (range estrelas)}}⭐{{/each}}
-    </span>
-    ({{estrelas}} de 5 estrelas)
-  </p>
-  
-  {{#if comentario}}
-  <p><strong>Seu comentário:</strong></p>
-  <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #1E90FF; margin: 15px 0; font-style: italic;">
-    "{{comentario}}"
-  </div>
-  {{/if}}
-</div>
-
-<div class="summary-box">
-  <h3>🙏 Por que sua avaliação é importante</h3>
-  <p>Sua opinião nos ajuda a:</p>
-  <ul style="margin: 10px 0; padding-left: 20px;">
-    <li><strong>Melhorar continuamente</strong> nossos serviços</li>
-    <li><strong>Orientar outros compradores</strong> em suas decisões</li>
-    <li><strong>Reconhecer vendedores</strong> que oferecem excelência</li>
-    <li><strong>Identificar áreas</strong> que precisam de atenção</li>
-  </ul>
-</div>
-
-{{#if (gte estrelas 4)}}
-<div class="summary-box" style="background-color: #d4edda; border-color: #4caf50;">
-  <h3 style="color: #155724;">🎉 Que ótimo saber que você gostou!</h3>
-  <p style="color: #155724;">Ficamos muito felizes em saber que você teve uma experiência positiva conosco. Continue explorando nossa plataforma e descobrindo novos produtos incríveis!</p>
-</div>
-{{else}}
-<div class="summary-box" style="background-color: #fff3cd; border-color: #ffc107;">
-  <h3 style="color: #856404;">💡 Vamos melhorar juntos!</h3>
-  <p style="color: #856404;">Agradecemos seu feedback honesto. Nossa equipe está sempre trabalhando para melhorar a experiência de todos os usuários. Suas sugestões são muito importantes para nós!</p>
-</div>
+{{#if comentario}}
+Seu comentário: "{{comentario}}"
 {{/if}}
 
-<div style="text-align: center; margin: 40px 0;">
-  <a href="{{frontendUrl}}/home" class="button">CONTINUAR COMPRANDO</a>
-</div>
+Sua opinião é muito importante para nós e nos ajuda a melhorar continuamente nossos serviços.
 
-<div class="summary-box">
-  <h3>🛍️ Explore mais da HelpNet</h3>
-  <p><strong>Descubra:</strong></p>
-  <ul style="margin: 10px 0; padding-left: 20px;">
-    <li>Novos produtos adicionados diariamente</li>
-    <li>Ofertas exclusivas para clientes fiéis</li>
-    <li>Vendedores com as melhores avaliações</li>
-    <li>Categorias que podem interessar você</li>
-  </ul>
-</div>
-
-<p>Continuamos trabalhando para oferecer sempre a melhor experiência de compra online do Brasil!</p>
-
-<p>Se tiver mais sugestões ou precisar de ajuda, nossa equipe de suporte está sempre disponível.</p>
-
-<p><strong>Equipe HelpNet</strong><br>
-<em>Obrigado por fazer parte da nossa comunidade! 🚀</em></p>
+Atenciosamente,
+Equipe HelpNet

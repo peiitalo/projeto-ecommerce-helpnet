@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useAuth } from './AuthContext.jsx';
 import { carrinhoService, freteService } from '../services/api.js';
 
@@ -29,9 +29,19 @@ function safeStorageSet(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
 }
 
+// Função para comparação profunda de arrays de objetos
+function deepEqualArrays(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (JSON.stringify(a[i]) !== JSON.stringify(b[i])) return false;
+  }
+  return true;
+}
+
 export function CartProvider({ children }) {
   const { user } = useAuth();
-  const STORAGE_KEY = user ? `helpnet_cart_${user.id}` : 'helpnet_cart_guest';
+  const STORAGE_KEY = useMemo(() => user ? `helpnet_cart_${user.id}` : 'helpnet_cart_guest', [user]);
+  const COUPON_STORAGE_KEY = useMemo(() => user ? `helpnet_coupon_${user.id}` : 'helpnet_coupon_guest', [user]);
 
   const [items, setItems] = useState([]);
   const [freightOptions, setFreightOptions] = useState([]);
@@ -39,30 +49,52 @@ export function CartProvider({ children }) {
   const [selectedAddress, setSelectedAddress] = useState(null);
   const [freightLoading, setFreightLoading] = useState(false);
   const [freightError, setFreightError] = useState(null);
-  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [appliedCoupons, setAppliedCoupons] = useState([]);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState(null);
+
+  // Ref para debounce da sincronização
+  const syncTimeoutRef = useRef(null);
 
   // Persiste mudanças
   useEffect(() => {
     safeStorageSet(STORAGE_KEY, items);
   }, [items, STORAGE_KEY]);
 
+  // Persiste cupons aplicados
+  useEffect(() => {
+    safeStorageSet(COUPON_STORAGE_KEY, appliedCoupons);
+  }, [appliedCoupons, COUPON_STORAGE_KEY]);
+
   // Limpa carrinho quando usuário muda (logout/login com outra conta)
   useEffect(() => {
-    const prevUserId = localStorage.getItem('cart_prev_user_id');
-    const currentUserId = user?.id || null;
+    const prevUserId = localStorage.getItem('cart_prev_user_id') || '';
+    const currentUserId = user?.id ? user.id.toString() : '';
 
-    if (prevUserId !== currentUserId?.toString()) {
+    if (prevUserId !== currentUserId) {
+      // If logging out (prev was user, now null), save current cart to backup
+      if (prevUserId && !currentUserId) {
+        safeStorageSet(`helpnet_cart_backup_${prevUserId}`, items);
+      }
+      // Clear backup for previous user if changing users
+      if (prevUserId) {
+        localStorage.removeItem(`helpnet_cart_backup_${prevUserId}`);
+      }
       // Usuário mudou, limpa carrinho local
       setItems([]);
-      localStorage.setItem('cart_prev_user_id', currentUserId || '');
+      localStorage.setItem('cart_prev_user_id', currentUserId);
     }
   }, [user?.id]);
 
   // Sync cart when user logs in
-  useEffect(() => {
+  const syncCart = useCallback(async () => {
+    console.log('[CartContext] Sync cart called, user:', !!user, 'user.id:', user?.id, 'timestamp:', Date.now());
+    const couponKey = user ? `helpnet_coupon_${user.id}` : 'helpnet_coupon_guest';
     if (user) {
       // Sempre carrega do backend quando usuário está logado
-      carrinhoService.listar().then(data => {
+      try {
+        const data = await carrinhoService.listar();
+        console.log('[CartContext] Backend cart data received:', data);
         const backendItems = (data.itens || []).map(item => ({
           id: item.produto.ProdutoID,
           name: item.produto.Nome,
@@ -76,17 +108,101 @@ export function CartProvider({ children }) {
           estoque: item.produto.Estoque,
           quantity: item.Quantidade,
         }));
-        setItems(backendItems);
-      }).catch(error => {
+        console.log('[CartContext] Mapped backend items:', backendItems);
+
+        // Usar comparação profunda para evitar setItems desnecessário
+        setItems(prevItems => {
+          if (deepEqualArrays(prevItems, backendItems)) {
+            return prevItems; // Não mudar se igual
+          }
+          return backendItems;
+        });
+
+        if (backendItems.length === 0) {
+          // Check for backup
+          const backupKey = `helpnet_cart_backup_${user.id}`;
+          const backupItems = safeStorageGet(backupKey, []);
+          if (backupItems.length > 0) {
+            console.log('[CartContext] Using backup items:', backupItems);
+            setItems(prevItems => {
+              if (deepEqualArrays(prevItems, backupItems)) {
+                return prevItems;
+              }
+              return backupItems;
+            });
+            // Save to backend
+            try {
+              await Promise.all(backupItems.map(item => carrinhoService.adicionar(item.id, item.quantity)));
+            } catch (error) {
+              console.error('Erro ao salvar backup no backend:', error);
+            }
+            // Clear backup
+            localStorage.removeItem(backupKey);
+          } else {
+            console.log('[CartContext] Setting empty cart');
+            setItems(prevItems => {
+              if (prevItems.length === 0) return prevItems;
+              return [];
+            });
+          }
+        }
+      } catch (error) {
         console.error('Erro ao carregar carrinho:', error);
-        setItems([]);
+        setItems(prevItems => {
+          if (prevItems.length === 0) return prevItems;
+          return [];
+        });
+      }
+
+      // Carrega cupons aplicados do localStorage
+      const savedCoupons = safeStorageGet(couponKey, []);
+      setAppliedCoupons(prevCoupons => {
+        const newCoupons = Array.isArray(savedCoupons) ? savedCoupons : [];
+        if (deepEqualArrays(prevCoupons, newCoupons)) {
+          return prevCoupons;
+        }
+        return newCoupons;
       });
     } else {
       // Usuário não logado, carrega do localStorage guest
       const guestItems = safeStorageGet('helpnet_cart_guest', []);
-      setItems(guestItems);
+      console.log('[CartContext] Setting guest items:', guestItems);
+      setItems(prevItems => {
+        if (deepEqualArrays(prevItems, guestItems)) {
+          return prevItems;
+        }
+        return guestItems;
+      });
+
+      // Carrega cupons aplicados do localStorage guest
+      const guestCoupons = safeStorageGet('helpnet_coupon_guest', []);
+      setAppliedCoupons(prevCoupons => {
+        const newCoupons = Array.isArray(guestCoupons) ? guestCoupons : [];
+        if (deepEqualArrays(prevCoupons, newCoupons)) {
+          return prevCoupons;
+        }
+        return newCoupons;
+      });
     }
   }, [user]);
+
+  useEffect(() => {
+    // Limpar timeout anterior
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
+    }
+    // Debounce: aguardar 300ms antes de sync
+    syncTimeoutRef.current = setTimeout(() => {
+      syncCart();
+    }, 300);
+
+    // Cleanup
+    return () => {
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+    };
+  }, [syncCart]);
 
   // Adiciona item (soma quantidade se já existir)
   const addItem = async (product, quantity = 1) => {
@@ -189,6 +305,8 @@ export function CartProvider({ children }) {
           // Clear all items
           await carrinhoService.limpar();
           setItems([]);
+          // Clear backup to prevent restore
+          localStorage.removeItem(`helpnet_cart_backup_${user.id}`);
         }
       } catch (error) {
         console.error('Erro ao limpar carrinho:', error);
@@ -206,7 +324,22 @@ export function CartProvider({ children }) {
 
   // Calcular frete baseado no endereço selecionado e produtos específicos
   const calculateFreight = async (enderecoId, produtoIds = null) => {
+    console.log('[DEBUG CartContext] calculateFreight called:', {
+      user: !!user,
+      userId: user?.id,
+      enderecoId,
+      produtoIds,
+      itemsCount: items.length,
+      timestamp: Date.now()
+    });
+
     if (!user || !enderecoId) {
+      console.log('[DEBUG CartContext] calculateFreight early return - no user or enderecoId', {
+        hasUser: !!user,
+        userId: user?.id,
+        enderecoId
+      });
+      console.log('[CartContext] freightOptions limpo - sem usuário ou endereço');
       setFreightOptions([]);
       setSelectedFreight(null);
       return;
@@ -216,76 +349,217 @@ export function CartProvider({ children }) {
     const idsParaCalculo = produtoIds || items.map(item => item.id);
     const itemsParaCalculo = items.filter(item => idsParaCalculo.includes(item.id));
 
+    console.log('[DEBUG CartContext] Items para cálculo:', {
+      idsParaCalculo,
+      itemsParaCalculoCount: itemsParaCalculo.length,
+      itemsParaCalculo: itemsParaCalculo.map(i => ({ id: i.id, name: i.name, quantity: i.quantity }))
+    });
+
     if (idsParaCalculo.length === 0) {
+      console.log('[DEBUG CartContext] Nenhum produto para calcular frete');
+      console.log('[CartContext] freightOptions limpo - nenhum produto para calcular frete');
       setFreightOptions([]);
       setSelectedFreight(null);
       return;
     }
 
-    // Verificar se todos os produtos têm frete grátis
-    const todosFreteGratis = itemsParaCalculo.every(item => item.freeShipping);
-    
-    if (todosFreteGratis) {
-      const freteGratisOption = {
-        id: 'frete-gratis',
-        nome: 'Frete Grátis',
-        transportadora: 'HelpNet',
-        valor: 0,
-        prazo: '3-5 dias úteis',
-        descricao: 'Todos os produtos selecionados têm frete grátis',
-        ativo: true
-      };
-      setFreightOptions([freteGratisOption]);
-      setSelectedFreight(freteGratisOption);
-      setFreightLoading(false);
-      return;
-    }
-
+    console.log('[DEBUG CartContext] Iniciando cálculo de frete...');
     setFreightLoading(true);
     setFreightError(null);
 
     try {
+      console.log('[DEBUG CartContext] Chamando freteService.calcular:', {
+        clienteId: user.id,
+        enderecoId,
+        produtoIds: idsParaCalculo,
+        timestamp: Date.now()
+      });
+
       const freteResult = await freteService.calcular(user.id, enderecoId, idsParaCalculo);
 
+      console.log('[DEBUG CartContext] Resposta do freteService:', {
+        freteResult,
+        hasOpcoes: !!freteResult?.opcoes,
+        opcoesLength: freteResult?.opcoes?.length || 0,
+        endereco: freteResult?.endereco,
+        timestamp: Date.now()
+      });
+
       const options = freteResult.opcoes || [];
+      console.log('[DEBUG CartContext] Definindo opções de frete:', {
+        optionsCount: options.length,
+        options: options.map(o => ({ id: o.id, nome: o.nome, valor: o.valor, prazo: o.prazo }))
+      });
+
+      console.log('[CartContext] freightOptions atualizado com opções:', options.length);
       setFreightOptions(options);
 
       // Selecionar primeira opção como padrão se disponível
       if (options.length > 0) {
+        console.log('[DEBUG CartContext] Selecionando primeira opção de frete:', options[0]);
         setSelectedFreight(options[0]);
       } else {
+        console.log('[DEBUG CartContext] Nenhuma opção de frete disponível');
         setSelectedFreight(null);
       }
     } catch (error) {
-      console.error('Erro ao calcular frete:', error);
+      console.error('[DEBUG CartContext] Erro ao calcular frete:', {
+        error: error.message,
+        stack: error.stack,
+        timestamp: Date.now()
+      });
       setFreightError(error.message || 'Erro ao calcular frete');
+      console.log('[CartContext] freightOptions limpo devido a erro no cálculo');
       setFreightOptions([]);
       setSelectedFreight(null);
     } finally {
+      console.log('[DEBUG CartContext] Finalizando cálculo de frete');
       setFreightLoading(false);
     }
   };
 
   const count = useMemo(() => items.length, [items]); // Conta itens únicos
-  const subtotal = useMemo(() => items.reduce((sum, i) => sum + (i.price * (i.quantity || 0)), 0), [items]);
+
+  // Calcular subtotal usando preços já com desconto aplicado
+  const subtotal = useMemo(() => {
+    return items.reduce((sum, i) => {
+      return sum + (i.price * (i.quantity || 0));
+    }, 0);
+  }, [items]);
+
   const freight = useMemo(() => selectedFreight || { valor: 0, prazo: '', nome: '' }, [selectedFreight]);
   
-  // Calcular desconto do cupom
-  const couponDiscount = useMemo(() => {
-    if (!appliedCoupon || subtotal < (appliedCoupon.minValue || 0)) return 0;
-    
-    if (appliedCoupon.type === 'percentage') {
-      return (subtotal * appliedCoupon.discount) / 100;
-    } else if (appliedCoupon.type === 'fixed') {
-      return Math.min(appliedCoupon.discount, subtotal);
+  // Aplicar cupom (adicionar à lista de cupons aplicados)
+  const applyCoupon = async (couponCode, selectedItems = null) => {
+    // Improved validation
+    const trimmedCode = couponCode.trim().toUpperCase();
+
+    if (!trimmedCode) {
+      setCouponError('Digite o código do cupom');
+      return false;
     }
-    return 0;
-  }, [appliedCoupon, subtotal]);
+
+    // Validate format: only letters, numbers, underscores, hyphens
+    const codeRegex = /^[A-Z0-9_-]+$/;
+    if (!codeRegex.test(trimmedCode)) {
+      setCouponError('Código do cupom contém caracteres inválidos. Use apenas letras, números, traços (-) e underscores (_)');
+      return false;
+    }
+
+    // Validate length
+    if (trimmedCode.length < 3 || trimmedCode.length > 20) {
+      setCouponError('Código do cupom deve ter entre 3 e 20 caracteres');
+      return false;
+    }
+
+    setCouponLoading(true);
+    setCouponError(null);
+
+    const itemsToUse = selectedItems || items;
+
+    try {
+      const response = await fetch('/api/cupons/validar', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          codigo: trimmedCode,
+          itensCarrinho: itemsToUse.map(item => ({
+            ProdutoID: item.id,
+            PrecoUnitario: item.price,
+            Quantidade: item.quantity
+          }))
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao validar cupom');
+      }
+
+      if (data.state !== 'active') {
+        throw new Error(data.reason || 'Cupom não pode ser aplicado');
+      }
+
+      // Verificar se o cupom já está aplicado
+      const isAlreadyApplied = appliedCoupons.some(coupon => coupon.Codigo === data.coupon.Codigo);
+      if (isAlreadyApplied) {
+        throw new Error('Este cupom já está aplicado');
+      }
+
+      // Transform API response to match expected format with item-specific data
+      const transformedCoupon = {
+        ...data.coupon,
+        TipoDesconto: data.coupon.DescontoTipo,
+        ValorDesconto: data.coupon.DescontoValor,
+        ValorMinimo: data.coupon.Restricoes?.valorMinimo || 0,
+        Codigo: data.coupon.Codigo,
+        Nome: data.coupon.Nome,
+        discountDetails: data.discountDetails, // Item-specific discount details
+        descontoAplicado: data.discountDetails?.totalDiscount || 0,
+        valorFinal: data.discountDetails?.eligibleItems ?
+          data.discountDetails.eligibleItems.reduce((total, item) => total + item.finalAmount, 0) : 0
+      };
+
+      setAppliedCoupons(prev => [...prev, transformedCoupon]);
+
+      // Se o cupom for de frete grátis, recalcular frete automaticamente
+      if (transformedCoupon.TipoDesconto === 'frete_gratis') {
+        // Recalcular frete para mostrar frete grátis
+        if (selectedAddress) {
+          await calculateFreight(selectedAddress.EnderecoID, itemsToUse.map(item => item.id));
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Erro ao aplicar cupom:', error);
+      setCouponError(error.message);
+      return false;
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  // Remover cupom específico
+  const removeCoupon = (couponCode = null) => {
+    if (couponCode) {
+      // Remove specific coupon
+      setAppliedCoupons(prev => prev.filter(coupon => coupon.Codigo !== couponCode));
+    } else {
+      // Remove all coupons if no code specified
+      setAppliedCoupons([]);
+    }
+    setCouponError(null);
+  };
+
+  // Calcular desconto total dos cupons aplicados (item-specific)
+  const couponDiscount = useMemo(() => {
+    if (!appliedCoupons || appliedCoupons.length === 0) return 0;
+
+    let totalDiscount = 0;
+
+    // Each coupon now has item-specific discount details
+    for (const coupon of appliedCoupons) {
+      if (coupon.discountDetails?.totalDiscount) {
+        totalDiscount += coupon.discountDetails.totalDiscount;
+      } else if (coupon.descontoAplicado) {
+        // Fallback for backward compatibility
+        totalDiscount += coupon.descontoAplicado;
+      }
+    }
+
+    return totalDiscount;
+  }, [appliedCoupons]);
   
   const total = useMemo(() => {
-    const freightCost = appliedCoupon?.type === 'free_shipping' ? 0 : freight.valor;
+    const hasFreeShipping = appliedCoupons.some(coupon => coupon.TipoDesconto === 'frete_gratis');
+    const freightCost = hasFreeShipping ? 0 : freight.valor;
     return Math.max(0, subtotal - couponDiscount + freightCost);
-  }, [subtotal, couponDiscount, freight.valor, appliedCoupon]);
+  }, [subtotal, couponDiscount, freight.valor, appliedCoupons]);
 
   const value = {
     items,
@@ -305,10 +579,12 @@ export function CartProvider({ children }) {
     calculateFreight,
     freightLoading,
     freightError,
-    appliedCoupon,
+    appliedCoupons,
     couponDiscount,
-    applyCoupon: setAppliedCoupon,
-    removeCoupon: () => setAppliedCoupon(null),
+    couponLoading,
+    couponError,
+    applyCoupon,
+    removeCoupon,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
@@ -319,3 +595,4 @@ export function useCart() {
   if (!ctx) throw new Error('useCart deve ser usado dentro de CartProvider');
   return ctx;
 }
+

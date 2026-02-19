@@ -17,10 +17,9 @@ export default function PaymentCheckout() {
   const carregarResumo = async () => {
     const data = await apiRequest(`/pagamentos/${id}/resumo`);
     setResumo(data.resumo);
-    // Selecionar automaticamente o primeiro método com restante > 0
-    const m = data.resumo.metodos.find(m => m.restante > 0) || data.resumo.metodos[0];
-    setMetodoSelecionado(m?.metodoId || null);
-    setValorPagamento(m ? String(m.restante.toFixed(2)) : '');
+    // Não selecionar automaticamente - cliente deve escolher
+    setMetodoSelecionado(null);
+    setValorPagamento('');
   };
 
   useEffect(() => { carregarResumo(); }, [id]);
@@ -43,15 +42,14 @@ export default function PaymentCheckout() {
         body: JSON.stringify({ metodoId: metodoSelecionado, valor })
       });
       setResumo(resp.resumo);
-      // Ajusta seleção para próximo restante
-      const prox = resp.resumo.metodos.find(m => m.restante > 0);
-      setMetodoSelecionado(prox?.metodoId || null);
-      setValorPagamento(prox ? String(prox.restante.toFixed(2)) : '');
+      // Não ajustar seleção automaticamente - cliente deve escolher
+      setMetodoSelecionado(null);
+      setValorPagamento('');
 
       // Redirecionar quando pago
       if (resp.resumo.statusPagamento === 'PAGO') {
-        // Gerar e mostrar comprovante completo
-        gerarComprovante(resp.resumo);
+        // Redirecionar diretamente para pedidos sem mostrar comprovante
+        setTimeout(() => navigate('/meus-pedidos'), 1000);
       }
     } catch (e) {
       setError(e.message || 'Falha ao processar pagamento');
@@ -65,73 +63,6 @@ export default function PaymentCheckout() {
   );
 
   const formatBRL = (v) => v?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-  const gerarComprovante = (resumoCompleto) => {
-    const comprovante = `
-═══════════════════════════════════════
-           COMPROVANTE DE PAGAMENTO
-                   HelpNet
-═══════════════════════════════════════
-
-Pedido: #${resumoCompleto.pedidoId}
-Data: ${new Date().toLocaleString('pt-BR')}
-Cliente: ${resumoCompleto.cliente?.nome || 'Cliente'}
-Vendedor: ${resumoCompleto.vendedor?.nome || 'Vendedor'}
-
-───────────────────────────────────────
-                PRODUTOS
-───────────────────────────────────────
-${resumoCompleto.itens?.map(item => 
-  `${item.nome} - Qtd: ${item.quantidade}\nPreço unit.: ${formatBRL(item.precoUnitario)}\nSubtotal: ${formatBRL(item.quantidade * item.precoUnitario)}`
-).join('\n\n') || 'Itens não disponíveis'}
-
-───────────────────────────────────────
-              PAGAMENTOS
-───────────────────────────────────────
-${resumoCompleto.metodos?.map(metodo => 
-  `${metodo.metodo}: ${formatBRL(metodo.pago)}`
-).join('\n') || 'Métodos não disponíveis'}
-
-───────────────────────────────────────
-               ENDEREÇO
-───────────────────────────────────────
-${resumoCompleto.endereco?.nome || 'Não informado'}
-${resumoCompleto.endereco?.logradouro || ''} ${resumoCompleto.endereco?.numero || ''}
-${resumoCompleto.endereco?.cidade || ''} - ${resumoCompleto.endereco?.uf || ''}
-CEP: ${resumoCompleto.endereco?.cep || 'Não informado'}
-
-───────────────────────────────────────
-                VALORES
-───────────────────────────────────────
-Subtotal: ${formatBRL(resumoCompleto.subtotal || 0)}
-Frete: ${formatBRL(resumoCompleto.frete || 0)}
-Desconto: ${formatBRL(resumoCompleto.desconto || 0)}
-Cupons aplicados: ${resumoCompleto.cupons?.join(', ') || 'Nenhum'}
-
-TOTAL PAGO: ${formatBRL(resumoCompleto.totalPago || 0)}
-
-═══════════════════════════════════════
-        Obrigado pela preferência!
-═══════════════════════════════════════
-    `.trim();
-
-    if (navigator.share) {
-      navigator.share({
-        title: 'Comprovante de Pagamento - HelpNet',
-        text: comprovante
-      }).then(() => {
-        setTimeout(() => navigate('/meus-pedidos'), 2000);
-      }).catch(() => {
-        navigator.clipboard.writeText(comprovante);
-        alert('Comprovante copiado para área de transferência!');
-        setTimeout(() => navigate('/meus-pedidos'), 2000);
-      });
-    } else {
-      navigator.clipboard.writeText(comprovante);
-      alert('Comprovante copiado para área de transferência!');
-      setTimeout(() => navigate('/meus-pedidos'), 2000);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center p-6">
@@ -149,7 +80,7 @@ TOTAL PAGO: ${formatBRL(resumoCompleto.totalPago || 0)}
           {resumo.metodos.map((m) => (
             <label key={m.metodoId} className={`flex items-center justify-between p-3 border rounded-lg ${m.restante <= 0 ? 'opacity-50' : ''}`}>
               <div className="flex items-center gap-2">
-                <input type="radio" name="metodo" value={m.metodoId} checked={metodoSelecionado===m.metodoId} onChange={()=>{setMetodoSelecionado(m.metodoId); setValorPagamento(String(Math.max(0, m.restante).toFixed(2)));}} disabled={m.restante<=0 || resumo.statusPagamento==='PAGO' || resumo.statusPagamento==='EXPIRADO'} />
+                <input type="radio" name="metodo" value={m.metodoId} checked={metodoSelecionado===m.metodoId} onChange={()=>{setMetodoSelecionado(m.metodoId);}} disabled={m.restante<=0 || resumo.statusPagamento==='PAGO' || resumo.statusPagamento==='EXPIRADO'} />
                 <div>
                   <div className="font-medium text-slate-900">{m.metodo}</div>
                   <div className="text-xs text-slate-600">Alocado: {formatBRL(m.alocado)} • Pago: {formatBRL(m.pago)} • Restante: {formatBRL(m.restante)}</div>

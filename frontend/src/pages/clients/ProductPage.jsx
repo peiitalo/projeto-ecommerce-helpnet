@@ -14,7 +14,8 @@ import {
   FaUser,
   FaRegHeart,
   FaImage,
-  FaSearchPlus
+  FaSearchPlus,
+  FaBell,
 } from 'react-icons/fa';
 import {
   FiChevronLeft,
@@ -25,19 +26,27 @@ import {
 import { produtoService, favoritoService, avaliacaoService } from '../../services/api';
 import { log } from '../../utils/logger';
 import { useCart } from '../../context/CartContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 import LazyImage from '../../components/LazyImage';
 import LoadingSkeleton from '../../components/LoadingSkeleton';
+import LoginRegisterModal from '../../components/LoginRegisterModal';
 import { buildImageUrl, buildImageUrls, getFirstValidImage } from '../../utils/imageUtils';
 import { useNotifications } from '../../hooks/useNotifications';
+import { useCounters } from '../../context/CountersContext';
 
 
 function ProductPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { addItem, removeItem, items } = useCart();
+  const { addItem, removeItem, items, clear, count: cartCount } = useCart();
+  const { user } = useAuth();
+  const { favoritesCount, notificationsCount } = useCounters();
+
+  console.log('[ProductPage] Rendering with id:', id, 'user:', user ? 'logged in' : 'not logged in');
   const [buttonState, setButtonState] = useState('add'); // 'add', 'added', 'remove'
   const [addedToCartTimeout, setAddedToCartTimeout] = useState(null);
   const { showSuccess, showError, showWarning } = useNotifications();
+  const [showLoginModal, setShowLoginModal] = useState(false);
   
   // Estados para avaliações
   const [avaliacoes, setAvaliacoes] = useState([]);
@@ -102,7 +111,6 @@ function ProductPage() {
   // Função para calcular promoção baseada no endereço (mock)
   const calcularPromocao = (cep) => {
     if (!cep) return null;
-    if (cep.startsWith('01')) return 'Frete Grátis para São Paulo!';
     if (cep.startsWith('2')) return '10% OFF no frete para Sudeste!';
     return null;
   };
@@ -124,6 +132,12 @@ function ProductPage() {
 
   useEffect(() => {
     const fetchProduct = async () => {
+      if (!id || id === 'undefined') {
+        setError('Produto não encontrado');
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError('');
       try {
@@ -140,6 +154,8 @@ function ProductPage() {
     };
 
     const checkFavoriteStatus = async () => {
+      if (!id || id === 'undefined' || !user?.id) return;
+
       try {
         const favorites = await favoritoService.listar();
         const isFav = (favorites.favoritos || []).some(fav => fav.produto.ProdutoID === parseInt(id));
@@ -152,7 +168,7 @@ function ProductPage() {
 
     fetchProduct();
     checkFavoriteStatus();
-  }, [id]);
+  }, [id, user?.id]);
 
   // Check if product is in cart
   const isInCart = items.some(item => item.id === (product?.ProdutoID || product?.id || id));
@@ -169,8 +185,8 @@ function ProductPage() {
   // Carregar avaliações
   useEffect(() => {
     const carregarAvaliacoes = async () => {
-      if (!id) return;
-      
+      if (!id || id === 'undefined') return;
+
       setLoadingAvaliacoes(true);
       try {
         const [avaliacoesResponse, minhaAvaliacaoResponse] = await Promise.all([
@@ -195,7 +211,8 @@ function ProductPage() {
   useEffect(() => {
     const carregarProdutosSugeridos = async () => {
       if (!product?.CategoriaID && !product?.VendedorID) return;
-      
+      if (!id || id === 'undefined') return;
+
       setLoadingProdutosSugeridos(true);
       try {
         const filtros = {
@@ -203,7 +220,7 @@ function ProductPage() {
           limit: 6,
           exclude: id // Excluir o produto atual
         };
-        
+
         const response = await produtoService.listar(filtros);
         setProdutosSugeridos(response.data?.produtos || []);
       } catch (error) {
@@ -331,6 +348,10 @@ function ProductPage() {
   };
 
   const handleAddToCart = () => {
+    if (!user) {
+      setShowLoginModal(true);
+      return;
+    }
     const mapped = {
       id: product?.ProdutoID || product?.id || id,
       name: product?.Nome || product?.nome || name,
@@ -355,6 +376,10 @@ function ProductPage() {
   };
 
   const handleToggleFavorite = async () => {
+    if (!user) {
+      setShowLoginModal(true);
+      return;
+    }
     try {
       const produtoId = product?.ProdutoID || product?.id || id;
       if (isFavorite) {
@@ -371,21 +396,25 @@ function ProductPage() {
   };
 
   const handleAddComment = async () => {
+    if (!user) {
+      setShowLoginModal(true);
+      return;
+    }
     if (!newComment.trim() || !newRating) return;
-    
+
     setSubmittingAvaliacao(true);
     try {
       await avaliacaoService.avaliar(id, newRating, newComment.trim());
-      
+
       // Recarregar avaliações
       const [avaliacoesResponse, minhaAvaliacaoResponse] = await Promise.all([
         avaliacaoService.listarPorProduto(id),
         avaliacaoService.minhaDoProduto(id).catch(() => null)
       ]);
-      
+
       setAvaliacoes(avaliacoesResponse.data || []);
       setMinhaAvaliacao(minhaAvaliacaoResponse?.data || null);
-      
+
       setNewComment('');
       setNewRating(5);
       showSuccess('Avaliação enviada com sucesso!');
@@ -432,18 +461,79 @@ function ProductPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Header com botão voltar */}
+      {/* Header com navegação */}
       <header className="bg-white sticky top-0 z-40 border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-4 h-16">
-            <button
-              onClick={() => navigate(-1)}
-              className="p-2 text-slate-600 hover:text-blue-700 transition-colors"
-              aria-label="Voltar"
-            >
-              <FaArrowLeft className="text-lg" />
-            </button>
-            <h1 className="text-lg font-semibold text-slate-900 truncate">{name}</h1>
+          <div className="flex items-center justify-between gap-4 h-16">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate(-1)}
+                className="p-2 text-slate-600 hover:text-blue-700 transition-colors"
+                aria-label="Voltar"
+              >
+                <FaArrowLeft className="text-lg" />
+              </button>
+              <h1 className="text-lg font-semibold text-slate-900 truncate">{name}</h1>
+            </div>
+
+            <div className="flex items-center gap-2 sm:gap-3">
+              <button
+                onClick={() => {
+                  if (!user?.id) {
+                    setShowLoginModal(true);
+                  } else {
+                    navigate('/favoritos');
+                  }
+                }}
+                className="relative p-2 rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50"
+              >
+                <FaHeart />
+                {favoritesCount > 0 && (
+                  <span className="absolute -top-1 -right-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-600 text-white">
+                    {favoritesCount}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  if (!user?.id) {
+                    setShowLoginModal(true);
+                  } else {
+                    navigate('/notificacoes');
+                  }
+                }}
+                className="relative p-2 rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50"
+              >
+                <FaBell />
+                {notificationsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-600 text-white">
+                    {notificationsCount}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  if (!user?.id) {
+                    setShowLoginModal(true);
+                  } else {
+                    navigate('/carrinho');
+                  }
+                }}
+                className="relative p-2 rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50"
+              >
+                <FaShoppingCart />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-600 text-white">
+                    {cartCount}
+                  </span>
+                )}
+              </button>
+              {user && user.id && (
+                <Link to="/perfil" className="p-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100">
+                  <FaUser />
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -485,7 +575,7 @@ function ProductPage() {
                   {discount > 0 && (
                     <span className="px-3 py-1 bg-red-500 text-white text-sm font-bold rounded-lg flex items-center gap-1 shadow-sm">
                       <FaPercent className="text-xs" />
-                      {discount}% OFF
+                      {discount}%
                     </span>
                   )}
                   {freeShipping && (
@@ -661,14 +751,31 @@ function ProductPage() {
                   >
                     −
                   </button>
-                  <span className="px-4 py-2 font-medium bg-slate-50 border-x border-slate-200 min-w-[60px] text-center">{quantity}</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max={estoque || 999}
+                    value={quantity}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value) || 1;
+                      const maxQty = estoque || 999;
+                      setQuantity(Math.max(1, Math.min(maxQty, value)));
+                    }}
+                    className="px-4 py-2 font-medium bg-slate-50 border-x border-slate-200 min-w-[60px] text-center focus:outline-none focus:ring-0"
+                  />
                   <button
-                    onClick={() => setQuantity(quantity + 1)}
+                    onClick={() => setQuantity(Math.min(estoque || 999, quantity + 1))}
                     className="px-3 py-2 hover:bg-slate-50 transition-colors text-slate-600 hover:text-slate-900 font-medium"
+                    disabled={quantity >= (estoque || 999)}
                   >
                     +
                   </button>
                 </div>
+                {estoque && (
+                  <span className="text-sm text-slate-500">
+                    {estoque} disponíveis
+                  </span>
+                )}
               </div>
 
               {/* Botões de Ação */}
@@ -716,8 +823,29 @@ function ProductPage() {
                   </button>
 
                   <button
-                    onClick={() => {
-                      handleAddToCart();
+                    onClick={async () => {
+                      if (!user) {
+                        setShowLoginModal(true);
+                        return;
+                      }
+                      // Clear cart and add only this item for direct purchase
+                      await clear();
+                      const mapped = {
+                        id: product?.ProdutoID || product?.id || id,
+                        name: product?.Nome || product?.nome || name,
+                        price: Number(product?.Preco ?? product?.preco ?? price ?? 0),
+                        image: Array.isArray(product?.Imagens) ? product.Imagens[0] : null,
+                        sku: product?.SKU || product?.sku || sku,
+                        estoque: product?.Estoque ?? product?.estoque ?? estoque ?? 0,
+                      };
+                      await addItem(mapped, quantity);
+                      // Set sessionStorage for direct checkout
+                      sessionStorage.setItem('helpnet_checkout_data', JSON.stringify({
+                        selectedItems: [mapped.id],
+                        subtotal: mapped.price * quantity,
+                        couponDiscount: 0,
+                        appliedCoupons: []
+                      }));
                       navigate('/checkout');
                     }}
                     className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-green-300 bg-green-50 text-green-700 rounded-xl font-medium hover:bg-green-100 hover:border-green-400 transition-all duration-200"
@@ -948,7 +1076,7 @@ function ProductPage() {
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
                               <h5 className="font-semibold text-slate-900">
-                                {avaliacao.cliente?.Nome || avaliacao.Cliente?.Nome || 'Cliente Anônimo'}
+                                {avaliacao.cliente?.NomeCompleto || avaliacao.Cliente?.NomeCompleto || 'Cliente'}
                               </h5>
                               <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
                                 {new Date(avaliacao.CriadoEm).toLocaleDateString('pt-BR')}
@@ -1183,6 +1311,9 @@ function ProductPage() {
           </div>
         </div>
       )}
+
+      {/* Login/Register Modal */}
+      <LoginRegisterModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
     </div>
   );
 }

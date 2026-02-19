@@ -5,10 +5,12 @@ import path from 'path';
 import fs from 'fs';
 
 // Verificar se o Cloudinary está configurado
-const isCloudinaryConfigured = process.env.CLOUDINARY_CLOUD_NAME && 
-                              process.env.CLOUDINARY_API_KEY && 
+const isCloudinaryConfigured = process.env.CLOUDINARY_CLOUD_NAME &&
+                              process.env.CLOUDINARY_API_KEY &&
                               process.env.CLOUDINARY_API_SECRET &&
-                              process.env.CLOUDINARY_CLOUD_NAME !== 'demo';
+                              process.env.CLOUDINARY_CLOUD_NAME !== 'demo' &&
+                              process.env.CLOUDINARY_API_KEY !== 'your-api-key' &&
+                              process.env.CLOUDINARY_API_SECRET !== 'your-api-secret';
 
 let storage;
 

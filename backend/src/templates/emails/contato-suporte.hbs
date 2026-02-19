@@ -1,55 +1,16 @@
-<div style="text-align: center; margin-bottom: 30px;">
-  <div style="font-size: 48px; margin-bottom: 15px;">📧</div>
-  <h1 style="color: #2c3e50; font-size: 28px; font-weight: 600; margin: 0;">Nova Mensagem de Contato Recebida</h1>
-  <p style="color: #7f8c8d; font-size: 16px; margin: 10px 0 0 0;">Um cliente entrou em contato através do formulário de suporte</p>
-</div>
+Subject: Novo contato - {{assunto}}
 
-<div class="summary-box">
-  <h3>📋 Informações do Cliente</h3>
-  <table style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td style="padding: 8px 0; font-weight: 600; color: #2c3e50; width: 120px;">👤 Nome:</td>
-      <td style="padding: 8px 0; color: #555555;">{{nome}}</td>
-    </tr>
-    <tr>
-      <td style="padding: 8px 0; font-weight: 600; color: #2c3e50;">📧 E-mail:</td>
-      <td style="padding: 8px 0; color: #555555;">
-        <a href="mailto:{{email}}" style="color: #1E90FF; text-decoration: none;">{{email}}</a>
-      </td>
-    </tr>
-    {{#if telefone}}
-    <tr>
-      <td style="padding: 8px 0; font-weight: 600; color: #2c3e50;">📱 Telefone:</td>
-      <td style="padding: 8px 0; color: #555555;">{{telefone}}</td>
-    </tr>
-    {{/if}}
-    <tr>
-      <td style="padding: 8px 0; font-weight: 600; color: #2c3e50;">📝 Assunto:</td>
-      <td style="padding: 8px 0; color: #555555;">{{assunto}}</td>
-    </tr>
-  </table>
-</div>
+Olá equipe HelpNet,
 
-<div style="background-color: #f8f9fa; border-left: 4px solid #1E90FF; padding: 20px; margin: 25px 0; border-radius: 0 8px 8px 0;">
-  <h3 style="color: #2c3e50; font-size: 18px; font-weight: 600; margin: 0 0 15px 0;">💬 Mensagem do Cliente</h3>
-  <div style="background-color: #ffffff; padding: 15px; border-radius: 6px; border: 1px solid #e8e8e8;">
-    <p style="color: #555555; font-size: 16px; line-height: 1.6; margin: 0; white-space: pre-wrap;">{{mensagem}}</p>
-  </div>
-</div>
+Um novo contato foi recebido através do formulário de suporte:
 
-<div style="text-align: center; margin: 30px 0;">
-  <a href="mailto:{{email}}?subject=Re: {{assunto}}" class="button" style="display: inline-block; background-color: #1E90FF; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
-    📧 RESPONDER CLIENTE
-  </a>
-</div>
+<b>Nome:</b> {{nome}}
+<b>E-mail:</b> {{email}}
+<b>Telefone:</b> {{telefone}}
+<b>Assunto:</b> {{assunto}}
 
-<div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 15px; margin: 25px 0;">
-  <p style="color: #856404; font-size: 14px; margin: 0; text-align: center;">
-    ⏰ <strong>Lembrete:</strong> Responder em até 24 horas para manter a qualidade do atendimento
-  </p>
-</div>
+<b>Mensagem:</b>
+{{mensagem}}
 
-<p style="color: #7f8c8d; font-size: 14px; text-align: center; margin: 30px 0 0 0;">
-  Esta mensagem foi enviada automaticamente pelo sistema HelpNet<br>
-  Data: {{formatDate (now) 'DD/MM/YYYY [às] HH:mm'}}
-</p>
+Atenciosamente,
+Sistema HelpNet

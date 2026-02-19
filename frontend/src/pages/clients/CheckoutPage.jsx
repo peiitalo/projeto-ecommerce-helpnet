@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext.jsx';
-import { useAuth } from '../../context/AuthContext.jsx';
-import { clienteService, freteService } from '../../services/api';
+import { clienteService } from '../../services/api';
 import { useNotifications } from '../../hooks/useNotifications';
-import MaskedInput from '../../components/cadastro/MaskedInput.jsx';
+import CheckoutSidebar from '../../components/checkout/CheckoutSidebar';
+import CheckoutHeader from '../../components/checkout/CheckoutHeader';
+import OrderItemsSection from '../../components/checkout/OrderItemsSection';
+import AddressSelection from '../../components/checkout/AddressSelection';
+import PaymentMethodsSection from '../../components/checkout/PaymentMethodsSection';
+import OrderSummary from '../../components/checkout/OrderSummary';
+import ReceiptPage from '../../components/checkout/ReceiptPage';
+import CouponInput from '../../components/CouponInput';
 import {
   FaShoppingCart,
   FaUser,
@@ -29,7 +35,7 @@ import {
   FiX,
   FiPackage,
   FiTag,
-  FiCreditCard as FiCreditCardIcon,
+  FiCreditCard,
   FiMapPin,
   FiHelpCircle,
   FiSettings,
@@ -40,9 +46,7 @@ function CheckoutPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [addresses, setAddresses] = useState([]);
-  const [paymentMethods, setPaymentMethods] = useState([
-    { id: 1, type: 'pix', amount: 0, label: 'PIX', active: true }
-  ]);
+  const [paymentMethods, setPaymentMethods] = useState([]);
   const [showAllMethods, setShowAllMethods] = useState(false);
   const allAvailableMethods = [
     { id: 1, type: 'pix', amount: 0, label: 'PIX' },
@@ -52,17 +56,23 @@ function CheckoutPage() {
   ];
   const [orderData, setOrderData] = useState(null);
   const [processingOrder, setProcessingOrder] = useState(false);
+  const [installments, setInstallments] = useState({});
   const [orderComplete, setOrderComplete] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
-  const [cardDetails, setCardDetails] = useState({});
-  const [installments, setInstallments] = useState({});
-  const [cashDiscount, setCashDiscount] = useState(0.05); // 5% de desconto à vista
-  const [discountApplied, setDiscountApplied] = useState({}); // Controla se desconto foi aplicado por método
+  // Removed coupon-related state as it's now handled by CouponInput component
+  const CASH_DISCOUNT_PERCENTAGE = 5; // Desconto fixo de 5% para pagamentos à vista
 
-  const { items, count, clear, freight, freightOptions, selectedFreight, setSelectedFreight, calculateFreight, freightLoading, freightError, selectedAddress, setSelectedAddress, total, subtotal } = useCart();
-  const { user } = useAuth();
+  // Calcular desconto atual baseado nos métodos de pagamento selecionados
+  const getCurrentDiscountPercentage = () => {
+    const hasCashPayment = paymentMethods.some(method =>
+      (method.type === 'pix' || method.type === 'debito') && method.amount > 0
+    );
+    return hasCashPayment ? CASH_DISCOUNT_PERCENTAGE : 0;
+  };
+
+  const { items, count, clear, freight, freightOptions, selectedFreight, setSelectedFreight, calculateFreight, freightLoading, freightError, selectedAddress, setSelectedAddress, total, appliedCoupons, couponDiscount } = useCart();
   const navigate = useNavigate();
-  const { showSuccess, showError, showWarning, showInfo } = useNotifications();
+  const { showSuccess, showError, showInfo } = useNotifications();
 
   // Logo configuration
   const logoConfig = {
@@ -77,11 +87,13 @@ function CheckoutPage() {
     { label: 'Explore', to: '/explorer', icon: <FiSearch className="text-slate-500" /> },
     { label: 'Pedidos', to: '/meus-pedidos', icon: <FiPackage className="text-slate-500" /> },
     { label: 'Histórico', to: '/historico', icon: <FiClock className="text-slate-500" /> },
-    { label: 'Meus Cupons', to: '/cupons', icon: <FiCreditCardIcon className="text-slate-500" /> },
+    { label: 'Meus Cupons', to: '/cupons', icon: <FiCreditCard className="text-slate-500" /> },
     { label: 'Endereços', to: '/enderecos', icon: <FiMapPin className="text-slate-500" /> },
     { label: 'Suporte', to: '/suporte', icon: <FiHelpCircle className="text-slate-500" /> },
     { label: 'Configurações', to: '/configuracoes', icon: <FiSettings className="text-slate-500" /> },
   ];
+
+
 
   // Carregar dados necessários
   useEffect(() => {
@@ -91,6 +103,7 @@ function CheckoutPage() {
     }
     carregarDadosCheckout();
   }, [count, navigate]);
+
 
   // Ler itens selecionados do sessionStorage
   const getSelectedItems = () => {
@@ -106,42 +119,61 @@ function CheckoutPage() {
     }
   };
 
-  // Atualizar orderData sempre que freight mudar (já que subtotal é baseado nos itens selecionados)
+
+  // Atualizar orderData sempre que freight, discountPercentage ou appliedCoupon mudar
   useEffect(() => {
     if (orderData) {
       const selectedItemIds = getSelectedItems();
       const selectedItems = items.filter(item => selectedItemIds.includes(item.id));
-      const selectedSubtotal = selectedItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+      const selectedSubtotal = selectedItems.reduce((total, item) => {
+        return total + (item.price * item.quantity);
+      }, 0);
 
+      const currentDiscountPercentage = getCurrentDiscountPercentage();
+      // Apply coupon discounts first, then payment discounts to the remaining amount
+      const amountAfterCouponDiscount = selectedSubtotal - couponDiscount;
+      const discountAmount = amountAfterCouponDiscount * (currentDiscountPercentage / 100);
+
+      const freteCost = appliedCoupons.some(coupon => coupon.TipoDesconto === 'frete_gratis') ? 0 : freight.valor;
+      const totalCalculado = amountAfterCouponDiscount - discountAmount + freteCost;
       const dadosAtualizados = {
         items: selectedItems,
         subtotal: selectedSubtotal,
-        frete: freight.valor,
-        total: selectedSubtotal + freight.valor
+        discountAmount: discountAmount,
+        couponDiscountAmount: couponDiscount,
+        frete: freteCost,
+        total: Math.max(0, totalCalculado)
       };
       setOrderData(dadosAtualizados);
 
-      console.log(`[DEBUG] Order total updated: R$ ${dadosAtualizados.total.toFixed(2)} (subtotal: R$ ${dadosAtualizados.subtotal.toFixed(2)}, freight: R$ ${dadosAtualizados.frete.toFixed(2)})`);
+      console.log(`[DEBUG] Order total updated: R$ ${dadosAtualizados.total.toFixed(2)} (subtotal: R$ ${dadosAtualizados.subtotal.toFixed(2)}, coupon discount: R$ ${dadosAtualizados.couponDiscountAmount.toFixed(2)}, payment discount: R$ ${dadosAtualizados.discountAmount.toFixed(2)}, freight: R$ ${dadosAtualizados.frete.toFixed(2)})`);
 
-      // Atualizar valores dos métodos de pagamento baseado no novo total
-      setPaymentMethods(prev => prev.map(method => {
-        if (method.type === 'pix' || method.type === 'debito') {
-          // PIX e Débito: pagamento total imediato
-          console.log(`[DEBUG] Updating ${method.type} method ${method.id} to full amount: R$ ${dadosAtualizados.total.toFixed(2)}`);
-          return { ...method, amount: dadosAtualizados.total };
-        }
-        // Outros métodos mantêm o valor atual, mas podem ser ajustados se necessário
-        return method;
-      }));
+      // Não atualizar automaticamente os valores - cliente deve escolher
+      // setPaymentMethods(prev => prev);
     }
-  }, [freight.valor, items]);
+  }, [freight.valor, items, appliedCoupons, total]);
+
+  // Auto-fill total amount when only one payment method is selected
+  useEffect(() => {
+    if (paymentMethods.length === 1 && orderData?.total > 0) {
+      setPaymentMethods(prev => prev.map(method => ({ ...method, amount: orderData.total })));
+    }
+  }, [paymentMethods.length, orderData?.total]);
 
   const carregarDadosCheckout = async () => {
     try {
       setLoading(true);
 
+      // Carregar dados do checkout do sessionStorage
+      const checkoutData = JSON.parse(sessionStorage.getItem('helpnet_checkout_data') || '{}');
+
+      // Aplicar cupons se existirem nos dados salvos
+      if (checkoutData.appliedCoupons && Array.isArray(checkoutData.appliedCoupons)) {
+        // Note: CartContext will handle loading coupons from storage
+      }
+
       // Obter itens selecionados
-      const selectedItemIds = getSelectedItems();
+      const selectedItemIds = checkoutData.selectedItems || getSelectedItems();
       const selectedItems = items.filter(item => selectedItemIds.includes(item.id));
 
       // Carregar endereços do cliente
@@ -149,28 +181,62 @@ function CheckoutPage() {
       const enderecos = enderecosResponse.enderecos || [];
       setAddresses(enderecos);
 
-      // Selecionar primeiro endereço como padrão se existir
-      if (enderecos.length > 0) {
-        setSelectedAddress(enderecos[0]);
-        // Calcular frete automaticamente para o primeiro endereço e itens selecionados
-        await calculateFreight(enderecos[0].EnderecoID, selectedItemIds);
+      // Selecionar endereço salvo ou primeiro como padrão
+      let selectedAddressToUse = null;
+      if (checkoutData.selectedAddressId && enderecos.length > 0) {
+        selectedAddressToUse = enderecos.find(a => a.EnderecoID === checkoutData.selectedAddressId) || enderecos[0];
+      } else if (enderecos.length > 0) {
+        selectedAddressToUse = enderecos[0];
       }
 
-      // Calcular subtotal apenas dos itens selecionados
-      const selectedSubtotal = selectedItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+      if (selectedAddressToUse) {
+        console.log('[CheckoutPage] Setting selected address and calculating freight:', selectedAddressToUse.EnderecoID);
+        setSelectedAddress(selectedAddressToUse);
+        // Calcular frete automaticamente para o endereço selecionado e itens selecionados
+        console.log('[CheckoutPage] Calling calculateFreight with:', selectedAddressToUse.EnderecoID, selectedItemIds);
+        try {
+          await calculateFreight(selectedAddressToUse.EnderecoID, selectedItemIds);
+          console.log('[CheckoutPage] calculateFreight completed successfully');
+        } catch (error) {
+          console.error('[CheckoutPage] Error in calculateFreight:', error);
+          showError('Erro ao calcular frete: ' + error.message);
+        }
+        setSelectedFreight(null); // Não selecionar frete automaticamente
+      } else {
+        console.log('[CheckoutPage] No address selected, skipping freight calculation');
+        showInfo('Selecione um endereço para calcular o frete');
+      }
 
-      // Preparar dados do pedido usando valores calculados
+      // Calcular subtotal apenas dos itens selecionados (usando preços já com desconto)
+      const selectedSubtotal = selectedItems.reduce((total, item) => {
+        return total + (item.price * item.quantity);
+      }, 0);
+
+      // Calcular desconto à vista
+      const currentDiscountPercentage = getCurrentDiscountPercentage();
+      // Apply coupon discounts first, then payment discounts to the remaining amount
+      const amountAfterCouponDiscount = selectedSubtotal - couponDiscount;
+      const discountAmount = amountAfterCouponDiscount * (currentDiscountPercentage / 100);
+
+      // Usar valores calculados do CartContext
+      const freteCost = appliedCoupons.some(coupon => coupon.TipoDesconto === 'frete_gratis') ? 0 : freight.valor;
+
+      // Calcular total correto
+      const totalCalculado = amountAfterCouponDiscount - discountAmount + freteCost;
+
+      // Preparar dados do pedido usando valores do CartContext
       const dadosPedido = {
         items: selectedItems,
         subtotal: selectedSubtotal,
-        frete: freight.valor,
-        total: selectedSubtotal + freight.valor
+        discountAmount: discountAmount,
+        couponDiscountAmount: couponDiscount,
+        frete: freteCost,
+        total: Math.max(0, totalCalculado)
       };
 
       setOrderData(dadosPedido);
 
-      // Definir valor total no PIX por padrão
-      setPaymentMethods([{ id: 1, type: 'pix', amount: dadosPedido.total, label: 'PIX', active: true }]);
+      // Não preencher automaticamente - cliente deve escolher
 
     } catch (error) {
       console.error('Erro ao carregar dados do checkout:', error);
@@ -179,45 +245,13 @@ function CheckoutPage() {
     }
   };
 
-  // Calcular subtotal
-  const calcularSubtotal = () => {
-    return items.reduce((total, item) => total + (item.price * item.quantity), 0);
-  };
-
 
   // Atualizar valor do método de pagamento
   const updatePaymentAmount = (id, amount) => {
     const numericAmount = parseFloat(amount) || 0;
     setPaymentMethods(prev => prev.map(method => {
-      // Para débito, forçar pagamento total imediato
-      if (method.type === 'debito') {
-        const totalPedido = orderData?.total || 0;
-        console.log(`[DEBUG] Débito method ${id}: Forçando pagamento total imediato de R$ ${totalPedido.toFixed(2)}`);
-        return { ...method, amount: totalPedido };
-      }
       return method.id === id ? { ...method, amount: numericAmount } : method;
     }));
-  };
-
-  // Atualizar dados do cartão para um método específico
-  const updateCardDetails = (methodId, field, value) => {
-    setCardDetails(prev => ({
-      ...prev,
-      [methodId]: {
-        ...prev[methodId],
-        [field]: value
-      }
-    }));
-  };
-
-  // Obter dados do cartão para um método específico
-  const getCardDetails = (methodId) => {
-    return cardDetails[methodId] || {
-      number: '',
-      expiry: '',
-      cvv: '',
-      name: ''
-    };
   };
 
   // Calcular parcelas para cartão de crédito
@@ -235,45 +269,12 @@ function CheckoutPage() {
     return installments;
   };
 
-  // Calcular preço à vista com desconto
-  const calculateCashPrice = (amount) => {
-    const discount = amount * cashDiscount;
-    return {
-      original: amount,
-      discount: discount,
-      final: amount - discount,
-      discountPercent: (cashDiscount * 100).toFixed(0)
-    };
-  };
-
   // Atualizar parcelas para um método de pagamento
   const updateInstallments = (methodId, installments) => {
     setInstallments(prev => ({
       ...prev,
       [methodId]: installments
     }));
-  };
-
-  // Aplicar desconto à vista
-  const applyCashDiscount = (methodId) => {
-    const method = paymentMethods.find(m => m.id === methodId);
-    if (!method || discountApplied[methodId]) return;
-
-    const cashPrice = calculateCashPrice(method.amount);
-    updatePaymentAmount(methodId, cashPrice.final);
-    setDiscountApplied(prev => ({ ...prev, [methodId]: true }));
-    showSuccess(`Desconto de ${cashPrice.discountPercent}% aplicado! Preço à vista: R$ ${cashPrice.final.toFixed(2)}`);
-  };
-
-  // Remover desconto à vista
-  const removeCashDiscount = (methodId) => {
-    const method = paymentMethods.find(m => m.id === methodId);
-    if (!method || !discountApplied[methodId]) return;
-
-    const originalAmount = method.amount / (1 - cashDiscount);
-    updatePaymentAmount(methodId, originalAmount);
-    setDiscountApplied(prev => ({ ...prev, [methodId]: false }));
-    showSuccess(`Desconto removido! Valor original: R$ ${originalAmount.toFixed(2)}`);
   };
 
   // Adicionar método de pagamento
@@ -294,13 +295,6 @@ function CheckoutPage() {
 
     const newMethod = { ...methodTemplate, active: true };
 
-    // Para débito, definir valor total imediato
-    if (type === 'debito') {
-      const totalPedido = orderData?.total || 0;
-      newMethod.amount = totalPedido;
-      console.log(`[DEBUG] Débito adicionado com valor total: R$ ${totalPedido.toFixed(2)}`);
-    }
-
     setPaymentMethods(prev => [...prev, newMethod]);
   };
 
@@ -310,23 +304,9 @@ function CheckoutPage() {
     if (paymentMethods.length <= 1) return;
 
     setPaymentMethods(prev => prev.filter(method => method.id !== id));
-    
-    // Limpar dados do cartão do método removido
-    setCardDetails(prev => {
-      const newCardDetails = { ...prev };
-      delete newCardDetails[id];
-      return newCardDetails;
-    });
-
-    // Limpar estado do desconto aplicado
-    setDiscountApplied(prev => {
-      const newDiscountApplied = { ...prev };
-      delete newDiscountApplied[id];
-      return newDiscountApplied;
-    });
   };
 
-  // Calcular total dos pagamentos
+  // Calcular total dos pagamentos (os valores já incluem descontos aplicados)
   const calcularTotalPagamentos = () => {
     return paymentMethods.reduce((total, method) => total + method.amount, 0);
   };
@@ -364,30 +344,72 @@ function CheckoutPage() {
 
   // Atualizar endereço selecionado e recalcular frete
   const handleAddressChange = async (endereco) => {
+    console.log('[CheckoutPage] handleAddressChange chamado:', {
+      enderecoId: endereco.EnderecoID,
+      nome: endereco.Nome,
+      cep: endereco.CEP,
+      timestamp: new Date().toISOString()
+    });
+
     setSelectedAddress(endereco);
 
     if (endereco) {
       const selectedItemIds = getSelectedItems();
-      // Calcular frete usando apenas os itens selecionados
+      console.log('[CheckoutPage] Verificando produtos no carrinho antes de calcular frete:', {
+        selectedItemIds,
+        totalItens: selectedItemIds.length,
+        hasItems: selectedItemIds.length > 0
+      });
+
+      if (selectedItemIds.length === 0) {
+        console.log('[CheckoutPage] Nenhum produto no carrinho - pulando cálculo de frete');
+        return;
+      }
+
+      console.log('[CheckoutPage] Chamando calculateFreight:', {
+        enderecoId: endereco.EnderecoID,
+        produtoIds: selectedItemIds,
+        timestamp: new Date().toISOString()
+      });
+
       await calculateFreight(endereco.EnderecoID, selectedItemIds);
 
-      // Recalcular dados do pedido
-      const selectedItems = items.filter(item => selectedItemIds.includes(item.id));
-      const selectedSubtotal = selectedItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+      console.log('[CheckoutPage] calculateFreight concluído para endereço:', endereco.EnderecoID);
 
+      // Aguardar um pouco para garantir que calculateFreight terminou de definir
+      setTimeout(() => setSelectedFreight(null), 10);
+
+      // Recalcular dados do pedido usando os valores calculados do CartContext
+      const selectedItems = items.filter(item => selectedItemIds.includes(item.id));
+
+      // Recalcular subtotal usando preços já com desconto
+      const recalculatedSubtotal = selectedItems.reduce((total, item) => {
+        return total + (item.price * item.quantity);
+      }, 0);
+
+      const currentDiscountPercentage = getCurrentDiscountPercentage();
+      // Apply coupon discounts first, then payment discounts to the remaining amount
+      const amountAfterCouponDiscount = recalculatedSubtotal - couponDiscount;
+      const discountAmount = amountAfterCouponDiscount * (currentDiscountPercentage / 100);
+
+      const freteCost = appliedCoupons.some(coupon => coupon.TipoDesconto === 'frete_gratis') ? 0 : freight.valor;
+      const totalCalculado = amountAfterCouponDiscount - discountAmount + freteCost;
       setOrderData({
         items: selectedItems,
-        subtotal: selectedSubtotal,
-        frete: freight.valor,
-        total: selectedSubtotal + freight.valor
+        subtotal: recalculatedSubtotal,
+        discountAmount: discountAmount,
+        couponDiscountAmount: couponDiscount,
+        frete: freteCost,
+        total: Math.max(0, totalCalculado)
       });
 
       // Ajustar valor do pagamento para o novo total (se apenas 1 método ativo)
       if (paymentMethods.length === 1) {
-        setPaymentMethods(prev => prev.map(method => ({ ...method, amount: selectedSubtotal + freight.valor })));
+        setPaymentMethods(prev => prev.map(method => ({ ...method, amount: total })));
       }
     }
   };
+
 
   // Finalizar pedido
   const handleFinalizarPedido = async () => {
@@ -396,6 +418,15 @@ function CheckoutPage() {
     if (!selectedAddress) {
       console.log('[DEBUG] Erro: Nenhum endereço selecionado');
       showError('Selecione um endereço de entrega');
+      return;
+    }
+
+    // Verificar se frete foi selecionado ou há cupom de frete grátis
+    const hasFreeShippingCoupon = appliedCoupons.some(coupon => coupon.TipoDesconto === 'frete_gratis');
+
+    if (!selectedFreight && !hasFreeShippingCoupon) {
+      console.log('[DEBUG] Erro: Nenhum frete selecionado e nenhum cupom de frete grátis');
+      showError('Selecione uma opção de frete ou aplique um cupom de frete grátis válido');
       return;
     }
 
@@ -430,14 +461,25 @@ function CheckoutPage() {
         enderecoId: selectedAddress.EnderecoID,
         itens: selectedItems.map(item => ({
           produtoId: item.id,
-          quantidade: item.quantity
+          quantidade: item.quantity,
+          precoUnitario: item.price // Send discounted price
         })),
         metodosPagamento: metodosComValor.map(method => ({
           tipo: method.type,
-          valor: method.amount
+          valor: method.amount,
+          descontoAplicado: method.type === 'pix' || method.type === 'debito'
         })),
-        frete: selectedFreight ? selectedFreight.valor : 0,
-        observacoes: ''
+        frete: selectedFreight ? selectedFreight.valor : 0, // O frete já é calculado apenas para produtos que não têm frete grátis
+        descontoVista: getCurrentDiscountPercentage(),
+        valorDescontoVista: orderData.discountAmount || 0,
+        observacoes: '',
+        cuponsAplicados: appliedCoupons.map(coupon => ({
+          codigo: coupon.Codigo,
+          itensAplicados: coupon.discountDetails?.itemDiscounts?.map(discount => ({
+            produtoId: discount.productId,
+            descontoAplicado: discount.discountAmount
+          })) || []
+        }))
       };
 
       console.log('[DEBUG] Dados do pedido preparados:', {
@@ -536,125 +578,13 @@ function CheckoutPage() {
 
   if (orderComplete && receiptData) {
     return (
-      <div className="min-h-screen bg-white flex">
-        {/* Sidebar */}
-        <aside className="hidden md:flex md:w-72 bg-white border-r border-slate-200 flex-col fixed h-screen">
-          <div className="h-16 px-6 border-b border-slate-200 flex items-center sticky top-0 bg-white z-10">
-            <Link to="/" className="flex items-center gap-2">
-              <span className="text-xl font-semibold text-blue-700">{logoConfig.textLogo}</span>
-            </Link>
-          </div>
-          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-            <p className="px-3 text-xs font-semibold tracking-wide text-slate-500 uppercase">Navegação</p>
-            {clienteMenu.map((item) => (
-              <Link
-                key={item.label}
-                to={item.to}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 hover:bg-blue-50 hover:text-blue-700 border border-transparent hover:border-blue-200 transition-colors"
-              >
-                <span className="w-5 h-5 flex items-center justify-center">{item.icon}</span>
-                <span className="text-sm font-medium">{item.label}</span>
-              </Link>
-            ))}
-          </nav>
-        </aside>
-
-        <div className="flex-1 flex flex-col md:ml-72">
-          <header className="bg-white sticky top-0 z-40 border-b border-slate-200">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex items-center justify-between gap-4 h-16">
-                <div className="flex items-center gap-2">
-                  <div className="hidden md:flex items-center gap-2 shrink-0">
-                    <img
-                      src="/logo-horizontal.png"
-                      alt="HelpNet Logo"
-                      className="h-6 w-auto"
-                    />
-                  </div>
-                  <div className="md:hidden shrink-0">
-                    <img
-                      src="/logo-horizontal.png"
-                      alt="HelpNet Logo"
-                      className="h-6 w-auto"
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <Link to="/perfil" className="p-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100">
-                    <FaUser />
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </header>
-
-          <main className="flex-1 bg-slate-50">
-            <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
-                <div className="text-center mb-8">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <FaCheck className="text-green-600 text-2xl" />
-                  </div>
-                  <h1 className="text-2xl font-bold text-slate-900 mb-2">Pedido Realizado com Sucesso!</h1>
-                  <p className="text-slate-600">Seu pedido foi processado e será enviado em breve.</p>
-                </div>
-
-                <div className="border border-slate-200 rounded-lg p-6 mb-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <FaReceipt className="text-blue-600" />
-                    <h2 className="text-lg font-semibold text-slate-900">Comprovante</h2>
-                  </div>
-
-                  <div className="space-y-3 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-slate-600">Pedido:</span>
-                      <span className="font-medium">{receiptData.orderId}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-600">Data:</span>
-                      <span className="font-medium">{receiptData.date}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-600">Total:</span>
-                      <span className="font-medium text-green-600">{formatPrice(receiptData.total)}</span>
-                    </div>
-                  </div>
-
-                  {/* Métodos de pagamento */}
-                  <div className="mt-4 pt-4 border-t border-slate-200">
-                    <h3 className="text-sm font-medium text-slate-900 mb-2">Métodos de Pagamento:</h3>
-                    <div className="space-y-1">
-                      {receiptData.paymentMethods
-                        .filter(method => method.amount > 0)
-                        .map((method, index) => (
-                        <div key={index} className="flex justify-between text-sm">
-                          <span className="text-slate-600">{method.label}:</span>
-                          <span className="font-medium">{formatPrice(method.amount)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <button
-                    onClick={handleCompartilharComprovante}
-                    className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                  >
-                    Compartilhar Comprovante
-                  </button>
-                  <Link
-                    to="/explorer"
-                    className="flex-1 bg-slate-100 text-slate-700 py-3 px-6 rounded-lg hover:bg-slate-200 transition-colors font-medium text-center"
-                  >
-                    Continuar Comprando
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </main>
-        </div>
-      </div>
+      <ReceiptPage
+        receiptData={receiptData}
+        handleCompartilharComprovante={handleCompartilharComprovante}
+        logoConfig={logoConfig}
+        clienteMenu={clienteMenu}
+        formatPrice={formatPrice}
+      />
     );
   }
 
@@ -695,74 +625,20 @@ function CheckoutPage() {
         </nav>
       </div>
 
-      {/* Sidebar Desktop */}
-      <aside className="hidden md:flex md:w-72 bg-white border-r border-slate-200 flex-col fixed h-screen">
-        <div className="h-16 px-6 border-b border-slate-200 flex items-center sticky top-0 bg-white z-10">
-          <Link to="/" className="flex items-center gap-2">
-            <span className="text-xl font-semibold text-blue-700">{logoConfig.textLogo}</span>
-          </Link>
-        </div>
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          <p className="px-3 text-xs font-semibold tracking-wide text-slate-500 uppercase">Navegação</p>
-          {clienteMenu.map((item) => (
-            <Link
-              key={item.label}
-              to={item.to}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 hover:bg-blue-50 hover:text-blue-700 border border-transparent hover:border-blue-200 transition-colors"
-            >
-              <span className="w-5 h-5 flex items-center justify-center">{item.icon}</span>
-              <span className="text-sm font-medium">{item.label}</span>
-            </Link>
-          ))}
-        </nav>
-      </aside>
+      <CheckoutSidebar
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        logoConfig={logoConfig}
+        clienteMenu={clienteMenu}
+      />
 
       {/* Conteúdo Principal */}
       <div className="flex-1 flex flex-col md:ml-72">
-        {/* Header */}
-        <header className="bg-white sticky top-0 z-40 border-b border-slate-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between gap-4 h-16">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setSidebarOpen(true)}
-                  className="md:hidden p-2 rounded-lg text-blue-700 hover:bg-blue-50 border border-transparent hover:border-blue-200"
-                  aria-label="Abrir menu"
-                >
-                  <FiMenu />
-                </button>
-                <div className="hidden md:flex items-center gap-2 shrink-0">
-                  <img
-                    src="/logo-horizontal.png"
-                    alt="HelpNet Logo"
-                    className="h-6 w-auto"
-                  />
-                </div>
-                <div className="md:hidden shrink-0">
-                  <img
-                    src="/logo-horizontal.png"
-                    alt="HelpNet Logo"
-                    className="h-6 w-auto"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 sm:gap-3">
-                <Link to="/carrinho" className="relative p-2 rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50">
-                  <FaShoppingCart />
-                  {count > 0 && (
-                    <span className="absolute -top-1 -right-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-600 text-white">
-                      {count}
-                    </span>
-                  )}
-                </Link>
-                <Link to="/perfil" className="p-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100">
-                  <FaUser />
-                </Link>
-              </div>
-            </div>
-          </div>
-        </header>
+        <CheckoutHeader
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+          count={count}
+        />
 
         {/* Conteúdo do Checkout */}
         <main className="flex-1 bg-slate-50">
@@ -781,447 +657,59 @@ function CheckoutPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Resumo do Pedido */}
               <div className="lg:col-span-2 space-y-6">
-                {/* Itens do Carrinho */}
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                  <h2 className="text-xl font-semibold text-slate-900 mb-4">Itens do Pedido</h2>
-                  <div className="space-y-4">
-                    {(orderData?.items?.length > 0 ? orderData.items : items.filter(item => getSelectedItems().includes(item.id))).map((item) => (
-                      <div key={item.id} className="flex items-center gap-4 p-4 border border-slate-200 rounded-lg">
-                        <img
-                          src={item.image || '/placeholder-image.png'}
-                          alt={item.name}
-                          className="w-16 h-16 object-cover rounded-lg"
-                          onError={(e) => {
-                            e.target.src = '/placeholder-image.png';
-                          }}
-                        />
-                        <div className="flex-1">
-                          <h3 className="font-medium text-slate-900">{item.name}</h3>
-                          <p className="text-sm text-slate-600">Quantidade: {item.quantity}</p>
-                        </div>
-                        <div className="text-right">
-                          {item.discount > 0 ? (
-                            <div>
-                              <p className="font-semibold text-green-600">{formatPrice(item.price * item.quantity)}</p>
-                              <p className="text-sm text-slate-400 line-through">{formatPrice(item.originalPrice * item.quantity)}</p>
-                              <p className="text-xs text-green-600">{item.discount}% OFF</p>
-                            </div>
-                          ) : (
-                            <div>
-                              <p className="font-semibold text-slate-900">{formatPrice(item.price * item.quantity)}</p>
-                              <p className="text-sm text-slate-600">{formatPrice(item.price)} cada</p>
-                            </div>
-                          )}
-                          {item.freeShipping && (
-                            <p className="text-xs text-blue-600 font-medium">Frete Grátis</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                    {(!orderData?.items || orderData.items.length === 0) && items.filter(item => getSelectedItems().includes(item.id)).length === 0 && (
-                      <div className="text-center py-8">
-                        <p className="text-slate-600">Nenhum item selecionado para checkout.</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <OrderItemsSection
+                  orderData={orderData}
+                  items={items}
+                  getSelectedItems={getSelectedItems}
+                />
 
-                {/* Seleção de Endereço */}
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                  <h2 className="text-xl font-semibold text-slate-900 mb-4">Endereço de Entrega</h2>
-                  {addresses.length > 0 ? (
-                    <div className="space-y-3">
-                      {addresses.map((address) => (
-                        <div
-                          key={address.EnderecoID}
-                          onClick={() => handleAddressChange(address)}
-                          className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                            selectedAddress?.EnderecoID === address.EnderecoID
-                              ? 'border-blue-500 bg-blue-50'
-                              : 'border-slate-200 hover:border-slate-300'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-start gap-3">
-                              <FaMapMarkerAlt className="text-slate-400 mt-1" />
-                              <div>
-                                <h3 className="font-medium text-slate-900">{address.Nome}</h3>
-                                <p className="text-sm text-slate-600">
-                                  {address.CEP}, {address.Cidade} - {address.UF}
-                                </p>
-                                <p className="text-sm text-slate-600">
-                                  {address.Bairro}, {address.Numero}
-                                </p>
-                              </div>
-                            </div>
-                            {selectedAddress?.EnderecoID === address.EnderecoID && (
-                              <div className="flex items-center gap-2">
-                                {freightLoading && (
-                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                                )}
-                                <FaCheck className="text-blue-600" />
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-
-                      {/* Exibir opções de frete */}
-                      {selectedAddress && freightOptions.length > 0 && (
-                        <div className="mt-4 space-y-3">
-                          <div className="flex items-center gap-2 mb-2">
-                            <FaTruck className="text-blue-600" />
-                            <span className="text-sm font-medium text-blue-900">Opções de Frete</span>
-                          </div>
-                          {freightOptions.map((option) => (
-                            <div
-                              key={option.id}
-                              onClick={() => setSelectedFreight(option)}
-                              className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                                selectedFreight?.id === option.id
-                                  ? 'border-blue-500 bg-blue-50'
-                                  : 'border-slate-200 hover:border-slate-300'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  <div>
-                                    <h4 className="font-medium text-slate-900">{option.nome}</h4>
-                                    <p className="text-sm text-slate-600">{option.transportadora}</p>
-                                    <p className="text-sm text-slate-600">{option.descricao}</p>
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <p className="font-medium text-blue-600">{formatPrice(option.valor)}</p>
-                                  <p className="text-sm text-slate-600">{option.prazo}</p>
-                                </div>
-                              </div>
-                              {selectedFreight?.id === option.id && (
-                                <div className="flex items-center gap-2 mt-2">
-                                  <FaCheck className="text-blue-600" />
-                                  <span className="text-sm text-blue-600">Selecionado</span>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Exibir erro de cálculo de frete */}
-                      {freightError && (
-                        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-sm font-medium text-red-900">Erro no cálculo do frete</span>
-                          </div>
-                          <p className="text-sm text-red-800">{freightError}</p>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <FaMapMarkerAlt className="mx-auto h-12 w-12 text-slate-400 mb-4" />
-                      <h3 className="text-lg font-medium text-slate-900 mb-2">Nenhum endereço cadastrado</h3>
-                      <p className="text-slate-600 mb-4">Adicione um endereço para continuar com a compra</p>
-                      <Link
-                        to="/enderecos"
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                      >
-                        <FaMapMarkerAlt />
-                        <span>Adicionar Endereço</span>
-                      </Link>
-                    </div>
-                  )}
-                </div>
-
-                {/* Método de Pagamento */}
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold text-slate-900">Métodos de Pagamento</h2>
-                    <div className="flex items-center gap-2">
-                      {paymentMethods.length > 1 && (
-                        <button
-                          onClick={distribuirValorAutomaticamente}
-                          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                        >
-                          Distribuir automaticamente
-                        </button>
-                      )}
-                      {!showAllMethods && (
-                        <button
-                          onClick={() => setShowAllMethods(true)}
-                          className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
-                        >
-                          <FaCreditCard className="text-xs" />
-                          Adicionar método
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Modal/Seção para adicionar métodos */}
-                  {showAllMethods && (
-                    <div className="mb-4 p-4 bg-slate-50 rounded-lg">
-                      <h3 className="text-sm font-medium text-slate-900 mb-3">Escolha métodos adicionais:</h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        {allAvailableMethods.map((method) => {
-                          const isSelected = paymentMethods.some(m => m.type === method.type);
-                          return (
-                            <button
-                              key={method.type}
-                              onClick={() => {
-                                if (isSelected) {
-                                  removePaymentMethod(paymentMethods.find(m => m.type === method.type)?.id);
-                                } else {
-                                  addPaymentMethod(method.type);
-                                }
-                              }}
-                              disabled={isSelected && paymentMethods.length <= 1}
-                              className={`p-3 border rounded-lg text-left transition-colors ${
-                                isSelected
-                                  ? 'border-blue-500 bg-blue-50 text-blue-700'
-                                  : 'border-slate-200 hover:border-slate-300 text-slate-700'
-                              } disabled:opacity-50 disabled:cursor-not-allowed`}
-                            >
-                              <div className="flex items-center gap-2">
-                                {method.type === 'cartao' && <FaCreditCard className="text-slate-400" />}
-                                {method.type === 'debito' && <FaCreditCard className="text-slate-400" />}
-                                {method.type === 'boleto' && <FaBarcode className="text-slate-400" />}
-                                {method.type === 'pix' && <FaMoneyBillWave className="text-slate-400" />}
-                                <div>
-                                  <div className="text-sm font-medium">{method.label}</div>
-                                  <div className="text-xs text-slate-500">
-                                    {method.type === 'cartao' && 'Cartão de crédito'}
-                                    {method.type === 'boleto' && 'Boleto bancário'}
-                                    {method.type === 'pix' && 'PIX instantâneo'}
-                                  </div>
-                                </div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <div className="mt-3 flex justify-end">
-                        <button
-                          onClick={() => setShowAllMethods(false)}
-                          className="text-sm text-slate-600 hover:text-slate-700 font-medium"
-                        >
-                          Fechar
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="space-y-3">
-                    {paymentMethods.map((method) => (
-                      <div key={method.id} className="p-4 border border-slate-200 rounded-lg">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            {method.type === 'cartao' && <FaCreditCard className="text-slate-400" />}
-                            {method.type === 'boleto' && <FaBarcode className="text-slate-400" />}
-                            {method.type === 'pix' && <FaMoneyBillWave className="text-slate-400" />}
-                            <div>
-                              <h3 className="font-medium text-slate-900">{method.label}</h3>
-                              <p className="text-sm text-slate-600">
-                                {method.type === 'cartao' && 'Visa, Mastercard, Elo'}
-                                {method.type === 'debito' && 'Débito instantâneo'}
-                                {method.type === 'boleto' && 'Pagamento à vista'}
-                                {method.type === 'pix' && 'Pagamento instantâneo'}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {method.amount > 0 && (
-                              <span className="text-sm font-medium text-green-600">
-                                R$ {method.amount.toFixed(2)}
-                              </span>
-                            )}
-                            {paymentMethods.length > 1 && (
-                              <button
-                                onClick={() => removePaymentMethod(method.id)}
-                                className="p-1 text-red-500 hover:bg-red-50 rounded"
-                                title="Remover método"
-                              >
-                                <FaTrash className="text-xs" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-slate-600">R$</span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={method.amount || ''}
-                              onChange={(e) => updatePaymentAmount(method.id, e.target.value)}
-                              placeholder="0,00"
-                              disabled={method.type === 'debito'} // Débito sempre paga o total imediato
-                              className={`flex-1 px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm ${
-                                method.type === 'debito' ? 'bg-slate-50 cursor-not-allowed' : ''
-                              }`}
-                            />
-                            {method.type === 'debito' && (
-                              <span className="text-xs text-blue-600 font-medium ml-2">Pagamento total imediato</span>
-                            )}
-                          </div>
-
-
-
-                          {/* Opções de parcelas e preço à vista */}
-                          {method.amount > 0 && (
-                            <div className="space-y-3 p-3 bg-slate-50 rounded-lg">
-                              {/* Preço à vista com desconto */}
-                              <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-                                <div>
-                                  <p className="text-sm font-medium text-green-800">Preço à vista</p>
-                                  <p className="text-xs text-green-600">
-                                    {calculateCashPrice(method.amount).discountPercent}% de desconto
-                                  </p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-lg font-bold text-green-800">
-                                    R$ {calculateCashPrice(method.amount).final.toFixed(2)}
-                                  </p>
-                                  {!discountApplied[method.id] ? (
-                                    <button
-                                      onClick={() => applyCashDiscount(method.id)}
-                                      className="text-xs text-green-600 hover:text-green-800 underline"
-                                    >
-                                      Aplicar desconto
-                                    </button>
-                                  ) : (
-                                    <button
-                                      onClick={() => removeCashDiscount(method.id)}
-                                      className="text-xs text-red-600 hover:text-red-800 underline"
-                                    >
-                                      Remover desconto
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Parcelas para cartão de crédito */}
-                              {method.type === 'cartao' && (
-                                <div>
-                                  <h4 className="text-sm font-medium text-slate-900 mb-2">Parcelas</h4>
-                                  <div className="grid grid-cols-2 gap-2">
-                                    {calculateInstallments(method.amount).slice(0, 6).map((installment, index) => (
-                                      <button
-                                        key={index}
-                                        onClick={() => {
-                                          updateInstallments(method.id, installment.installments);
-                                          showInfo(`Parcelamento em ${installment.installments}x selecionado`);
-                                        }}
-                                        className={`p-2 text-xs border rounded-lg transition-colors ${
-                                          installments[method.id] === installment.installments
-                                            ? 'border-blue-500 bg-blue-50 text-blue-700'
-                                            : 'border-slate-200 hover:border-slate-300 text-slate-700'
-                                        }`}
-                                      >
-                                        {installment.label}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-
-                              
-                              
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Resumo dos pagamentos */}
-                  <div className="mt-4 p-4 bg-slate-50 rounded-lg">
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-slate-600">Total do pedido:</span>
-                      <span className="font-medium">{formatPrice(orderData?.total || 0)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-slate-600">Total dos pagamentos:</span>
-                      <span className="font-medium">{formatPrice(calcularTotalPagamentos())}</span>
-                    </div>
-                    <div className="flex justify-between text-sm font-medium">
-                      <span className={calcularValorRestante() > 0 ? 'text-red-600' : 'text-green-600'}>
-                        {calcularValorRestante() > 0 ? 'Valor restante:' : 'Valor coberto:'}
-                      </span>
-                      <span className={calcularValorRestante() > 0 ? 'text-red-600' : 'text-green-600'}>
-                        {formatPrice(Math.abs(calcularValorRestante()))}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                <AddressSelection
+                  addresses={addresses}
+                  selectedAddress={selectedAddress}
+                  handleAddressChange={handleAddressChange}
+                  freightLoading={freightLoading}
+                  appliedCoupons={appliedCoupons}
+                  freightOptions={freightOptions}
+                  selectedFreight={selectedFreight}
+                  setSelectedFreight={setSelectedFreight}
+                  freightError={freightError}
+                />
+                <PaymentMethodsSection
+                  paymentMethods={paymentMethods}
+                  setPaymentMethods={setPaymentMethods}
+                  showAllMethods={showAllMethods}
+                  setShowAllMethods={setShowAllMethods}
+                  allAvailableMethods={allAvailableMethods}
+                  updatePaymentAmount={updatePaymentAmount}
+                  calculateInstallments={calculateInstallments}
+                  installments={installments}
+                  updateInstallments={updateInstallments}
+                  removePaymentMethod={removePaymentMethod}
+                  addPaymentMethod={addPaymentMethod}
+                  distribuirValorAutomaticamente={distribuirValorAutomaticamente}
+                  orderData={orderData}
+                  calcularTotalPagamentos={calcularTotalPagamentos}
+                  calcularValorRestante={calcularValorRestante}
+                  formatPrice={formatPrice}
+                  showInfo={showInfo}
+                />
               </div>
 
-              {/* Resumo e Finalização */}
-              <div className="lg:col-span-1">
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 sticky top-24">
-                  <h2 className="text-xl font-semibold text-slate-900 mb-4">Resumo do Pedido</h2>
-
-                  <div className="space-y-3 mb-6">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-600">Subtotal ({orderData?.items?.length || 0} itens)</span>
-                      <span className="font-medium">{formatPrice(orderData?.subtotal || 0)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-600">Frete</span>
-                      <span className="font-medium">
-                        {freightLoading ? (
-                          <div className="flex items-center gap-2">
-                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-slate-600"></div>
-                            <span>Calculando...</span>
-                          </div>
-                        ) : selectedFreight ? (
-                          <div className="text-right">
-                            <div>{formatPrice(selectedFreight.valor)}</div>
-                            <div className="text-xs text-slate-500">{selectedFreight.nome}</div>
-                          </div>
-                        ) : (
-                          formatPrice(0)
-                        )}
-                      </span>
-                    </div>
-                    <div className="border-t border-slate-200 pt-3">
-                      <div className="flex justify-between text-lg font-semibold">
-                        <span className="text-slate-900">Total</span>
-                        <span className="text-blue-600">{formatPrice(orderData?.total || 0)}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={handleFinalizarPedido}
-                    disabled={processingOrder || !selectedAddress || calcularTotalPagamentos() === 0 || Math.abs(calcularTotalPagamentos() - (orderData?.total || 0)) > 0.01}
-                    className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed transition-colors font-medium"
-                  >
-                    {processingOrder ? (
-                      <div className="flex items-center justify-center gap-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        <span>Processando...</span>
-                      </div>
-                    ) : (
-                      'Finalizar Compra'
-                    )}
-                  </button>
-
-                  {!selectedAddress && (
-                    <p className="text-red-600 text-sm mt-2">Selecione um endereço de entrega</p>
-                  )}
-                  {calcularTotalPagamentos() === 0 && (
-                    <p className="text-red-600 text-sm mt-2">Adicione valores aos métodos de pagamento</p>
-                  )}
-                  {calcularTotalPagamentos() > 0 && Math.abs(calcularTotalPagamentos() - (orderData?.total || 0)) > 0.01 && (
-                    <p className="text-red-600 text-sm mt-2">
-                      O total dos pagamentos deve ser igual a {formatPrice(orderData?.total || 0)}
-                    </p>
-                  )}
-                </div>
-              </div>
+              <OrderSummary
+                orderData={orderData}
+                freightLoading={freightLoading}
+                selectedFreight={selectedFreight}
+                appliedCoupons={appliedCoupons}
+                formatPrice={formatPrice}
+                handleFinalizarPedido={handleFinalizarPedido}
+                processingOrder={processingOrder}
+                selectedAddress={selectedAddress}
+                calcularTotalPagamentos={calcularTotalPagamentos}
+                calcularValorRestante={calcularValorRestante}
+                items={items}
+                getSelectedItems={getSelectedItems}
+                freightOptions={freightOptions}
+              />
             </div>
           </div>
         </main>
