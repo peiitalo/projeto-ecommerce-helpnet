@@ -14,12 +14,21 @@ importers:
       '@react-input/mask':
         specifier: ^2.0.4
         version: 2.0.4(@types/react@19.2.3)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      '@sideway/address':
+        specifier: ^5.0.0
+        version: 5.0.0
+      '@sideway/formula':
+        specifier: ^3.0.1
+        version: 3.0.1
       chart.js:
         specifier: ^4.5.0
         version: 4.5.1
       cpf-cnpj-validator:
         specifier: ^1.0.3
         version: 1.0.3
+      joi:
+        specifier: ^18.0.2
+        version: 18.0.2
       jspdf:
         specifier: ^3.0.3
         version: 3.0.3
@@ -376,9 +385,22 @@ packages:
     resolution: {integrity: sha512-SkszZf13HVgGmChdHo/PxchnSaCJ6cetVqLzyciudzZRT0jcOouIF/Q93mgjw8cce+D+4F4C1Z/WrfFN+O3VHQ==}
     deprecated: Moved to 'npm install @sideway/address'
 
+  '@hapi/address@5.1.1':
+    resolution: {integrity: sha512-A+po2d/dVoY7cYajycYI43ZbYMXukuopIsqCjh5QzsBCipDtdofHntljDlpccMjIfTy6UOkg+5KPriwYch2bXA==}
+    engines: {node: '>=14.0.0'}
+
   '@hapi/formula@2.0.0':
     resolution: {integrity: sha512-V87P8fv7PI0LH7LiVi8Lkf3x+KCO7pQozXRssAHNXXL9L1K+uyu4XypLXwxqVDKgyQai6qj3/KteNlrqDx4W5A==}
     deprecated: Moved to 'npm install @sideway/formula'
+
+  '@hapi/formula@3.0.2':
+    resolution: {integrity: sha512-hY5YPNXzw1He7s0iqkRQi+uMGh383CGdyyIGYtB+W5N3KHPXoqychklvHhKCC9M3Xtv0OCs/IHw+r4dcHtBYWw==}
+
+  '@hapi/hoek@10.0.1':
+    resolution: {integrity: sha512-CvlW7jmOhWzuqOqiJQ3rQVLMcREh0eel4IBnxDx2FAcK8g7qoJRQK4L1CPBASoCY6y8e6zuCy3f2g+HWdkzcMw==}
+
+  '@hapi/hoek@11.0.7':
+    resolution: {integrity: sha512-HV5undWkKzcB4RZUusqOpcgxOaq6VOAH7zhhIr2g3G8NF/MlFO75SjOr2NfuSx0Mh40+1FqCkagKLJRykUWoFQ==}
 
   '@hapi/hoek@9.3.0':
     resolution: {integrity: sha512-/c6rf4UJlmHlC9b5BaNvzAcFv7HZ2QHaV0D4/HNlBdvFnvQq8RI4kYdhyPCl7Xj+oWvTWQ8ujhqS53LIgAe6KQ==}
@@ -390,8 +412,15 @@ packages:
   '@hapi/pinpoint@2.0.1':
     resolution: {integrity: sha512-EKQmr16tM8s16vTT3cA5L0kZZcTMU5DUOZTuvpnY738m+jyP3JIUj+Mm1xc1rsLkGBQ/gVnfKYPwOmPg1tUR4Q==}
 
+  '@hapi/tlds@1.1.6':
+    resolution: {integrity: sha512-xdi7A/4NZokvV0ewovme3aUO5kQhW9pQ2YD1hRqZGhhSi5rBv4usHYidVocXSi9eihYsznZxLtAiEYYUL6VBGw==}
+    engines: {node: '>=14.0.0'}
+
   '@hapi/topo@5.1.0':
     resolution: {integrity: sha512-foQZKJig7Ob0BMAYBfcJk8d77QtOe7Wo4ox7ff1lQYoNNAb6jwcY1ncdoy2e9wQZzvNy7ODZCYJkK8kzmcAnAg==}
+
+  '@hapi/topo@6.0.2':
+    resolution: {integrity: sha512-KR3rD5inZbGMrHmgPxsJ9dbi6zEK+C3ZwUwTa+eMwWLz7oijWUTWD2pMSNNYJAU6Qq+65NkxXjqHr/7LM2Xkqg==}
 
   '@humanfs/core@0.19.1':
     resolution: {integrity: sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA==}
@@ -505,56 +534,67 @@ packages:
     resolution: {integrity: sha512-EPlb95nUsz6Dd9Qy13fI5kUPXNSljaG9FiJ4YUGU1O/Q77i5DYFW5KR8g1OzTcdZUqQQ1KdDqsTohdFVwCwjqg==}
     cpu: [arm]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-arm-musleabihf@4.53.2':
     resolution: {integrity: sha512-BOmnVW+khAUX+YZvNfa0tGTEMVVEerOxN0pDk2E6N6DsEIa2Ctj48FOMfNDdrwinocKaC7YXUZ1pHlKpnkja/Q==}
     cpu: [arm]
     os: [linux]
+    libc: [musl]
 
   '@rollup/rollup-linux-arm64-gnu@4.53.2':
     resolution: {integrity: sha512-Xt2byDZ+6OVNuREgBXr4+CZDJtrVso5woFtpKdGPhpTPHcNG7D8YXeQzpNbFRxzTVqJf7kvPMCub/pcGUWgBjA==}
     cpu: [arm64]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-arm64-musl@4.53.2':
     resolution: {integrity: sha512-+LdZSldy/I9N8+klim/Y1HsKbJ3BbInHav5qE9Iy77dtHC/pibw1SR/fXlWyAk0ThnpRKoODwnAuSjqxFRDHUQ==}
     cpu: [arm64]
     os: [linux]
+    libc: [musl]
 
   '@rollup/rollup-linux-loong64-gnu@4.53.2':
     resolution: {integrity: sha512-8ms8sjmyc1jWJS6WdNSA23rEfdjWB30LH8Wqj0Cqvv7qSHnvw6kgMMXRdop6hkmGPlyYBdRPkjJnj3KCUHV/uQ==}
     cpu: [loong64]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-ppc64-gnu@4.53.2':
     resolution: {integrity: sha512-3HRQLUQbpBDMmzoxPJYd3W6vrVHOo2cVW8RUo87Xz0JPJcBLBr5kZ1pGcQAhdZgX9VV7NbGNipah1omKKe23/g==}
     cpu: [ppc64]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-riscv64-gnu@4.53.2':
     resolution: {integrity: sha512-fMjKi+ojnmIvhk34gZP94vjogXNNUKMEYs+EDaB/5TG/wUkoeua7p7VCHnE6T2Tx+iaghAqQX8teQzcvrYpaQA==}
     cpu: [riscv64]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-riscv64-musl@4.53.2':
     resolution: {integrity: sha512-XuGFGU+VwUUV5kLvoAdi0Wz5Xbh2SrjIxCtZj6Wq8MDp4bflb/+ThZsVxokM7n0pcbkEr2h5/pzqzDYI7cCgLQ==}
     cpu: [riscv64]
     os: [linux]
+    libc: [musl]
 
   '@rollup/rollup-linux-s390x-gnu@4.53.2':
     resolution: {integrity: sha512-w6yjZF0P+NGzWR3AXWX9zc0DNEGdtvykB03uhonSHMRa+oWA6novflo2WaJr6JZakG2ucsyb+rvhrKac6NIy+w==}
     cpu: [s390x]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-x64-gnu@4.53.2':
     resolution: {integrity: sha512-yo8d6tdfdeBArzC7T/PnHd7OypfI9cbuZzPnzLJIyKYFhAQ8SvlkKtKBMbXDxe1h03Rcr7u++nFS7tqXz87Gtw==}
     cpu: [x64]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-x64-musl@4.53.2':
     resolution: {integrity: sha512-ah59c1YkCxKExPP8O9PwOvs+XRLKwh/mV+3YdKqQ5AMQ0r4M4ZDuOrpWkUaqO7fzAHdINzV9tEVu8vNw48z0lA==}
     cpu: [x64]
     os: [linux]
+    libc: [musl]
 
   '@rollup/rollup-openharmony-arm64@4.53.2':
     resolution: {integrity: sha512-4VEd19Wmhr+Zy7hbUsFZ6YXEiP48hE//KPLCSVNY5RMGX2/7HZ+QkN55a3atM1C/BZCGIgqN+xrVgtdak2S9+A==}
@@ -580,6 +620,16 @@ packages:
     resolution: {integrity: sha512-k+/Rkcyx//P6fetPoLMb8pBeqJBNGx81uuf7iljX9++yNBVRDQgD04L+SVXmXmh5ZP4/WOp4mWF0kmi06PW2tA==}
     cpu: [x64]
     os: [win32]
+
+  '@sideway/address@5.0.0':
+    resolution: {integrity: sha512-IEZ3Gi972M1yubSPhcpzpVTT/Vb46F9L0W+K/GhqvWv6aAvVbNNVsYFekXWEemHHFfTVrxFcURrzsPGPPKkxKQ==}
+    engines: {node: '>=14.0.0'}
+
+  '@sideway/formula@3.0.1':
+    resolution: {integrity: sha512-/poHZJJVjx3L+zVD6g9KgHfYnb443oi7wLu/XKojDviHy6HOEOA6z1Trk5aR1dGcmPenJEgb2sK2I80LeS3MIg==}
+
+  '@standard-schema/spec@1.1.0':
+    resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
   '@types/babel__core@7.20.5':
     resolution: {integrity: sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==}
@@ -1025,6 +1075,10 @@ packages:
   jiti@1.21.7:
     resolution: {integrity: sha512-/imKNG4EbWNrVjoNC/1H5/9GFy+tqjGBHCaSsN+P2RnPqjsLmv6UD3Ej+Kj8nBWaRAwyk7kK5ZUc+OEatnTR3A==}
     hasBin: true
+
+  joi@18.0.2:
+    resolution: {integrity: sha512-RuCOQMIt78LWnktPoeBL0GErkNaJPTBGcYuyaBvUOQSpcpcLfWrHPPihYdOGbV5pam9VTWbeoF7TsGiHugcjGA==}
+    engines: {node: '>= 20'}
 
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
@@ -1779,7 +1833,17 @@ snapshots:
     dependencies:
       '@hapi/hoek': 9.3.0
 
+  '@hapi/address@5.1.1':
+    dependencies:
+      '@hapi/hoek': 11.0.7
+
   '@hapi/formula@2.0.0': {}
+
+  '@hapi/formula@3.0.2': {}
+
+  '@hapi/hoek@10.0.1': {}
+
+  '@hapi/hoek@11.0.7': {}
 
   '@hapi/hoek@9.3.0': {}
 
@@ -1793,9 +1857,15 @@ snapshots:
 
   '@hapi/pinpoint@2.0.1': {}
 
+  '@hapi/tlds@1.1.6': {}
+
   '@hapi/topo@5.1.0':
     dependencies:
       '@hapi/hoek': 9.3.0
+
+  '@hapi/topo@6.0.2':
+    dependencies:
+      '@hapi/hoek': 11.0.7
 
   '@humanfs/core@0.19.1': {}
 
@@ -1935,6 +2005,14 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.53.2':
     optional: true
+
+  '@sideway/address@5.0.0':
+    dependencies:
+      '@hapi/hoek': 10.0.1
+
+  '@sideway/formula@3.0.1': {}
+
+  '@standard-schema/spec@1.1.0': {}
 
   '@types/babel__core@7.20.5':
     dependencies:
@@ -2411,6 +2489,16 @@ snapshots:
       '@pkgjs/parseargs': 0.11.0
 
   jiti@1.21.7: {}
+
+  joi@18.0.2:
+    dependencies:
+      '@hapi/address': 5.1.1
+      '@hapi/formula': 3.0.2
+      '@hapi/hoek': 11.0.7
+      '@hapi/pinpoint': 2.0.1
+      '@hapi/tlds': 1.1.6
+      '@hapi/topo': 6.0.2
+      '@standard-schema/spec': 1.1.0
 
   js-tokens@4.0.0: {}
 
